@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Feedback{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    {% if correct %}
+    <div class="alert alert-success mb-4" role="alert">
+        <h4 class="alert-heading">Correct!</h4>
+        <p>Great job! You got it right.</p>
+    </div>
+    {% else %}
+    <div class="alert alert-danger mb-4" role="alert">
+        <h4 class="alert-heading">Not quite right</h4>
+        <p>Keep practicing, you'll get it next time!</p>
+    </div>
+    {% endif %}
+    
+    <div class="language-card mb-4">
+        <div class="row">
+            <div class="col-md-12">
+                <h3>{{ card.word }}</h3>
+                <p><strong>Translation:</strong> {{ card.translation }}</p>
+                <p><strong>Equivalent:</strong> {{ card.equivalent }}</p>
+                <p class="card-example"><strong>Example:</strong> {{ card.example }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="d-grid gap-2">
+        <a href="{{ url_for('next_card') }}" class="btn btn-primary">Next Card</a>
+    </div>
+</div>
+{% endblock %} 

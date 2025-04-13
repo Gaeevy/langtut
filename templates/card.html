@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Flashcard{% endblock %}
+
+{% block content %}
+<div class="text-center mb-4">
+    <div class="progress-container">
+        <div class="progress" style="height: 10px;">
+            <div class="progress-bar" role="progressbar" style="width: {{ (index / total * 100)|round }}%;" 
+                 aria-valuenow="{{ index }}" aria-valuemin="0" aria-valuemax="{{ total }}"></div>
+        </div>
+        <div class="d-flex justify-content-between mt-1">
+            <small>Card {{ index + 1 }} of {{ total }}</small>
+            <small>{{ (index / total * 100)|round }}% complete</small>
+        </div>
+    </div>
+</div>
+
+<div class="language-card mb-4">
+    <div class="row">
+        <div class="col-md-12 text-center">
+            <p class="card-word">{{ card.translation }}</p>
+            <p class="card-example">{{ card.example }}</p>
+        </div>
+    </div>
+</div>
+
+<form action="{{ url_for('process_answer') }}" method="post">
+    <div class="mb-3">
+        <label for="answer" class="form-label">Your answer:</label>
+        <input type="text" class="form-control" id="answer" name="answer" placeholder="Type your answer here" autocomplete="off" autofocus required>
+    </div>
+    <div class="d-grid gap-2">
+        <button type="submit" class="btn btn-primary">Submit Answer</button>
+    </div>
+</form>
+
+<div class="mt-4 text-center">
+    <p class="text-muted small">Type the word in the target language ({{ card.word }})</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Set focus to the answer input field when the page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('answer').focus();
+    });
+</script>
+{% endblock %} 

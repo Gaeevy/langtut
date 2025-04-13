@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Results{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <h2 class="mb-4">Learning Session Complete!</h2>
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <h4 class="card-title">Your Results</h4>
+            <div class="row mt-4">
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h5 class="card-title">Total Cards</h5>
+                            <p class="display-4">{{ total }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h5 class="card-title">Correct Answers</h5>
+                            <p class="display-4">{{ correct }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h5 class="card-title">Success Rate</h5>
+                            <p class="display-4">{{ percentage }}%</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {% if updated %}
+            <div class="alert alert-success mt-4" role="alert">
+                Your progress has been saved to the spreadsheet.
+            </div>
+            {% else %}
+                {% if is_authenticated %}
+                <div class="alert alert-warning mt-4" role="alert">
+                    There was an issue updating the spreadsheet. Your progress may not have been saved.
+                </div>
+                {% else %}
+                <div class="alert alert-warning mt-4" role="alert">
+                    You're not authenticated with Google Sheets. <a href="{{ url_for('auth') }}" class="alert-link">Sign in</a> to save your progress.
+                </div>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="d-grid gap-2">
+        <a href="{{ url_for('index') }}" class="btn btn-primary">Start Again</a>
+    </div>
+</div>
+{% endblock %} 

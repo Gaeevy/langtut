@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <h2 class="mb-4">Welcome to Language Learning</h2>
+    <p class="mb-4">Practice your vocabulary with flashcards. Click Start to begin.</p>
+    
+    <form action="{{ url_for('start_learning') }}" method="post">
+        <button type="submit" class="btn btn-primary btn-lg">Start Learning</button>
+    </form>
+
+    <div class="mt-4 auth-status">
+        {% if is_authenticated %}
+            <div class="alert alert-success">
+                <p>You are authenticated with Google Sheets. Your progress will be saved.</p>
+                <a href="{{ url_for('clear_credentials') }}" class="btn btn-outline-secondary btn-sm mt-2">Log Out</a>
+            </div>
+        {% else %}
+            <div class="alert alert-warning">
+                <p>You are not authenticated with Google Sheets. Your progress won't be saved.</p>
+                <a href="{{ url_for('auth') }}" class="btn btn-outline-primary btn-sm mt-2">Log In with Google</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 
