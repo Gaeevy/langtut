@@ -21,6 +21,12 @@
         <div class="col-md-12 text-center">
             <p class="card-word">{{ card.translation }}</p>
             <p class="card-example">{{ card.example }}</p>
+            {% if card.example_translation %}
+            <p class="card-example-translation text-muted small">{{ card.example_translation }}</p>
+            {% endif %}
+            <p class="card-level small">
+                <span class="badge bg-info">Level {{ card.level }}</span>
+            </p>
         </div>
     </div>
 </div>

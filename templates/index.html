@@ -5,11 +5,32 @@
 {% block content %}
 <div class="text-center">
     <h2 class="mb-4">Welcome to Language Learning</h2>
-    <p class="mb-4">Practice your vocabulary with flashcards. Click Start to begin.</p>
+    <p class="mb-4">Select a vocabulary set (tab) to practice:</p>
     
-    <form action="{{ url_for('start_learning') }}" method="post">
-        <button type="submit" class="btn btn-primary btn-lg">Start Learning</button>
-    </form>
+    <div class="row row-cols-1 row-cols-md-2 g-4 mb-4">
+        {% for tab in tabs %}
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">{{ tab.name }}</h5>
+                    <p class="card-text">
+                        <span class="badge bg-primary">{{ tab.card_count }} words</span>
+                        <span class="badge bg-info">Avg. Level: {{ tab.average_level }}</span>
+                    </p>
+                    <form action="{{ url_for('start_learning', tab_name=tab.name) }}" method="post">
+                        <button type="submit" class="btn btn-primary">Practice {{ tab.name }}</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-12">
+            <div class="alert alert-warning">
+                No vocabulary sets found. Please check your Google Sheet.
+            </div>
+        </div>
+        {% endfor %}
+    </div>
 
     <div class="mt-4 auth-status">
         {% if is_authenticated %}

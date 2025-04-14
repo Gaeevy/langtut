@@ -14,6 +14,13 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 import pathlib
+import sys
+
+# Set default encoding to UTF-8
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8')
 
 app = Flask(__name__)
 # Disable CORS for local development
@@ -28,12 +35,15 @@ app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
+# Set default encoding for Flask
+app.config['JSON_AS_ASCII'] = False
+app.config['JSONIFY_MIMETYPE'] = 'application/json; charset=utf-8'
+
 # Initialize Flask-Session
 Session(app)
 
 # Google Sheets API settings
 SPREADSHEET_ID = '15_PsHfMb440wtUgZ0d1aJmu5YIXoo9JKytlJINxOV8Q'
-SHEET_NAME = 'Sheet1'  # Adjust this to your sheet's name
 
 # Google OAuth2 settings
 CLIENT_SECRETS_FILE = 'client_secret.json'
@@ -58,9 +68,26 @@ class Card(BaseModel):
     translation: str
     equivalent: str
     example: str
+    example_translation: str
     cnt_shown: int = 0
     cnt_corr_answers: int = 0
+    level: int = 0
     last_shown: Optional[str] = None
+
+# Pydantic model for tabs
+class Tab(BaseModel):
+    name: str
+    cards: List[Card] = []
+    
+    @property
+    def card_count(self) -> int:
+        return len(self.cards)
+    
+    @property
+    def average_level(self) -> float:
+        if not self.cards:
+            return 0.0
+        return round(sum(card.level for card in self.cards) / len(self.cards), 1)
 
 def get_credentials():
     """Get valid credentials from session or through the OAuth flow."""
@@ -88,98 +115,118 @@ def credentials_to_dict(credentials):
         'scopes': credentials.scopes
     }
 
-def get_worksheet():
-    """Connect to Google Sheets using gspread"""
-    # Try to get authenticated access first
+def get_spreadsheet():
+    """Connect to Google Sheets using gspread and return the spreadsheet"""
     creds = get_credentials()
-    if creds:
-        try:
-            # Authenticated access
-            gc = gspread.authorize(creds)
-            sh = gc.open_by_key(SPREADSHEET_ID)
-            worksheet = sh.worksheet(SHEET_NAME)
-            return worksheet, True  # Second value indicates if write is possible
-        except Exception as e:
-            print(f"Error accessing spreadsheet with auth: {e}")
     
-    # Fall back to read-only access for public sheets
     try:
-        # For an MVP, we'll use a simpler approach with direct HTTP requests
-        # This works for public sheets that are published to the web
-        # Get the published CSV version of the sheet
-        sheet_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv"
-        response = requests.get(sheet_url)
-        
-        if response.status_code == 200:
-            # We got the CSV data, but we need to parse it and return a mock worksheet
-            csv_data = StringIO(response.text)
-            reader = csv.reader(csv_data)
-            rows = list(reader)
-            
-            # Create a simple mock worksheet object that has get_all_values method
-            class MockWorksheet:
-                def get_all_values(self):
-                    return rows
-                
-                def batch_update(self, updates):
-                    # Cannot update without authentication
-                    print("Warning: Can't update sheet without authentication")
-                    return False
-            
-            return MockWorksheet(), False  # Second value indicates if write is not possible
-        else:
-            print(f"Error fetching spreadsheet: {response.status_code}")
-            return None, False
+        # Authenticated access
+        gc = gspread.authorize(creds)
+        spreadsheet = gc.open_by_key(SPREADSHEET_ID)
+        return spreadsheet, True  # Second value indicates if write is possible
     except Exception as e:
-        print(f"Error accessing spreadsheet: {e}")
+        print(f"Error accessing spreadsheet with auth using creds {creds}: {e}")
         return None, False
 
-def read_spreadsheet():
-    """Read data from Google Sheets"""
-    worksheet, _ = get_worksheet()
-    if not worksheet:
-        return []
+def get_worksheet(sheet_name):
+    """Get a specific worksheet by name"""
+    spreadsheet, can_write = get_spreadsheet()
+    if not spreadsheet:
+        return None, False
     
-    # Get all values from the worksheet
-    values = worksheet.get_all_values()
-    
-    if not values:
-        return []
-    
-    # Skip the header row
-    data_rows = values[1:]
-    cards = []
-    
-    for row in data_rows:
-        if not row or len(row) < 5 or not row[0]:  # Skip empty rows
-            continue
-        
-        # Pad the row if it doesn't have enough columns
-        padded_row = row + ['0'] * (8 - len(row)) if len(row) < 8 else row
-        
-        try:
-            card = Card(
-                id=int(padded_row[0]),
-                word=padded_row[1],
-                translation=padded_row[2] if len(padded_row) > 2 else "",
-                equivalent=padded_row[3] if len(padded_row) > 3 else "",
-                example=padded_row[4] if len(padded_row) > 4 else "",
-                cnt_shown=int(padded_row[5]) if len(padded_row) > 5 and padded_row[5] else 0,
-                cnt_corr_answers=int(padded_row[6]) if len(padded_row) > 6 and padded_row[6] else 0,
-                last_shown=padded_row[7] if len(padded_row) > 7 and padded_row[7] else None
-            )
-            cards.append(card)
-        except Exception as e:
-            print(f"Error processing row {row}: {e}")
-            continue
-    
-    return cards
+    try:
+        worksheet = spreadsheet.worksheet(sheet_name)
+        return worksheet, can_write
+    except Exception as e:
+        print(f"Error accessing worksheet {sheet_name}: {e}")
+        return None, False
 
-def update_spreadsheet(cards):
-    """Update data in Google Sheets in bulk"""
-    worksheet, can_write = get_worksheet()
+def get_all_tabs():
+    """Get all tabs (worksheets) from the spreadsheet"""
+    spreadsheet, _ = get_spreadsheet()
+    if not spreadsheet:
+        return []
+    
+    try:
+        # Get all worksheets
+        worksheets = spreadsheet.worksheets()
+        tabs = []
+        
+        for worksheet in worksheets:
+            tab_name = worksheet.title
+            # Read cards for each tab
+            cards = read_worksheet_data(worksheet)
+            
+            # Create Tab object
+            tab = Tab(name=tab_name, cards=cards)
+            tabs.append(tab)
+        
+        return tabs
+    except Exception as e:
+        print(f"Error getting all tabs: {e}")
+        return []
+
+def read_worksheet_data(worksheet):
+    """Read data from a specific worksheet"""
+    try:
+        # Get all values from the worksheet
+        values = worksheet.get_all_values()
+        
+        if not values:
+            return []
+        
+        # Skip the header row
+        data_rows = values[1:]
+        cards = []
+        
+        for row in data_rows:
+            if not row or len(row) < 5 or not row[0]:  # Skip empty rows
+                continue
+            
+            # Pad the row if it doesn't have enough columns
+            padded_row = row + [''] * (10 - len(row)) if len(row) < 10 else row
+            
+            try:
+                card = Card(
+                    id=int(padded_row[0]),
+                    word=padded_row[1],  # Keep original encoding
+                    translation=padded_row[2] if len(padded_row) > 2 else "",
+                    equivalent=padded_row[3] if len(padded_row) > 3 else "",
+                    example=padded_row[4] if len(padded_row) > 4 else "",
+                    example_translation=padded_row[5] if len(padded_row) > 5 else "",
+                    cnt_shown=int(padded_row[6]) if len(padded_row) > 6 and padded_row[6] else 0,
+                    cnt_corr_answers=int(padded_row[7]) if len(padded_row) > 7 and padded_row[7] else 0,
+                    level=int(padded_row[8]) if len(padded_row) > 8 and padded_row[8] else 0,
+                    last_shown=padded_row[9] if len(padded_row) > 9 and padded_row[9] else None
+                )
+                cards.append(card)
+            except Exception as e:
+                print(f"Error processing row {row}: {e}")
+                continue
+        
+        return cards
+    except Exception as e:
+        print(f"Error reading worksheet data: {e}")
+        return []
+
+def read_spreadsheet(sheet_name=None):
+    """Read data from Google Sheets, either from a specific sheet or all sheets"""
+    if sheet_name:
+        # Read specific sheet
+        worksheet, _ = get_worksheet(sheet_name)
+        if not worksheet:
+            return []
+        
+        return read_worksheet_data(worksheet)
+    else:
+        # Read all sheets
+        return get_all_tabs()
+
+def update_spreadsheet(sheet_name, cards):
+    """Update data in Google Sheets in bulk for a specific sheet"""
+    worksheet, can_write = get_worksheet(sheet_name)
     if not worksheet:
-        raise Exception("Could not access spreadsheet")
+        raise Exception(f"Could not access worksheet {sheet_name}")
     
     if not can_write:
         raise Exception("Authentication required to update spreadsheet")
@@ -187,14 +234,17 @@ def update_spreadsheet(cards):
     # Prepare the data for update
     values = []
     for card in cards:
+        # Keep original encoding for string values
         values.append([
             card.id,
             card.word,
             card.translation,
             card.equivalent,
             card.example,
+            card.example_translation,
             card.cnt_shown,
             card.cnt_corr_answers,
+            card.level,
             card.last_shown
         ])
     
@@ -227,7 +277,26 @@ def index():
     is_authenticated = 'credentials' in session
     print(f"Authentication status: {is_authenticated}")
     
-    return render_template('index.html', is_authenticated=is_authenticated)
+    # Get tabs
+    tabs = read_spreadsheet()
+    
+    return render_template('index.html', is_authenticated=is_authenticated, tabs=tabs)
+
+@app.route('/start/<tab_name>', methods=['POST'])
+def start_learning(tab_name):
+    # Read cards from the specified tab
+    cards = read_spreadsheet(sheet_name=tab_name)
+    if not cards:
+        return render_template('error.html', message=f'No cards found in the tab {tab_name}')
+    
+    # Store cards in session (converted to dict for JSON serialization)
+    session['cards'] = [card.model_dump() for card in cards]
+    session['current_index'] = 0
+    session['answers'] = []
+    session['active_tab'] = tab_name
+    
+    # Redirect to the first card
+    return redirect(url_for('show_card'))
 
 @app.route('/auth')
 def auth():
@@ -332,21 +401,6 @@ def clear_credentials():
         del session['credentials']
     return redirect(url_for('index'))
 
-@app.route('/start', methods=['POST'])
-def start_learning():
-    # Read cards from spreadsheet
-    cards = read_spreadsheet()
-    if not cards:
-        return render_template('error.html', message='No cards found in the spreadsheet')
-    
-    # Store cards in session (converted to dict for JSON serialization)
-    session['cards'] = [card.model_dump() for card in cards]
-    session['current_index'] = 0
-    session['answers'] = []
-    
-    # Redirect to the first card
-    return redirect(url_for('show_card'))
-
 @app.route('/card')
 def show_card():
     if 'cards' not in session or 'current_index' not in session:
@@ -384,6 +438,7 @@ def process_answer():
     current_card['cnt_shown'] += 1
     if correct:
         current_card['cnt_corr_answers'] += 1
+        current_card['level'] += 1  # Increase level for correct answer
     current_card['last_shown'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     # Store updated card back to session
@@ -423,7 +478,7 @@ def next_card():
 
 @app.route('/results')
 def show_results():
-    if 'cards' not in session or 'answers' not in session:
+    if 'cards' not in session or 'answers' not in session or 'active_tab' not in session:
         return redirect(url_for('index'))
     
     # Convert session data back to Card objects
@@ -436,7 +491,7 @@ def show_results():
     updated = False
     if is_authenticated:
         try:
-            update_result = update_spreadsheet(cards)
+            update_result = update_spreadsheet(session['active_tab'], cards)
             updated = True
         except Exception as e:
             print(f"Error updating spreadsheet: {e}")
@@ -446,17 +501,22 @@ def show_results():
     total = len(answers)
     correct = sum(1 for a in answers if a['correct'])
     
+    # Get active tab name for display
+    active_tab = session.get('active_tab', '')
+    
     # Clear session data
     session.pop('cards', None)
     session.pop('current_index', None)
     session.pop('answers', None)
+    session.pop('active_tab', None)
     
     return render_template('results.html', 
                           total=total, 
                           correct=correct, 
                           percentage=round(correct/total*100) if total else 0,
                           updated=updated,
-                          is_authenticated=is_authenticated)
+                          is_authenticated=is_authenticated,
+                          tab_name=active_tab)
 
 @app.route('/test')
 def test():

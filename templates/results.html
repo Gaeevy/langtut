@@ -6,6 +6,12 @@
 <div class="text-center">
     <h2 class="mb-4">Learning Session Complete!</h2>
     
+    {% if tab_name %}
+    <div class="alert alert-info mb-4">
+        <p class="mb-0">Tab: <strong>{{ tab_name }}</strong></p>
+    </div>
+    {% endif %}
+    
     <div class="card mb-4">
         <div class="card-body">
             <h4 class="card-title">Your Results</h4>

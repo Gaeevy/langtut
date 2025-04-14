@@ -23,6 +23,12 @@
                 <p><strong>Translation:</strong> {{ card.translation }}</p>
                 <p><strong>Equivalent:</strong> {{ card.equivalent }}</p>
                 <p class="card-example"><strong>Example:</strong> {{ card.example }}</p>
+                {% if card.example_translation %}
+                <p class="card-example-translation"><strong>Example Translation:</strong> {{ card.example_translation }}</p>
+                {% endif %}
+                <p class="card-level">
+                    <span class="badge bg-info">Level {{ card.level }}</span>
+                </p>
             </div>
         </div>
     </div>
