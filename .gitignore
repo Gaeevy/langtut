@@ -1,5 +1,5 @@
 # Flask session files
-*.session
+flask_session/
 
 # Python bytecode
 __pycache__/
