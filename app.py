@@ -15,6 +15,7 @@ from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 import pathlib
 import sys
+import random
 
 # Set default encoding to UTF-8
 if sys.stdout.encoding != 'utf-8':
@@ -26,6 +27,9 @@ app = Flask(__name__)
 # Disable CORS for local development
 # CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 app.secret_key = os.urandom(24)  # For session management
+
+# Application settings
+MAX_CARDS_PER_SESSION = 2  # Maximum number of cards per learning session
 
 # Add session configuration for better cookie handling
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -224,6 +228,25 @@ def read_spreadsheet(sheet_name=None):
 
 def update_spreadsheet(sheet_name, cards):
     """Update data in Google Sheets in bulk for a specific sheet"""
+    # First, we need to get all cards from the sheet
+    all_cards = read_spreadsheet(sheet_name=sheet_name)
+    if not all_cards:
+        raise Exception(f"Could not read worksheet {sheet_name}")
+    
+    # Create a map of card IDs to their updated versions
+    card_updates = {card.id: card for card in cards}
+    
+    # Update the all_cards list with the modified cards
+    for i, card in enumerate(all_cards):
+        if card.id in card_updates:
+            # Only update the dynamic fields (statistics)
+            updated_card = card_updates[card.id]
+            all_cards[i].cnt_shown = updated_card.cnt_shown
+            all_cards[i].cnt_corr_answers = updated_card.cnt_corr_answers
+            all_cards[i].level = updated_card.level
+            all_cards[i].last_shown = updated_card.last_shown
+    
+    # Now proceed with updating only the dynamic columns of the sheet
     worksheet, can_write = get_worksheet(sheet_name)
     if not worksheet:
         raise Exception(f"Could not access worksheet {sheet_name}")
@@ -231,37 +254,28 @@ def update_spreadsheet(sheet_name, cards):
     if not can_write:
         raise Exception("Authentication required to update spreadsheet")
     
-    # Prepare the data for update
-    values = []
-    for card in cards:
-        # Keep original encoding for string values
-        values.append([
-            card.id,
-            card.word,
-            card.translation,
-            card.equivalent,
-            card.example,
-            card.example_translation,
-            card.cnt_shown,
-            card.cnt_corr_answers,
-            card.level,
-            card.last_shown
-        ])
+    # Prepare the updates for only the dynamic columns
+    # Column indices: cnt_shown=6, cnt_corr_answers=7, level=8, last_shown=9
+    dynamic_columns = [6, 7, 8, 9]  # 0-based indices for the dynamic columns
     
-    # Update the spreadsheet (starting from row 2 to skip header)
-    # For gspread, we need to update the cells with batch update
+    # Create cell updates only for the dynamic columns
     cell_updates = []
-    for i, row in enumerate(values):
-        for j, value in enumerate(row):
+    for i, card in enumerate(all_cards):
+        # Only create updates for the dynamic columns (statistics)
+        values = [card.cnt_shown, card.cnt_corr_answers, card.level, card.last_shown]
+        
+        for col_idx, value in zip(dynamic_columns, values):
             cell_updates.append({
-                'range': f'{chr(65+j)}{i+2}',  # e.g., A2, B2, etc.
+                'range': f'{chr(65+col_idx)}{i+2}',  # e.g., G2, H2, I2, J2
                 'values': [[value]]
             })
     
-    # Execute the batch update
-    result = worksheet.batch_update(cell_updates)
+    # Execute the batch update if there are changes
+    if cell_updates:
+        result = worksheet.batch_update(cell_updates)
+        return result
     
-    return result
+    return "No updates to make"
 
 @app.route('/')
 def index():
@@ -289,11 +303,20 @@ def start_learning(tab_name):
     if not cards:
         return render_template('error.html', message=f'No cards found in the tab {tab_name}')
     
+    # Limit cards to MAX_CARDS_PER_SESSION
+    if len(cards) > MAX_CARDS_PER_SESSION:
+        # Shuffle and select random cards
+        random.shuffle(cards)
+        cards = cards[:MAX_CARDS_PER_SESSION]
+    
     # Store cards in session (converted to dict for JSON serialization)
     session['cards'] = [card.model_dump() for card in cards]
     session['current_index'] = 0
     session['answers'] = []
+    session['incorrect_cards'] = []  # Track indices of incorrectly answered cards
+    session['reviewing_incorrect'] = False  # Flag to indicate if we're reviewing incorrect cards
     session['active_tab'] = tab_name
+    session['original_card_count'] = len(cards)  # Store total card count for reference
     
     # Redirect to the first card
     return redirect(url_for('show_card'))
@@ -408,13 +431,39 @@ def show_card():
     
     cards = session['cards']
     index = session['current_index']
+    reviewing = session.get('reviewing_incorrect', False)
     
-    if index >= len(cards):
-        # All cards have been shown, go to results
+    # Check if we've gone through all the initial cards
+    if index >= len(cards) and not reviewing:
+        # If we have incorrect cards, start reviewing them
+        if session.get('incorrect_cards', []):
+            session['reviewing_incorrect'] = True
+            session['current_index'] = 0
+            return redirect(url_for('show_card'))
+        else:
+            # All cards correct, go to results
+            return redirect(url_for('show_results'))
+    
+    # If we're reviewing and reached the end of incorrect cards, go to results
+    if reviewing and index >= len(session['incorrect_cards']):
         return redirect(url_for('show_results'))
     
-    current_card = cards[index]
-    return render_template('card.html', card=current_card, index=index, total=len(cards))
+    # Get the current card (either from original list or from incorrect cards)
+    if reviewing:
+        # Get the incorrect card index from the stored list
+        incorrect_idx = session['incorrect_cards'][index]
+        current_card = cards[incorrect_idx]
+        # Add a flag to indicate this is a review card
+        current_card['is_review'] = True
+    else:
+        current_card = cards[index]
+        current_card['is_review'] = False
+    
+    return render_template('card.html', 
+                          card=current_card, 
+                          index=index, 
+                          total=len(session['incorrect_cards']) if reviewing else len(cards),
+                          reviewing=reviewing)
 
 @app.route('/answer', methods=['POST'])
 def process_answer():
@@ -424,10 +473,19 @@ def process_answer():
     # Get user's answer
     user_answer = request.form.get('answer', '').strip().lower()
     
+    # Check if we're in review mode
+    reviewing = session.get('reviewing_incorrect', False)
+    
     # Get current card
     cards = session['cards']
     index = session['current_index']
-    current_card = cards[index]
+    
+    if reviewing:
+        # Get the original index of the card being reviewed
+        original_index = session['incorrect_cards'][index]
+        current_card = cards[original_index]
+    else:
+        current_card = cards[index]
     
     # Check if answer is correct (simple exact match for MVP)
     correct = user_answer == current_card['word'].lower() or \
@@ -436,20 +494,36 @@ def process_answer():
     
     # Update card stats
     current_card['cnt_shown'] += 1
+    
     if correct:
         current_card['cnt_corr_answers'] += 1
-        current_card['level'] += 1  # Increase level for correct answer
+        # Only increase level on first attempt correct answers
+        if not reviewing:
+            current_card['level'] += 1  # Increase level for correct answer
+    else:
+        # For incorrect answers, track the card for review if this is the first attempt
+        if not reviewing:
+            session['incorrect_cards'].append(index)
+        else:
+            # If this is a review and still incorrect, decrease the level
+            current_card['level'] = max(0, current_card['level'] - 1)
+    
     current_card['last_shown'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     # Store updated card back to session
-    cards[index] = current_card
+    if reviewing:
+        cards[original_index] = current_card
+    else:
+        cards[index] = current_card
+    
     session['cards'] = cards
     
     # Record the answer
     session['answers'] = session.get('answers', []) + [{
         'card_id': current_card['id'],
         'correct': correct,
-        'user_answer': user_answer
+        'user_answer': user_answer,
+        'is_review': reviewing
     }]
     
     # Move to next card
@@ -465,12 +539,54 @@ def show_feedback(correct):
     # Get the previous card (now at current_index - 1)
     index = session['current_index'] - 1
     cards = session['cards']
+    reviewing = session.get('reviewing_incorrect', False)
     
-    if index < 0 or index >= len(cards):
+    if reviewing:
+        if index < 0 or index >= len(session['incorrect_cards']):
+            return redirect(url_for('show_card'))
+        
+        # Get the original index of the card
+        original_index = session['incorrect_cards'][index]
+        card = cards[original_index]
+    else:
+        if index < 0 or index >= len(cards):
+            return redirect(url_for('show_card'))
+        
+        card = cards[index]
+    
+    return render_template('feedback.html', 
+                          card=card, 
+                          correct=(correct == 'true'),
+                          card_index=original_index if reviewing else index,
+                          reviewing=reviewing)
+
+@app.route('/rate-difficulty/<int:card_index>/<difficulty>')
+def rate_difficulty(card_index, difficulty):
+    """Rate a card as easy or difficult after answering correctly"""
+    if 'cards' not in session:
+        return redirect(url_for('index'))
+    
+    cards = session['cards']
+    
+    if card_index < 0 or card_index >= len(cards):
         return redirect(url_for('show_card'))
     
-    card = cards[index]
-    return render_template('feedback.html', card=card, correct=(correct == 'true'))
+    # Update the card's level based on difficulty rating
+    card = cards[card_index]
+    
+    if difficulty == 'easy':
+        # Increase level if rated easy
+        card['level'] += 1
+    elif difficulty == 'difficult':
+        # Decrease level if rated difficult (but not below 0)
+        card['level'] = max(0, card['level'] - 1)
+    
+    # Save the updated card back to session
+    cards[card_index] = card
+    session['cards'] = cards
+    
+    # Continue to the next card
+    return redirect(url_for('next_card'))
 
 @app.route('/next')
 def next_card():
@@ -482,7 +598,23 @@ def show_results():
         return redirect(url_for('index'))
     
     # Convert session data back to Card objects
-    cards = [Card(**card_data) for card_data in session['cards']]
+    cards = session['cards']
+    reviewing = session.get('reviewing_incorrect', False)
+    
+    # If we're in review mode, make sure we get all the cards (original and reviewed)
+    if reviewing:
+        # Only include cards that have been seen in either mode
+        seen_card_indices = set()
+        
+        # Add all cards from the first round
+        for i in range(len(cards)):
+            seen_card_indices.add(i)
+        
+        # Convert to Card objects
+        card_objects = [Card(**cards[i]) for i in seen_card_indices]
+    else:
+        # Not in review mode, convert all cards
+        card_objects = [Card(**card_data) for card_data in cards]
     
     # Check if authenticated
     is_authenticated = 'credentials' in session
@@ -491,7 +623,7 @@ def show_results():
     updated = False
     if is_authenticated:
         try:
-            update_result = update_spreadsheet(session['active_tab'], cards)
+            update_result = update_spreadsheet(session['active_tab'], card_objects)
             updated = True
         except Exception as e:
             print(f"Error updating spreadsheet: {e}")
@@ -501,6 +633,10 @@ def show_results():
     total = len(answers)
     correct = sum(1 for a in answers if a['correct'])
     
+    # Count how many cards were reviewed
+    first_attempt_answers = [a for a in answers if not a.get('is_review', False)]
+    review_answers = [a for a in answers if a.get('is_review', False)]
+    
     # Get active tab name for display
     active_tab = session.get('active_tab', '')
     
@@ -509,6 +645,9 @@ def show_results():
     session.pop('current_index', None)
     session.pop('answers', None)
     session.pop('active_tab', None)
+    session.pop('original_card_count', None)
+    session.pop('incorrect_cards', None)
+    session.pop('reviewing_incorrect', None)
     
     return render_template('results.html', 
                           total=total, 
@@ -516,12 +655,91 @@ def show_results():
                           percentage=round(correct/total*100) if total else 0,
                           updated=updated,
                           is_authenticated=is_authenticated,
-                          tab_name=active_tab)
+                          tab_name=active_tab,
+                          ended_early=False,
+                          cards_remaining=0,
+                          first_attempt_count=len(first_attempt_answers),
+                          review_count=len(review_answers))
 
 @app.route('/test')
 def test():
     """Simple test route to verify server is working."""
     return "Server is working correctly! You can go back to the <a href='/'>homepage</a>."
+
+@app.route('/end-session')
+def end_session_early():
+    """End the learning session early but save progress"""
+    if 'cards' not in session or 'active_tab' not in session:
+        return redirect(url_for('index'))
+    
+    # Get current progress
+    cards = session['cards']
+    current_index = session.get('current_index', 0)
+    reviewing = session.get('reviewing_incorrect', False)
+    
+    # Convert session data back to Card objects
+    if reviewing:
+        # Only include cards that have been seen in either mode
+        seen_card_indices = set()
+        
+        # Add cards seen in the first round
+        for i in range(min(current_index, len(cards))):
+            seen_card_indices.add(i)
+        
+        # Add cards seen in review mode
+        for i in range(min(current_index, len(session.get('incorrect_cards', [])))):
+            original_idx = session['incorrect_cards'][i]
+            seen_card_indices.add(original_idx)
+        
+        seen_cards = [Card(**cards[i]) for i in seen_card_indices]
+    else:
+        # Not in review mode, just get the cards we've seen
+        seen_cards = [Card(**card_data) for card_data in cards[:current_index]]
+    
+    # Check if authenticated
+    is_authenticated = 'credentials' in session
+    
+    # Update the spreadsheet if authenticated
+    updated = False
+    if is_authenticated and seen_cards:
+        try:
+            update_result = update_spreadsheet(session['active_tab'], seen_cards)
+            updated = True
+        except Exception as e:
+            print(f"Error updating spreadsheet: {e}")
+    
+    # Get statistics for cards seen so far
+    answers = session.get('answers', [])
+    total = len(answers)
+    correct = sum(1 for a in answers if a['correct'])
+    
+    # Get active tab name for display
+    active_tab = session.get('active_tab', '')
+    
+    # Calculate remaining cards
+    if reviewing:
+        remaining = len(session.get('incorrect_cards', [])) - current_index
+    else:
+        remaining = len(cards) - current_index
+    
+    # Clear session data
+    session.pop('cards', None)
+    session.pop('current_index', None)
+    session.pop('answers', None)
+    session.pop('active_tab', None)
+    session.pop('original_card_count', None)
+    session.pop('incorrect_cards', None)
+    session.pop('reviewing_incorrect', None)
+    
+    return render_template('results.html', 
+                          total=total, 
+                          correct=correct, 
+                          percentage=round(correct/total*100) if total else 0,
+                          updated=updated,
+                          is_authenticated=is_authenticated,
+                          tab_name=active_tab,
+                          ended_early=True,
+                          cards_remaining=remaining)
 
 if __name__ == '__main__':
     # Check if the client secrets file exists
