@@ -7,12 +7,12 @@ from datetime import datetime
 
 from src import app
 from src.auth import get_credentials, credentials_to_dict
-from src.gsheet import read_spreadsheet, update_spreadsheet
+from src.gsheet import read_card_set, update_spreadsheet, read_all_card_sets
 from src.models import Card, NEVER_SHOWN
 from src.utils import load_redirect_uris, get_timestamp, format_timestamp, parse_timestamp
 from src.config import (
-    MAX_CARDS_PER_SESSION, CLIENT_SECRETS_FILE, SCOPES, 
-    API_SERVICE_NAME, API_VERSION
+    CLIENT_SECRETS_FILE, SCOPES,
+    API_SERVICE_NAME, API_VERSION, MAX_CARDS_PER_SESSION
 )
 
 # Load registered redirect URIs from client_secret.json
@@ -43,23 +43,16 @@ def index():
     print(f"Authentication status: {is_authenticated}")
 
     # Get tabs
-    tabs = read_spreadsheet()
+    card_sets = read_all_card_sets()
 
-    return render_template('index.html', is_authenticated=is_authenticated, tabs=tabs)
+    return render_template('index.html', is_authenticated=is_authenticated, tabs=card_sets)
 
 
 @app.route('/start/<tab_name>', methods=['POST'])
 def start_learning(tab_name):
     # Read cards from the specified tab
-    cards = read_spreadsheet(sheet_name=tab_name)
-    if not cards:
-        return render_template('error.html', message=f'No cards found in the tab {tab_name}')
-
-    # Limit cards to MAX_CARDS_PER_SESSION
-    if len(cards) > MAX_CARDS_PER_SESSION:
-        # Shuffle and select random cards
-        random.shuffle(cards)
-        cards = cards[:MAX_CARDS_PER_SESSION]
+    card_set = read_card_set(worksheet_name=tab_name)
+    cards = card_set.get_cards_to_review(limit=MAX_CARDS_PER_SESSION)
 
     # Store cards in session (converted to dict for JSON serialization)
     # We need to format datetime objects to strings for JSON serialization
@@ -263,14 +256,14 @@ def process_answer():
         current_card['cnt_corr_answers'] += 1
         # Only increase level on first attempt correct answers
         if not reviewing:
-            current_card['level'] += 1  # Increase level for correct answer
+            current_card['level'] = current_card['level'].next_level()
     else:
         # For incorrect answers, track the card for review if this is the first attempt
         if not reviewing:
             session['incorrect_cards'].append(index)
         else:
             # If this is a review and still incorrect, decrease the level
-            current_card['level'] = max(0, current_card['level'] - 1)
+            current_card['level'] = current_card['level'].previous_level()
 
     current_card['last_shown'] = format_timestamp(get_timestamp())
 
@@ -342,10 +335,10 @@ def rate_difficulty(card_index, difficulty):
 
     if difficulty == 'easy':
         # Increase level if rated easy
-        card['level'] += 1
+        card['level'] = card['level'].next_level()
     elif difficulty == 'difficult':
         # Decrease level if rated difficult (but not below 0)
-        card['level'] = max(0, card['level'] - 1)
+        card['level'] = card['level'].previous_level()
 
     # Update the last_shown timestamp
     card['last_shown'] = format_timestamp(get_timestamp())

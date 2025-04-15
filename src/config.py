@@ -17,7 +17,7 @@ API_SERVICE_NAME = settings.get("API_SERVICE_NAME", "sheets")
 API_VERSION = settings.get("API_VERSION", "v4")
 
 # Application settings
-MAX_CARDS_PER_SESSION = settings.get("MAX_CARDS_PER_SESSION", 2)  # Maximum number of cards per learning session
+MAX_CARDS_PER_SESSION = settings.get("MAX_CARDS_PER_SESSION", 10)  # Maximum number of cards per learning session
 
 # Flask settings
 SECRET_KEY = settings.get("SECRET_KEY", None)  # Will use random key if not set

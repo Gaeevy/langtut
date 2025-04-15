@@ -4,6 +4,7 @@ Data models for the application.
 This module contains Pydantic models for representing data structures
 in the application, such as language cards and tab collections.
 """
+import random
 from pydantic import BaseModel, computed_field
 from typing import List, Optional
 from enum import Enum
@@ -22,6 +23,14 @@ class Levels(Enum):
     LEVEL_5 = 5
     LEVEL_6 = 6
     LEVEL_7 = 7
+
+    def next_level(self):
+        """Get the next proficiency level."""
+        return Levels(self.value + 1) if self.value < 7 else Levels.LEVEL_7
+
+    def previous_level(self):
+        """Get the previous proficiency level."""
+        return Levels(self.value - 1) if self.value > 0 else Levels.LEVEL_0
 
 
 days_to_review = {
@@ -60,15 +69,13 @@ class Card(BaseModel):
     example_translation: str
     cnt_shown: int = 0
     cnt_corr_answers: int = 0
-    level: int = 0
-    last_shown: Optional[datetime] = NEVER_SHOWN
+    level: Levels = Levels.LEVEL_0
+    last_shown: datetime = NEVER_SHOWN
     
     @computed_field
     def next_review(self) -> datetime:
         """Calculate when this card should be reviewed next based on its level."""
-        level_enum = Levels(self.level) if self.level <= 7 else Levels.LEVEL_7
-        days = days_to_review[level_enum]
-        return self.last_shown + timedelta(days=days)
+        return self.last_shown + timedelta(days=days_to_review[self.level])
     
     @computed_field
     def seconds_to_next_review(self) -> int:
@@ -83,7 +90,7 @@ class Card(BaseModel):
 
 
 # Pydantic model for tabs
-class Tab(BaseModel):
+class CardSet(BaseModel):
     """
     Represents a collection of cards (a tab in the spreadsheet).
     
@@ -104,9 +111,12 @@ class Tab(BaseModel):
         """Calculates the average proficiency level across all cards."""
         if not self.cards:
             return 0.0
-        return round(sum(card.level for card in self.cards) / len(self.cards), 1)
+        return round(sum(card.level.value for card in self.cards) / len(self.cards), 1)
 
-    @property
-    def cards_to_review(self) -> List[Card]:
+    def get_cards_to_review(self, limit: int | None = None) -> List[Card]:
         """Returns the number of cards that are due for review."""
-        return [card for card in self.cards if card.is_delayed]
+        cards_to_review = [card for card in self.cards if card.is_delayed]
+        sorted_cards = sorted(cards_to_review, key=lambda card: card.seconds_to_next_review)
+        cards = sorted_cards[:limit] if limit else sorted_cards
+        random.shuffle(cards)
+        return cards
