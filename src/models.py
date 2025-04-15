@@ -113,6 +113,11 @@ class CardSet(BaseModel):
             return 0.0
         return round(sum(card.level.value for card in self.cards) / len(self.cards), 1)
 
+    @property
+    def cards_to_review(self) -> List[Card]:
+        """Returns the list of cards that are due for review."""
+        return [card for card in self.cards if card.is_delayed]
+
     def get_cards_to_review(self, limit: int | None = None) -> List[Card]:
         """Returns the number of cards that are due for review."""
         cards_to_review = [card for card in self.cards if card.is_delayed]

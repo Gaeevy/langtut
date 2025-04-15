@@ -513,6 +513,10 @@ def end_session_early():
     session.pop('incorrect_cards', None)
     session.pop('reviewing_incorrect', None)
 
+    # Calculate review counts
+    review_count = 0
+    first_attempt_count = total
+
     return render_template('results.html',
                            total=total,
                            correct=correct,
@@ -521,4 +525,6 @@ def end_session_early():
                            is_authenticated=is_authenticated,
                            tab_name=active_tab,
                            ended_early=True,
-                           cards_remaining=remaining)
+                           cards_remaining=remaining,
+                           review_count=review_count,
+                           first_attempt_count=first_attempt_count)
