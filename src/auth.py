@@ -1,0 +1,50 @@
+"""
+Authentication utilities for Google OAuth.
+
+This module provides functions for managing Google OAuth credentials
+and session handling.
+"""
+from flask import session
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+
+
+def get_credentials():
+    """
+    Get valid credentials from session or through the OAuth flow.
+    
+    Returns:
+        Credentials object if available, otherwise None
+    """
+    creds = None
+
+    # Load credentials from session if available
+    if 'credentials' in session:
+        creds = Credentials(**session['credentials'])
+
+    # Check if credentials are expired and refresh if needed
+    if creds and creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        session['credentials'] = credentials_to_dict(creds)
+
+    return creds
+
+
+def credentials_to_dict(credentials):
+    """
+    Convert credentials object to dictionary for session storage.
+    
+    Args:
+        credentials: Google OAuth credentials object
+        
+    Returns:
+        Dictionary representation of credentials suitable for session storage
+    """
+    return {
+        'token': credentials.token,
+        'refresh_token': credentials.refresh_token,
+        'token_uri': credentials.token_uri,
+        'client_id': credentials.client_id,
+        'client_secret': credentials.client_secret,
+        'scopes': credentials.scopes
+    }

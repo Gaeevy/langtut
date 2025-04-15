@@ -95,4 +95,52 @@ This is an MVP (Minimum Viable Product) with the following limitations:
 - Multiple language support
 - Spaced repetition algorithm
 - More sophisticated answer checking
-- Custom card decks for different topics 
+- Custom card decks for different topics
+
+## Project Structure
+
+The project follows a modular structure with key components divided into separate files:
+
+- `app.py` - Main entry point for the application
+- `src/` - Source code directory
+  - `__init__.py` - Initializes the Flask application
+  - `auth.py` - Authentication utilities for Google OAuth
+  - `config.py` - Configuration management using Dynaconf
+  - `gsheet.py` - Google Sheets interaction functions
+  - `models.py` - Data models using Pydantic
+  - `routes.py` - Flask routes and request handlers
+- `settings.toml` - Main configuration file
+- `.secrets.toml` - Secret configuration values (not committed to Git)
+- `templates/` - HTML templates
+- `static/` - Static assets (CSS, JavaScript)
+
+## Configuration
+
+The application uses Dynaconf for configuration management, allowing for:
+
+- Different environments (development, production)
+- Sensitive information separation
+- Environment variable overrides
+
+### Configuration Files
+
+- `settings.toml` - Contains default non-sensitive configuration 
+- `.secrets.toml` - Contains sensitive configuration (not in Git)
+- `.secrets.toml.example` - Template for creating your secrets file
+
+To set up your configuration:
+
+1. Copy `.secrets.toml.example` to `.secrets.toml`
+2. Generate a secret key and update the configuration:
+   ```bash
+   python -c "import os; print(os.urandom(24).hex())"
+   ```
+3. Edit `.secrets.toml` with your sensitive configuration values
+
+### Environment Variables
+
+You can override any configuration value using environment variables with the `LANGTUT_` prefix. For example:
+
+```bash
+export LANGTUT_DEBUG=false
+``` 

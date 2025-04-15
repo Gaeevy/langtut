@@ -16,6 +16,9 @@
                     <p class="card-text">
                         <span class="badge bg-primary">{{ tab.card_count }} words</span>
                         <span class="badge bg-info">Avg. Level: {{ tab.average_level }}</span>
+                        {% if tab.cards_to_review %}
+                        <span class="badge bg-warning">{{ tab.cards_to_review|length }} cards to review</span>
+                        {% endif %}
                     </p>
                     <form action="{{ url_for('start_learning', tab_name=tab.name) }}" method="post">
                         <button type="submit" class="btn btn-primary">Practice {{ tab.name }}</button>
