@@ -50,7 +50,7 @@
                 <p class="card-example-translation"><strong>Example Translation:</strong> {{ card.example_translation }}</p>
                 {% endif %}
                 <p class="card-level">
-                    <span class="badge bg-info">Level {{ card.level }}</span>
+                    <span class="badge bg-info">Level {{ card.level.value }}</span>
                     {% if reviewing %}
                     <span class="badge bg-warning">Review</span>
                     {% endif %}

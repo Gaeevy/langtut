@@ -26,12 +26,12 @@
     <div class="row">
         <div class="col-md-12 text-center">
             <p class="card-word">{{ card.translation }}</p>
-            <p class="card-example">{{ card.example }}</p>
             {% if card.example_translation %}
+            <p><strong>Equivalent:</strong> {{ card.equivalent }}</p>
             <p class="card-example-translation text-muted small">{{ card.example_translation }}</p>
             {% endif %}
             <p class="card-level small">
-                <span class="badge bg-info">Level {{ card.level }}</span>
+                <span class="badge bg-info">Level {{ card.level.value }}</span>
                 {% if card.is_review %}
                 <span class="badge bg-warning">Review</span>
                 {% endif %}
@@ -51,7 +51,7 @@
 </form>
 
 <div class="mt-4 text-center">
-    <p class="text-muted small">Type the word in the target language ({{ card.word }})</p>
+    <p class="text-muted small">Type the word in the target language</p>
     
     <div class="mt-3">
         <a href="{{ url_for('end_session_early') }}" class="btn btn-outline-secondary btn-sm" 
