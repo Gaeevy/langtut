@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 NEVER_SHOWN = datetime(1970, 1, 1)  # Unix epoch start date
 
 
-class Levels(Enum):
+class Levels(int, Enum):
     LEVEL_0 = 0
     LEVEL_1 = 1
     LEVEL_2 = 2
@@ -116,7 +116,7 @@ class CardSet(BaseModel):
     @property
     def cards_to_review(self) -> List[Card]:
         """Returns the list of cards that are due for review."""
-        return [card for card in self.cards if card.is_delayed]
+        return [card for card in self.cards if card.is_delayed and card.cnt_shown > 0]
 
     def get_cards_to_review(self, limit: int | None = None) -> List[Card]:
         """Returns the number of cards that are due for review."""
