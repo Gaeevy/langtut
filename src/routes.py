@@ -52,7 +52,7 @@ def index():
 def start_learning(tab_name):
     # Read cards from the specified tab
     card_set = read_card_set(worksheet_name=tab_name)
-    cards = card_set.get_cards_to_review(limit=MAX_CARDS_PER_SESSION)
+    cards = card_set.get_cards_to_review(limit=MAX_CARDS_PER_SESSION, ignore_unshown=False)
 
     # Store cards in session (converted to dict for JSON serialization)
     # We need to format datetime objects to strings for JSON serialization
