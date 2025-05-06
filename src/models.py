@@ -35,13 +35,13 @@ class Levels(int, Enum):
 
 days_to_review = {
     Levels.LEVEL_0: 0,
-    Levels.LEVEL_1: 3,
-    Levels.LEVEL_2: 7,
-    Levels.LEVEL_3: 14,
-    Levels.LEVEL_4: 30,
-    Levels.LEVEL_5: 60,
-    Levels.LEVEL_6: 90,
-    Levels.LEVEL_7: 120,
+    Levels.LEVEL_1: 2,
+    Levels.LEVEL_2: 5,
+    Levels.LEVEL_3: 9,
+    Levels.LEVEL_4: 15,
+    Levels.LEVEL_5: 25,
+    Levels.LEVEL_6: 40,
+    Levels.LEVEL_7: 60,
 }
 
 

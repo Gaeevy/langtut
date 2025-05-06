@@ -1,6 +1,9 @@
 # Flask session files
 flask_session/
 
+# static_files
+static_files/
+
 # Python bytecode
 __pycache__/
 *.py[cod]
