@@ -15,12 +15,7 @@ app = create_app()
 # Initialize database
 init_database(app)
 
-# Ensure database tables are created (especially important for Railway)
-if os.getenv('RAILWAY_ENVIRONMENT'):
-    with app.app_context():
-        from src.database import ensure_database_initialized
-        print("Railway environment detected - ensuring database tables exist...")
-        ensure_database_initialized()
+# Database tables will be created automatically when first accessed
 
 if __name__ == '__main__':
     # Detect if we're in development (running directly with python app.py)
