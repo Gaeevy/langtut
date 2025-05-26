@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Spreadsheet Settings{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <h2 class="mb-4">📊 Spreadsheet Settings</h2>
+            
+            <!-- Flash messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <!-- Current Status -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📋 Current Spreadsheet</h5>
+                </div>
+                <div class="card-body">
+                    {% if user_spreadsheet_id %}
+                        <div class="alert alert-success">
+                            <strong>Using Your Spreadsheet</strong><br>
+                            Spreadsheet ID: <code>{{ user_spreadsheet_id }}</code>
+                        </div>
+                        <form method="POST" action="{{ url_for('reset_spreadsheet') }}" class="d-inline" onsubmit="resetSpreadsheet()">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                🔄 Reset Spreadsheet
+                            </button>
+                        </form>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <strong>No Spreadsheet Linked</strong><br>
+                            You need to link a spreadsheet to start learning.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Link New Spreadsheet -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">🔗 Link Your Own Spreadsheet</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        Link your own Google Sheets spreadsheet to practice with your custom vocabulary.
+                    </p>
+
+                    <!-- Validation Form -->
+                    <div class="mb-3">
+                        <label for="spreadsheet_url" class="form-label">Google Sheets URL or ID</label>
+                        <input type="text" class="form-control" id="spreadsheet_url" 
+                               placeholder="https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit or just the ID">
+                        <div class="form-text">
+                            Paste the full URL from your Google Sheets or just the spreadsheet ID.
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn btn-primary" id="validate-btn">
+                        🔍 Validate Spreadsheet
+                    </button>
+
+                    <!-- Validation Results -->
+                    <div id="validation-results" class="mt-3" style="display: none;"></div>
+
+                    <!-- Confirmation Form -->
+                    <form method="POST" action="{{ url_for('set_spreadsheet') }}" id="confirm-form" style="display: none;">
+                        <input type="hidden" name="spreadsheet_url" id="confirmed_url">
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-success">
+                                ✅ Use This Spreadsheet
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Requirements -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📝 Spreadsheet Requirements</h5>
+                </div>
+                <div class="card-body">
+                    <p>Your spreadsheet must have the following structure:</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Column A</th>
+                                    <th>Column B</th>
+                                    <th>Column C</th>
+                                    <th>Column D</th>
+                                    <th>Column E</th>
+                                    <th>Column F+</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>id</strong></td>
+                                    <td><strong>word</strong></td>
+                                    <td><strong>translation</strong></td>
+                                    <td>equivalent</td>
+                                    <td>example</td>
+                                    <td><em>statistics (auto-filled)</em></td>
+                                </tr>
+                                <tr class="text-muted">
+                                    <td>1</td>
+                                    <td>olá</td>
+                                    <td>hello</td>
+                                    <td>hi</td>
+                                    <td>Olá, como está?</td>
+                                    <td>...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="alert alert-warning">
+                        <strong>Important:</strong> Make sure your spreadsheet is shared with your Google account and has at least the required columns: <code>id</code>, <code>word</code>, and <code>translation</code>.
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
+                    ← Back to Home
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('validate-btn').addEventListener('click', function() {
+    const url = document.getElementById('spreadsheet_url').value.trim();
+    const resultsDiv = document.getElementById('validation-results');
+    const confirmForm = document.getElementById('confirm-form');
+    const btn = this;
+    
+    if (!url) {
+        resultsDiv.innerHTML = '<div class="alert alert-danger">Please enter a spreadsheet URL or ID.</div>';
+        resultsDiv.style.display = 'block';
+        return;
+    }
+    
+    // Show loading
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Validating...';
+    resultsDiv.innerHTML = '<div class="alert alert-info">Checking spreadsheet access and format...</div>';
+    resultsDiv.style.display = 'block';
+    confirmForm.style.display = 'none';
+    
+    // Make AJAX request
+    fetch('/validate-spreadsheet', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            spreadsheet_url: url
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = '🔍 Validate Spreadsheet';
+        
+        if (data.success) {
+            resultsDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <strong>✅ ${data.message}</strong><br>
+                    <strong>Spreadsheet ID:</strong> <code>${data.spreadsheet_id}</code><br>
+                    <strong>Worksheets found:</strong> ${data.worksheets.join(', ')}
+                </div>
+            `;
+            
+            // Show confirmation form
+            document.getElementById('confirmed_url').value = url;
+            confirmForm.style.display = 'block';
+            
+            // Store the validated spreadsheet ID for localStorage
+            window.validatedSpreadsheetId = data.spreadsheet_id;
+        } else {
+            resultsDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <strong>❌ Validation Failed</strong><br>
+                    ${data.error}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        btn.disabled = false;
+        btn.innerHTML = '🔍 Validate Spreadsheet';
+        resultsDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <strong>❌ Error</strong><br>
+                Failed to validate spreadsheet: ${error.message}
+            </div>
+        `;
+    });
+});
+
+// Handle form submission to save to localStorage
+document.getElementById('confirm-form').addEventListener('submit', function(e) {
+    // Save to localStorage before form submission
+    if (window.validatedSpreadsheetId) {
+        localStorage.setItem('user_spreadsheet_id', window.validatedSpreadsheetId);
+    }
+});
+
+// Handle reset button to clear localStorage
+function resetSpreadsheet() {
+    localStorage.removeItem('user_spreadsheet_id');
+    // Then submit the form
+    return true;
+}
+</script>
+{% endblock %} 

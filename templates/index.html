@@ -5,6 +5,15 @@
 {% block content %}
 <div class="text-center">
     <h2 class="mb-4">Welcome to Language Learning</h2>
+    
+    <!-- Spreadsheet Status -->
+    {% if is_authenticated %}
+        <div class="alert alert-info mb-4">
+            📊 Using your spreadsheet: <code>{{ user_spreadsheet_id[:20] }}...</code>
+            <a href="{{ url_for('settings') }}" class="btn btn-outline-primary btn-sm ms-2">⚙️ Settings</a>
+        </div>
+    {% endif %}
+    
     <p class="mb-4">Select a vocabulary set (tab) to practice:</p>
     
     <div class="row row-cols-1 row-cols-md-2 g-4 mb-4">
@@ -29,7 +38,10 @@
         {% else %}
         <div class="col-12">
             <div class="alert alert-warning">
-                No vocabulary sets found. Please check your Google Sheet.
+                No vocabulary sets found in your spreadsheet.
+                {% if is_authenticated %}
+                    <br><a href="{{ url_for('settings') }}" class="btn btn-outline-primary btn-sm mt-2">🔗 Check Your Spreadsheet</a>
+                {% endif %}
             </div>
         </div>
         {% endfor %}
@@ -39,7 +51,10 @@
         {% if is_authenticated %}
             <div class="alert alert-success">
                 <p>You are authenticated with Google Sheets. Your progress will be saved.</p>
-                <a href="{{ url_for('clear_credentials') }}" class="btn btn-outline-secondary btn-sm mt-2">Log Out</a>
+                <div class="mt-2">
+                    <a href="{{ url_for('settings') }}" class="btn btn-outline-primary btn-sm me-2">⚙️ Settings</a>
+                    <a href="{{ url_for('clear_credentials') }}" class="btn btn-outline-secondary btn-sm" onclick="localStorage.removeItem('user_spreadsheet_id')">🚪 Log Out</a>
+                </div>
             </div>
         {% else %}
             <div class="alert alert-warning">

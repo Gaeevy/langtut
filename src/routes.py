@@ -1,4 +1,4 @@
-from flask import render_template, request, redirect, url_for, session, jsonify
+from flask import render_template, request, redirect, url_for, session, jsonify, flash
 from google_auth_oauthlib.flow import Flow
 import random
 import pathlib
@@ -7,12 +7,15 @@ from datetime import datetime
 
 from src import app
 from src.auth import get_credentials, credentials_to_dict
-from src.gsheet import read_card_set, update_spreadsheet, read_all_card_sets
+from src.gsheet import (
+    read_card_set, update_spreadsheet, read_all_card_sets,
+    extract_spreadsheet_id, validate_spreadsheet_access
+)
 from src.models import Card, NEVER_SHOWN
 from src.utils import load_redirect_uris, get_timestamp, format_timestamp, parse_timestamp
 from src.config import (
     CLIENT_SECRETS_FILE, SCOPES,
-    API_SERVICE_NAME, API_VERSION, MAX_CARDS_PER_SESSION
+    API_SERVICE_NAME, API_VERSION, MAX_CARDS_PER_SESSION, SPREADSHEET_ID
 )
 
 # Load registered redirect URIs from client_secret.json
@@ -28,6 +31,10 @@ class CustomJSONEncoder(json.JSONEncoder):
 # Set custom JSON encoder for Flask
 app.json_encoder = CustomJSONEncoder
 
+def get_user_spreadsheet_id():
+    """Get the user's active spreadsheet ID from session - None if not set"""
+    return session.get('user_spreadsheet_id', None)
+
 @app.route('/')
 def index():
     # Print debug information
@@ -42,16 +49,33 @@ def index():
     is_authenticated = 'credentials' in session
     print(f"Authentication status: {is_authenticated}")
 
-    # Get tabs
-    card_sets = read_all_card_sets()
+    # If not authenticated, show login screen
+    if not is_authenticated:
+        return render_template('login.html')
 
-    return render_template('index.html', is_authenticated=is_authenticated, tabs=card_sets)
+    # Get the user's active spreadsheet ID
+    user_spreadsheet_id = get_user_spreadsheet_id()
+    
+    # If no spreadsheet set, show setup screen
+    if not user_spreadsheet_id:
+        return render_template('setup.html', is_authenticated=is_authenticated)
+    
+    # Normal app flow with user's spreadsheet
+    card_sets = read_all_card_sets(user_spreadsheet_id)
+    
+    return render_template('index.html', 
+                         is_authenticated=is_authenticated, 
+                         tabs=card_sets,
+                         user_spreadsheet_id=user_spreadsheet_id)
 
 
 @app.route('/start/<tab_name>', methods=['POST'])
 def start_learning(tab_name):
+    # Get user's active spreadsheet
+    user_spreadsheet_id = get_user_spreadsheet_id()
+    
     # Read cards from the specified tab
-    card_set = read_card_set(worksheet_name=tab_name)
+    card_set = read_card_set(worksheet_name=tab_name, spreadsheet_id=user_spreadsheet_id)
     cards = card_set.get_cards_to_review(limit=MAX_CARDS_PER_SESSION, ignore_unshown=False)
 
     # Store cards in session (converted to dict for JSON serialization)
@@ -185,6 +209,7 @@ def oauth2callback():
         credentials = flow.credentials
         session['credentials'] = credentials_to_dict(credentials)
 
+        # After authentication, redirect to index which will check for existing spreadsheet
         return redirect(url_for('index'))
     except Exception as e:
         print(f"OAuth callback error: {str(e)}")
@@ -193,9 +218,12 @@ def oauth2callback():
 
 @app.route('/clear')
 def clear_credentials():
-    """Clear the stored credentials."""
+    """Clear the stored credentials and redirect to login."""
     if 'credentials' in session:
         del session['credentials']
+    # Also clear user spreadsheet when logging out
+    if 'user_spreadsheet_id' in session:
+        del session['user_spreadsheet_id']
     return redirect(url_for('index'))
 
 
@@ -414,7 +442,8 @@ def show_results():
     updated = False
     if is_authenticated:
         try:
-            update_result = update_spreadsheet(session['active_tab'], card_objects)
+            user_spreadsheet_id = get_user_spreadsheet_id()
+            update_result = update_spreadsheet(session['active_tab'], card_objects, user_spreadsheet_id)
             updated = True
         except Exception as e:
             print(f"Error updating spreadsheet: {e}")
@@ -504,7 +533,8 @@ def end_session_early():
     updated = False
     if is_authenticated and seen_cards:
         try:
-            update_result = update_spreadsheet(session['active_tab'], seen_cards)
+            user_spreadsheet_id = get_user_spreadsheet_id()
+            update_result = update_spreadsheet(session['active_tab'], seen_cards, user_spreadsheet_id)
             updated = True
         except Exception as e:
             print(f"Error updating spreadsheet: {e}")
@@ -547,3 +577,114 @@ def end_session_early():
                            cards_remaining=remaining,
                            review_count=review_count,
                            first_attempt_count=first_attempt_count)
+
+
+@app.route('/settings')
+def settings():
+    """Settings page for managing user's spreadsheet"""
+    if 'credentials' not in session:
+        flash('Please log in with Google to manage your spreadsheet settings.', 'warning')
+        return redirect(url_for('index'))
+    
+    user_spreadsheet_id = get_user_spreadsheet_id()
+    
+    return render_template('settings.html', 
+                         user_spreadsheet_id=user_spreadsheet_id)
+
+
+@app.route('/validate-spreadsheet', methods=['POST'])
+def validate_spreadsheet():
+    """Validate a spreadsheet URL/ID via AJAX"""
+    if 'credentials' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'})
+    
+    spreadsheet_url = request.json.get('spreadsheet_url', '').strip()
+    if not spreadsheet_url:
+        return jsonify({'success': False, 'error': 'Please provide a spreadsheet URL or ID'})
+    
+    try:
+        # Extract spreadsheet ID from URL
+        spreadsheet_id = extract_spreadsheet_id(spreadsheet_url)
+        
+        # Validate access and format
+        is_valid, error_message, worksheet_names = validate_spreadsheet_access(spreadsheet_id)
+        
+        if is_valid:
+            return jsonify({
+                'success': True, 
+                'spreadsheet_id': spreadsheet_id,
+                'worksheets': worksheet_names,
+                'message': 'Spreadsheet is valid and accessible!'
+            })
+        else:
+            return jsonify({'success': False, 'error': error_message})
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Error validating spreadsheet: {str(e)}'})
+
+
+@app.route('/set-spreadsheet', methods=['POST'])
+def set_spreadsheet():
+    """Set the user's active spreadsheet"""
+    if 'credentials' not in session:
+        flash('Please log in with Google to set your spreadsheet.', 'error')
+        return redirect(url_for('settings'))
+    
+    spreadsheet_url = request.form.get('spreadsheet_url', '').strip()
+    if not spreadsheet_url:
+        flash('Please provide a spreadsheet URL or ID.', 'error')
+        return redirect(url_for('settings'))
+    
+    try:
+        # Extract and validate spreadsheet ID
+        spreadsheet_id = extract_spreadsheet_id(spreadsheet_url)
+        is_valid, error_message, worksheet_names = validate_spreadsheet_access(spreadsheet_id)
+        
+        if is_valid:
+            # Store in session
+            session['user_spreadsheet_id'] = spreadsheet_id
+            flash(f'Successfully linked your spreadsheet! Found {len(worksheet_names)} worksheet(s): {", ".join(worksheet_names)}', 'success')
+        else:
+            flash(f'Error: {error_message}', 'error')
+            
+    except Exception as e:
+        flash(f'Error setting spreadsheet: {str(e)}', 'error')
+    
+    return redirect(url_for('settings'))
+
+
+@app.route('/load-saved-spreadsheet', methods=['POST'])
+def load_saved_spreadsheet():
+    """Load spreadsheet from localStorage into Flask session"""
+    if 'credentials' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'})
+    
+    data = request.get_json()
+    spreadsheet_id = data.get('spreadsheet_id')
+    
+    if not spreadsheet_id:
+        return jsonify({'success': False, 'error': 'No spreadsheet ID provided'})
+    
+    try:
+        # Validate the spreadsheet is still accessible
+        is_valid, error_msg, worksheets = validate_spreadsheet_access(spreadsheet_id)
+        
+        if is_valid:
+            session['user_spreadsheet_id'] = spreadsheet_id
+            return jsonify({'success': True, 'worksheets': worksheets})
+        else:
+            return jsonify({'success': False, 'error': error_msg})
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Error validating spreadsheet: {str(e)}'})
+
+
+@app.route('/reset-spreadsheet', methods=['POST'])
+def reset_spreadsheet():
+    """Reset spreadsheet - redirect to setup since no default"""
+    if 'user_spreadsheet_id' in session:
+        del session['user_spreadsheet_id']
+    
+    # Note: localStorage will be cleared by JavaScript
+    flash('Spreadsheet reset. Please set up a new one.', 'info')
+    return redirect(url_for('index'))  # Will show setup screen
