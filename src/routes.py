@@ -78,26 +78,36 @@ def start_learning(tab_name):
 def auth():
     """Initiate the OAuth flow to authorize the application."""
     try:
-        # Get the current request URL and determine which port we're using
+        # Get the current request URL and determine the correct redirect URI
         current_url = request.url
         print(f"Auth request URL: {current_url}")
-        parts = request.host.split(':')
-        port = parts[1] if len(parts) > 1 else '8080'  # default to 8080 if no port specified
-
-        # Use the first registered redirect URI if available
-        if REGISTERED_REDIRECT_URIS:
-            # Find a URI that matches our current port
-            matching_uris = [uri for uri in REGISTERED_REDIRECT_URIS if f":{port}" in uri]
-            if matching_uris:
-                redirect_uri = matching_uris[0]
-            else:
-                # Fall back to the first registered URI
-                redirect_uri = REGISTERED_REDIRECT_URIS[0]
+        
+        # Determine if we're in production or development
+        is_production = request.host.endswith('.railway.app') or request.host.endswith('.up.railway.app')
+        
+        if is_production:
+            # In production, use the Railway domain
+            redirect_uri = f"https://{request.host}/oauth2callback"
         else:
-            # No registered URIs found, create a default one
+            # In development, use localhost with the appropriate port
+            parts = request.host.split(':')
+            port = parts[1] if len(parts) > 1 else '8080'
             redirect_uri = f'http://localhost:{port}/oauth2callback'
 
-        print(f"Using registered redirect URI for auth: {redirect_uri}")
+        # Verify the redirect URI is in our registered list
+        if REGISTERED_REDIRECT_URIS and redirect_uri not in REGISTERED_REDIRECT_URIS:
+            print(f"Warning: {redirect_uri} not in registered URIs: {REGISTERED_REDIRECT_URIS}")
+            # Fall back to a registered URI that matches our environment
+            if is_production:
+                production_uris = [uri for uri in REGISTERED_REDIRECT_URIS if 'railway.app' in uri]
+                if production_uris:
+                    redirect_uri = production_uris[0]
+            else:
+                localhost_uris = [uri for uri in REGISTERED_REDIRECT_URIS if 'localhost' in uri]
+                if localhost_uris:
+                    redirect_uri = localhost_uris[0]
+
+        print(f"Using redirect URI for auth: {redirect_uri}")
 
         # Create flow instance to manage the OAuth 2.0 Authorization Grant Flow steps
         flow = Flow.from_client_secrets_file(
@@ -144,10 +154,14 @@ def oauth2callback():
         if not redirect_uri:
             # Fallback if we don't have it in the session
             print("Warning: No redirect_uri in session, constructing one...")
-            parts = request.host.split(':')
-            host = parts[0]  # localhost or 127.0.0.1
-            port = parts[1] if len(parts) > 1 else '8080'  # default to 8080 if no port specified
-            redirect_uri = f'http://localhost:{port}/oauth2callback'
+            is_production = request.host.endswith('.railway.app') or request.host.endswith('.up.railway.app')
+            
+            if is_production:
+                redirect_uri = f"https://{request.host}/oauth2callback"
+            else:
+                parts = request.host.split(':')
+                port = parts[1] if len(parts) > 1 else '8080'
+                redirect_uri = f'http://localhost:{port}/oauth2callback'
 
         print(f"Using redirect URI for callback: {redirect_uri}")
 
