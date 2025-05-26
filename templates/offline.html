@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Offline{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <div class="mb-4">
+        <i class="bi bi-wifi-off" style="font-size: 4rem; color: #6c757d;"></i>
+    </div>
+    
+    <h2 class="mb-3">You're Offline</h2>
+    <p class="lead mb-4">It looks like you're not connected to the internet.</p>
+    
+    <div class="alert alert-info">
+        <p class="mb-2"><strong>Don't worry!</strong> You can still:</p>
+        <ul class="list-unstyled mb-0">
+            <li>• Review previously loaded content</li>
+            <li>• Practice with cached flashcards</li>
+            <li>• Your progress will sync when you're back online</li>
+        </ul>
+    </div>
+    
+    <div class="mt-4">
+        <button onclick="window.location.reload()" class="btn btn-primary">
+            <i class="bi bi-arrow-clockwise"></i> Try Again
+        </button>
+        <a href="/" class="btn btn-outline-secondary ms-2">
+            <i class="bi bi-house"></i> Go Home
+        </a>
+    </div>
+</div>
+{% endblock %} 

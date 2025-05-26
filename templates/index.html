@@ -4,17 +4,6 @@
 
 {% block content %}
 <div class="text-center">
-    <h2 class="mb-4">Welcome to Language Learning</h2>
-    
-    <!-- Spreadsheet Status -->
-    {% if is_authenticated %}
-        <div class="alert alert-info mb-4">
-            📊 Using your spreadsheet: <code>{{ user_spreadsheet_id[:20] }}...</code>
-            <a href="{{ url_for('settings') }}" class="btn btn-outline-primary btn-sm ms-2">⚙️ Settings</a>
-        </div>
-    {% endif %}
-    
-    <p class="mb-4">Select a vocabulary set (tab) to practice:</p>
     
     <div class="row row-cols-1 row-cols-md-2 g-4 mb-4">
         {% for tab in tabs %}
@@ -47,21 +36,19 @@
         {% endfor %}
     </div>
 
-    <div class="mt-4 auth-status">
-        {% if is_authenticated %}
-            <div class="alert alert-success">
-                <p>You are authenticated with Google Sheets. Your progress will be saved.</p>
-                <div class="mt-2">
-                    <a href="{{ url_for('settings') }}" class="btn btn-outline-primary btn-sm me-2">⚙️ Settings</a>
-                    <a href="{{ url_for('clear_credentials') }}" class="btn btn-outline-secondary btn-sm">🚪 Log Out</a>
-                </div>
+    <!-- Spreadsheet Status -->
+    {% if is_authenticated %}
+        <div class="alert alert-light border-0 mt-4">
+            <small class="text-muted">📊 Using spreadsheet: <code>{{ user_spreadsheet_id[:20] }}...</code></small>
+            <div class="mt-2">
+                <a href="{{ url_for('settings') }}" class="btn btn-outline-primary btn-sm me-2">Settings</a>
+                <a href="{{ url_for('clear_credentials') }}" class="btn btn-outline-secondary btn-sm">Log Out</a>
             </div>
-        {% else %}
-            <div class="alert alert-warning">
-                <p>You are not authenticated with Google Sheets. Your progress won't be saved.</p>
-                <a href="{{ url_for('auth') }}" class="btn btn-outline-primary btn-sm mt-2">Log In with Google</a>
-            </div>
-        {% endif %}
-    </div>
+        </div>
+    {% else %}
+        <div class="mt-4">
+            <a href="{{ url_for('auth') }}" class="btn btn-primary">Sign in with Google</a>
+        </div>
+    {% endif %}
 </div>
 {% endblock %} 

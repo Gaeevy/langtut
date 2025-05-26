@@ -1,4 +1,4 @@
-from flask import render_template, request, redirect, url_for, session, jsonify, flash
+from flask import render_template, request, redirect, url_for, session, jsonify, flash, Response
 from google_auth_oauthlib.flow import Flow
 import random
 import pathlib
@@ -681,7 +681,6 @@ def set_spreadsheet():
     return redirect(url_for('settings'))
 
 
-
 @app.route('/reset-spreadsheet', methods=['POST'])
 def reset_spreadsheet():
     """Reset spreadsheet - remove active spreadsheet from database"""
@@ -694,3 +693,157 @@ def reset_spreadsheet():
     
     flash('Spreadsheet reset. Please set up a new one.', 'info')
     return redirect(url_for('index'))  # Will show setup screen
+
+
+@app.route('/admin/db-info')
+def db_info():
+    """Database information endpoint for debugging"""
+    try:
+        from src.database import db, User, UserSpreadsheet
+        
+        # Get database stats
+        user_count = User.query.count()
+        spreadsheet_count = UserSpreadsheet.query.count()
+        active_spreadsheets = UserSpreadsheet.query.filter_by(is_active=True).count()
+        
+        # Get recent users
+        recent_users = User.query.order_by(User.last_login.desc()).limit(5).all()
+        
+        # Get recent spreadsheets
+        recent_spreadsheets = UserSpreadsheet.query.order_by(UserSpreadsheet.last_used.desc()).limit(5).all()
+        
+        info = {
+            'database_stats': {
+                'total_users': user_count,
+                'total_spreadsheets': spreadsheet_count,
+                'active_spreadsheets': active_spreadsheets
+            },
+            'recent_users': [user.to_dict() for user in recent_users],
+            'recent_spreadsheets': [sheet.to_dict() for sheet in recent_spreadsheets],
+            'environment': 'Railway' if os.getenv('RAILWAY_ENVIRONMENT') else 'Local',
+            'database_path': app.config.get('SQLALCHEMY_DATABASE_URI', 'Not configured')
+        }
+        
+        return jsonify(info)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/users')
+def list_users():
+    """List all users in the database"""
+    try:
+        from src.database import User
+        users = User.query.order_by(User.last_login.desc()).all()
+        return jsonify([user.to_dict() for user in users])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/spreadsheets')
+def list_spreadsheets():
+    """List all spreadsheets in the database"""
+    try:
+        from src.database import UserSpreadsheet
+        spreadsheets = UserSpreadsheet.query.order_by(UserSpreadsheet.last_used.desc()).all()
+        return jsonify([sheet.to_dict() for sheet in spreadsheets])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/user/<int:user_id>')
+def get_user_details(user_id):
+    """Get detailed information about a specific user"""
+    try:
+        from src.database import User
+        user = User.query.get_or_404(user_id)
+        user_data = user.to_dict()
+        user_data['spreadsheets'] = [sheet.to_dict() for sheet in user.spreadsheets]
+        return jsonify(user_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/export-db')
+def export_database():
+    """Export database as SQL dump"""
+    try:
+        import sqlite3
+        import tempfile
+        from flask import Response
+        
+        # Get database path from config
+        db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+        if db_uri.startswith('sqlite:///'):
+            db_path = db_uri.replace('sqlite:///', '')
+        else:
+            return jsonify({'error': 'Not a SQLite database'}), 400
+        
+        # Create SQL dump
+        conn = sqlite3.connect(db_path)
+        dump_lines = []
+        for line in conn.iterdump():
+            dump_lines.append(line)
+        conn.close()
+        
+        dump_content = '\n'.join(dump_lines)
+        
+        return Response(
+            dump_content,
+            mimetype='application/sql',
+            headers={'Content-Disposition': 'attachment; filename=database_dump.sql'}
+        )
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/query', methods=['POST'])
+def execute_query():
+    """Execute a custom SQL query (READ-ONLY for safety)"""
+    try:
+        import sqlite3
+        from flask import request
+        
+        query = request.json.get('query', '').strip()
+        if not query:
+            return jsonify({'error': 'No query provided'}), 400
+        
+        # Safety check - only allow SELECT queries
+        if not query.upper().startswith('SELECT'):
+            return jsonify({'error': 'Only SELECT queries are allowed'}), 400
+        
+        # Get database path
+        db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+        if db_uri.startswith('sqlite:///'):
+            db_path = db_uri.replace('sqlite:///', '')
+        else:
+            return jsonify({'error': 'Not a SQLite database'}), 400
+        
+        # Execute query
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row  # Enable column access by name
+        cursor = conn.cursor()
+        cursor.execute(query)
+        
+        # Fetch results
+        rows = cursor.fetchall()
+        columns = [description[0] for description in cursor.description]
+        
+        # Convert to list of dictionaries
+        results = []
+        for row in rows:
+            results.append(dict(zip(columns, row)))
+        
+        conn.close()
+        
+        return jsonify({
+            'query': query,
+            'columns': columns,
+            'rows': results,
+            'count': len(results)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

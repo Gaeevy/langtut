@@ -3,59 +3,24 @@
 {% block title %}Login - Language Learning{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-md-6 text-center">
-            <div class="card">
-                <div class="card-body p-5">
-                    <h2 class="mb-4">🌟 Welcome to Language Learning!</h2>
-                    
-                    <p class="text-muted mb-4">
-                        Practice vocabulary with your own Google Sheets spreadsheets.<br>
-                        Track your progress and improve your language skills!
-                    </p>
-                    
-                    <div class="mb-4">
-                        <i class="fas fa-chart-line fa-3x text-primary mb-3"></i>
-                        <h5>Features:</h5>
-                        <ul class="list-unstyled">
-                            <li>📊 Use your own Google Sheets</li>
-                            <li>🎯 Spaced repetition learning</li>
-                            <li>📈 Progress tracking</li>
-                            <li>🔄 Automatic synchronization</li>
-                        </ul>
-                    </div>
-                    
-                    <a href="{{ url_for('auth') }}" class="btn btn-primary btn-lg">
-                        <i class="fab fa-google me-2"></i>
-                        Sign In with Google
-                    </a>
-                    
-                    <div class="mt-4">
-                        <small class="text-muted">
-                            We need Google access to read and update your spreadsheets
-                        </small>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Quick Start Guide -->
-            <div class="card mt-4">
-                <div class="card-header">
-                    <h5 class="mb-0">🚀 Quick Start</h5>
-                </div>
-                <div class="card-body text-start">
-                    <ol>
-                        <li><strong>Sign in</strong> with your Google account</li>
-                        <li><strong>Create or link</strong> a Google Sheets spreadsheet</li>
-                        <li><strong>Start learning</strong> with your vocabulary!</li>
-                    </ol>
-                    
-                    <div class="alert alert-info mt-3">
-                        <strong>Don't have a spreadsheet?</strong> No problem! We'll help you create one with the right format.
-                    </div>
-                </div>
-            </div>
+<div class="text-center">
+    <div class="mt-4 mb-4">
+        <div class="mb-4">
+            <i class="bi bi-translate login-icon" style="font-size: 3rem; color: #4a6da7; margin-bottom: 1rem; display: block;"></i>
+            <h4 class="text-muted mb-3">Learn vocabulary with your own Google Sheets</h4>
+            <p class="text-muted small">Spaced repetition • Progress tracking • Sync across devices</p>
+        </div>
+        
+        <div class="mt-4">
+            <a href="{{ url_for('auth') }}" class="btn btn-primary btn-lg px-4 py-3">
+                <i class="bi bi-google me-2"></i> Sign in with Google
+            </a>
+        </div>
+        
+        <div class="mt-4">
+            <small class="text-muted">
+                We'll access your Google Sheets to sync your vocabulary
+            </small>
         </div>
     </div>
 </div>
