@@ -11,7 +11,5 @@ restartPolicyType = "on_failure"
 DATABASE_PATH = "/app/data/app.db"
 RAILWAY_ENVIRONMENT = "production"
 
-# Volume mount for persistent SQLite database
-[[volumes]]
-mountPath = "/app/data"
-name = "langtut-database" 
+# Note: Volumes are now created and attached through Railway dashboard
+# The volume should be mounted to /app/data in the Railway dashboard 
