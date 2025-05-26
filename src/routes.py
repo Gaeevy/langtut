@@ -218,10 +218,6 @@ def oauth2callback():
 
         # Login user and create/update user record
         try:
-            # Ensure database is initialized before login attempt
-            from src.database import ensure_database_initialized
-            ensure_database_initialized()
-            
             user = login_user(session, credentials_dict)
             print(f"User {user.email} logged in successfully")
         except Exception as e:
@@ -501,11 +497,8 @@ def show_results():
 def test():
     """Simple test route to verify server and database are working."""
     try:
-        # Ensure database is initialized
-        from src.database import db, User, ensure_database_initialized
-        ensure_database_initialized()
-        
         # Test database connection
+        from src.database import db, User
         user_count = User.query.count()
         db_status = f"Database connected. Users: {user_count}"
     except Exception as e:
@@ -706,8 +699,7 @@ def reset_spreadsheet():
 def db_info():
     """Database information endpoint for debugging"""
     try:
-        from src.database import db, User, UserSpreadsheet, ensure_database_initialized
-        ensure_database_initialized()
+        from src.database import db, User, UserSpreadsheet
         
         # Get database stats
         user_count = User.query.count()
@@ -742,8 +734,7 @@ def db_info():
 def list_users():
     """List all users in the database"""
     try:
-        from src.database import User, ensure_database_initialized
-        ensure_database_initialized()
+        from src.database import User
         users = User.query.order_by(User.last_login.desc()).all()
         return jsonify([user.to_dict() for user in users])
     except Exception as e:
