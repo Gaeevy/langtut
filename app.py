@@ -7,9 +7,13 @@ import os
 import pathlib
 from src import create_app
 from src.config import FLASK_DEBUG, CLIENT_SECRETS_FILE, settings
+from src.database import init_database
 
 # Create the app instance for Gunicorn
 app = create_app()
+
+# Initialize database
+init_database(app)
 
 if __name__ == '__main__':
     # Detect if we're in development (running directly with python app.py)

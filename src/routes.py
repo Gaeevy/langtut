@@ -3,6 +3,7 @@ from google_auth_oauthlib.flow import Flow
 import random
 import pathlib
 import json
+import os
 from datetime import datetime
 
 from src import app
@@ -16,6 +17,10 @@ from src.utils import load_redirect_uris, get_timestamp, format_timestamp, parse
 from src.config import (
     CLIENT_SECRETS_FILE, SCOPES,
     API_SERVICE_NAME, API_VERSION, MAX_CARDS_PER_SESSION, SPREADSHEET_ID
+)
+from src.user_manager import (
+    login_user, get_current_user_from_session, get_user_spreadsheet_id,
+    set_user_spreadsheet, clear_user_session
 )
 
 # Load registered redirect URIs from client_secret.json
@@ -31,9 +36,9 @@ class CustomJSONEncoder(json.JSONEncoder):
 # Set custom JSON encoder for Flask
 app.json_encoder = CustomJSONEncoder
 
-def get_user_spreadsheet_id():
-    """Get the user's active spreadsheet ID from session - None if not set"""
-    return session.get('user_spreadsheet_id', None)
+def get_user_spreadsheet_id_legacy():
+    """Legacy function - now uses database instead of session"""
+    return get_user_spreadsheet_id(session)
 
 @app.route('/')
 def index():
@@ -54,7 +59,7 @@ def index():
         return render_template('login.html')
 
     # Get the user's active spreadsheet ID
-    user_spreadsheet_id = get_user_spreadsheet_id()
+    user_spreadsheet_id = get_user_spreadsheet_id(session)
     
     # If no spreadsheet set, show setup screen
     if not user_spreadsheet_id:
@@ -72,7 +77,7 @@ def index():
 @app.route('/start/<tab_name>', methods=['POST'])
 def start_learning(tab_name):
     # Get user's active spreadsheet
-    user_spreadsheet_id = get_user_spreadsheet_id()
+    user_spreadsheet_id = get_user_spreadsheet_id(session)
     
     # Read cards from the specified tab
     card_set = read_card_set(worksheet_name=tab_name, spreadsheet_id=user_spreadsheet_id)
@@ -132,6 +137,7 @@ def auth():
                     redirect_uri = localhost_uris[0]
 
         print(f"Using redirect URI for auth: {redirect_uri}")
+        print(f"Using OAuth scopes: {SCOPES}")
 
         # Create flow instance to manage the OAuth 2.0 Authorization Grant Flow steps
         flow = Flow.from_client_secrets_file(
@@ -207,7 +213,16 @@ def oauth2callback():
 
         # Store credentials in the session
         credentials = flow.credentials
-        session['credentials'] = credentials_to_dict(credentials)
+        credentials_dict = credentials_to_dict(credentials)
+        session['credentials'] = credentials_dict
+
+        # Login user and create/update user record
+        try:
+            user = login_user(session, credentials_dict)
+            print(f"User {user.email} logged in successfully")
+        except Exception as e:
+            print(f"Error during user login: {e}")
+            return render_template('error.html', message=f"Login error: {str(e)}")
 
         # After authentication, redirect to index which will check for existing spreadsheet
         return redirect(url_for('index'))
@@ -219,11 +234,7 @@ def oauth2callback():
 @app.route('/clear')
 def clear_credentials():
     """Clear the stored credentials and redirect to login."""
-    if 'credentials' in session:
-        del session['credentials']
-    # Also clear user spreadsheet when logging out
-    if 'user_spreadsheet_id' in session:
-        del session['user_spreadsheet_id']
+    clear_user_session(session)
     return redirect(url_for('index'))
 
 
@@ -442,7 +453,7 @@ def show_results():
     updated = False
     if is_authenticated:
         try:
-            user_spreadsheet_id = get_user_spreadsheet_id()
+            user_spreadsheet_id = get_user_spreadsheet_id(session)
             update_result = update_spreadsheet(session['active_tab'], card_objects, user_spreadsheet_id)
             updated = True
         except Exception as e:
@@ -484,8 +495,22 @@ def show_results():
 
 @app.route('/test')
 def test():
-    """Simple test route to verify server is working."""
-    return "Server is working correctly! You can go back to the <a href='/'>homepage</a>."
+    """Simple test route to verify server and database are working."""
+    try:
+        # Test database connection
+        from src.database import db, User
+        user_count = User.query.count()
+        db_status = f"Database connected. Users: {user_count}"
+    except Exception as e:
+        db_status = f"Database error: {str(e)}"
+    
+    return f"""
+    <h2>🚀 Language Learning App - Health Check</h2>
+    <p>✅ Server is working correctly!</p>
+    <p>📊 {db_status}</p>
+    <p>🌍 Environment: {'Railway' if os.getenv('RAILWAY_ENVIRONMENT') else 'Local'}</p>
+    <p><a href='/'>← Go to homepage</a></p>
+    """
 
 
 @app.route('/end-session')
@@ -533,7 +558,7 @@ def end_session_early():
     updated = False
     if is_authenticated and seen_cards:
         try:
-            user_spreadsheet_id = get_user_spreadsheet_id()
+            user_spreadsheet_id = get_user_spreadsheet_id(session)
             update_result = update_spreadsheet(session['active_tab'], seen_cards, user_spreadsheet_id)
             updated = True
         except Exception as e:
@@ -586,7 +611,7 @@ def settings():
         flash('Please log in with Google to manage your spreadsheet settings.', 'warning')
         return redirect(url_for('index'))
     
-    user_spreadsheet_id = get_user_spreadsheet_id()
+    user_spreadsheet_id = get_user_spreadsheet_id(session)
     
     return render_template('settings.html', 
                          user_spreadsheet_id=user_spreadsheet_id)
@@ -641,9 +666,12 @@ def set_spreadsheet():
         is_valid, error_message, worksheet_names = validate_spreadsheet_access(spreadsheet_id)
         
         if is_valid:
-            # Store in session
-            session['user_spreadsheet_id'] = spreadsheet_id
-            flash(f'Successfully linked your spreadsheet! Found {len(worksheet_names)} worksheet(s): {", ".join(worksheet_names)}', 'success')
+            # Store in database
+            try:
+                set_user_spreadsheet(session, spreadsheet_id, spreadsheet_url)
+                flash(f'Successfully linked your spreadsheet! Found {len(worksheet_names)} worksheet(s): {", ".join(worksheet_names)}', 'success')
+            except Exception as e:
+                flash(f'Error saving spreadsheet: {str(e)}', 'error')
         else:
             flash(f'Error: {error_message}', 'error')
             
@@ -653,38 +681,16 @@ def set_spreadsheet():
     return redirect(url_for('settings'))
 
 
-@app.route('/load-saved-spreadsheet', methods=['POST'])
-def load_saved_spreadsheet():
-    """Load spreadsheet from localStorage into Flask session"""
-    if 'credentials' not in session:
-        return jsonify({'success': False, 'error': 'Not authenticated'})
-    
-    data = request.get_json()
-    spreadsheet_id = data.get('spreadsheet_id')
-    
-    if not spreadsheet_id:
-        return jsonify({'success': False, 'error': 'No spreadsheet ID provided'})
-    
-    try:
-        # Validate the spreadsheet is still accessible
-        is_valid, error_msg, worksheets = validate_spreadsheet_access(spreadsheet_id)
-        
-        if is_valid:
-            session['user_spreadsheet_id'] = spreadsheet_id
-            return jsonify({'success': True, 'worksheets': worksheets})
-        else:
-            return jsonify({'success': False, 'error': error_msg})
-            
-    except Exception as e:
-        return jsonify({'success': False, 'error': f'Error validating spreadsheet: {str(e)}'})
-
 
 @app.route('/reset-spreadsheet', methods=['POST'])
 def reset_spreadsheet():
-    """Reset spreadsheet - redirect to setup since no default"""
-    if 'user_spreadsheet_id' in session:
-        del session['user_spreadsheet_id']
+    """Reset spreadsheet - remove active spreadsheet from database"""
+    user = get_current_user_from_session(session)
+    if user:
+        # Deactivate all spreadsheets for this user
+        from src.database import UserSpreadsheet, db
+        UserSpreadsheet.query.filter_by(user_id=user.id, is_active=True).update({'is_active': False})
+        db.session.commit()
     
-    # Note: localStorage will be cleared by JavaScript
     flash('Spreadsheet reset. Please set up a new one.', 'info')
     return redirect(url_for('index'))  # Will show setup screen

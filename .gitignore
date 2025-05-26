@@ -40,4 +40,13 @@ token.json
 Thumbs.db
 
 # Secrets
-.secrets.toml 
+.secrets.toml
+
+# Database files
+data/app.db
+data/*.db
+*.sqlite
+*.sqlite3
+
+# Railway
+.railway/ 

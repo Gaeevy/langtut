@@ -209,18 +209,14 @@ document.getElementById('validate-btn').addEventListener('click', function() {
     });
 });
 
-// Handle form submission to save to localStorage
+// Handle form submission - no localStorage needed anymore
 document.getElementById('confirm-form').addEventListener('submit', function(e) {
-    // Save to localStorage before form submission
-    if (window.validatedSpreadsheetId) {
-        localStorage.setItem('user_spreadsheet_id', window.validatedSpreadsheetId);
-    }
+    // Form will be handled by the server
 });
 
-// Handle reset button to clear localStorage
+// Handle reset button - no localStorage needed anymore
 function resetSpreadsheet() {
-    localStorage.removeItem('user_spreadsheet_id');
-    // Then submit the form
+    // Form will be handled by the server
     return true;
 }
 </script>

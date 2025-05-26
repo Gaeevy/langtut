@@ -48,3 +48,23 @@ def credentials_to_dict(credentials):
         'client_secret': credentials.client_secret,
         'scopes': credentials.scopes
     }
+
+
+def dict_to_credentials(credentials_dict):
+    """
+    Convert dictionary back to credentials object.
+    
+    Args:
+        credentials_dict: Dictionary representation of credentials
+        
+    Returns:
+        Google OAuth credentials object
+    """
+    return Credentials(
+        token=credentials_dict.get('token'),
+        refresh_token=credentials_dict.get('refresh_token'),
+        token_uri=credentials_dict.get('token_uri'),
+        client_id=credentials_dict.get('client_id'),
+        client_secret=credentials_dict.get('client_secret'),
+        scopes=credentials_dict.get('scopes')
+    )

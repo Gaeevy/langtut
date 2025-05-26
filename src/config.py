@@ -36,7 +36,11 @@ def get_client_secrets_file():
         return settings.get("CLIENT_SECRETS_FILE", "client_secret.json")
 
 CLIENT_SECRETS_FILE = get_client_secrets_file()
-SCOPES = settings.get("SCOPES", ["https://www.googleapis.com/auth/spreadsheets"])
+SCOPES = settings.get("SCOPES", [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile"
+])
 API_SERVICE_NAME = settings.get("API_SERVICE_NAME", "sheets")
 API_VERSION = settings.get("API_VERSION", "v4")
 

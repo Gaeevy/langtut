@@ -1,0 +1,17 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+healthcheckPath = "/test"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+
+# Environment variables for Railway
+[env]
+DATABASE_PATH = "/app/data/app.db"
+RAILWAY_ENVIRONMENT = "production"
+
+# Volume mount for persistent SQLite database
+[[volumes]]
+mountPath = "/app/data"
+name = "langtut-database" 
