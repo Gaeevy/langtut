@@ -141,11 +141,16 @@ def ensure_database_initialized():
     from flask import current_app
     
     try:
-        # Try a simple query to check if database is working
+        # Try to check if tables exist by querying sqlite_master
         from sqlalchemy import text
         with db.engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        return True
+            result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='users';"))
+            tables = [row[0] for row in result]
+            if 'users' in tables:
+                return True
+            else:
+                print("Users table not found, need to create tables")
+                raise Exception("Tables not found")
     except Exception as e:
         print(f"Database not initialized, attempting to create tables: {e}")
         try:
@@ -158,6 +163,7 @@ def ensure_database_initialized():
                         print(f"Creating volume directory: {database_dir}")
                         os.makedirs(database_dir, exist_ok=True)
             
+            print("Creating database tables...")
             db.create_all()
             print("Database tables created successfully")
             

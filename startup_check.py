@@ -64,9 +64,19 @@ def check_database_initialization():
             if ensure_database_initialized():
                 print("✅ Database initialization successful")
                 
-                # Test basic database operations
-                user_count = User.query.count()
-                print(f"✅ Database query successful - Users: {user_count}")
+                # Test basic database operations using ensure_database_initialized again
+                try:
+                    # This will call ensure_database_initialized internally
+                    from src.database import get_or_create_user
+                    # Try a simple database operation that will trigger table creation if needed
+                    user_count = User.query.count()
+                    print(f"✅ Database query successful - Users: {user_count}")
+                except Exception as e:
+                    print(f"❌ Database query failed, trying to create tables: {e}")
+                    # Force table creation
+                    db.create_all()
+                    user_count = User.query.count()
+                    print(f"✅ Database tables created and query successful - Users: {user_count}")
                 
                 return True
             else:

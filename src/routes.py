@@ -218,6 +218,10 @@ def oauth2callback():
 
         # Login user and create/update user record
         try:
+            # Ensure database is initialized before login attempt
+            from src.database import ensure_database_initialized
+            ensure_database_initialized()
+            
             user = login_user(session, credentials_dict)
             print(f"User {user.email} logged in successfully")
         except Exception as e:
