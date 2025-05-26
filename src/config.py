@@ -1,3 +1,6 @@
+import json
+import os
+import tempfile
 from dynaconf import Dynaconf
 
 settings = Dynaconf(
@@ -10,8 +13,29 @@ settings = Dynaconf(
 # Google Sheets API settings
 SPREADSHEET_ID = settings.get("SPREADSHEET_ID", "15_PsHfMb440wtUgZ0d1aJmu5YIXoo9JKytlJINxOV8Q")
 
-# Google OAuth2 settings
-CLIENT_SECRETS_FILE = settings.get("CLIENT_SECRETS_FILE", "client_secret.json")
+# Google OAuth2 settings - handle both file and environment variable
+def get_client_secrets_file():
+    """Get the client secrets file path, creating from env var if needed"""
+    # Check if we have client secrets as environment variable (production)
+    client_secrets_json = settings.get("CLIENT_SECRETS_JSON", None)
+    
+    if client_secrets_json:
+        # Create a temporary file with the client secrets
+        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
+        if isinstance(client_secrets_json, str):
+            # Parse JSON string if it's a string
+            client_secrets_data = json.loads(client_secrets_json)
+        else:
+            client_secrets_data = client_secrets_json
+        
+        json.dump(client_secrets_data, temp_file)
+        temp_file.close()
+        return temp_file.name
+    else:
+        # Use local file (development)
+        return settings.get("CLIENT_SECRETS_FILE", "client_secret.json")
+
+CLIENT_SECRETS_FILE = get_client_secrets_file()
 SCOPES = settings.get("SCOPES", ["https://www.googleapis.com/auth/spreadsheets"])
 API_SERVICE_NAME = settings.get("API_SERVICE_NAME", "sheets")
 API_VERSION = settings.get("API_VERSION", "v4")
