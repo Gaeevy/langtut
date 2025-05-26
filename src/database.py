@@ -119,18 +119,66 @@ def init_database(app):
     # Initialize SQLAlchemy with app
     db.init_app(app)
     
-    # Create tables
-    with app.app_context():
+    # Store database path in app config for later use
+    app.config['DATABASE_PATH'] = database_path
+    
+    # For Railway: defer table creation to runtime when volume is available
+    if os.getenv('RAILWAY_ENVIRONMENT'):
+        print("Railway environment detected - database tables will be created on first access")
+    else:
+        # Local development: create tables immediately
+        with app.app_context():
+            try:
+                db.create_all()
+                print(f"Database initialized successfully at: {database_path}")
+            except Exception as e:
+                print(f"Error initializing database: {e}")
+                raise
+
+
+def ensure_database_initialized():
+    """Ensure database is initialized - call this before any database operations"""
+    from flask import current_app
+    
+    try:
+        # Try a simple query to check if database is working
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except Exception as e:
+        print(f"Database not initialized, attempting to create tables: {e}")
         try:
+            # In Railway environment, ensure the volume directory exists
+            if os.getenv('RAILWAY_ENVIRONMENT'):
+                database_path = current_app.config.get('DATABASE_PATH')
+                if database_path:
+                    database_dir = os.path.dirname(database_path)
+                    if not os.path.exists(database_dir):
+                        print(f"Creating volume directory: {database_dir}")
+                        os.makedirs(database_dir, exist_ok=True)
+            
             db.create_all()
-            print(f"Database initialized successfully at: {database_path}")
-        except Exception as e:
-            print(f"Error initializing database: {e}")
-            raise
+            print("Database tables created successfully")
+            
+            # Verify tables were created
+            from sqlalchemy import text
+            with db.engine.connect() as conn:
+                result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table';"))
+                tables = [row[0] for row in result]
+                print(f"Database tables verified: {tables}")
+            
+            return True
+        except Exception as create_error:
+            print(f"Failed to create database tables: {create_error}")
+            return False
 
 
 def get_or_create_user(google_user_id, email=None, name=None):
     """Get existing user or create new one"""
+    # Ensure database is initialized before any operations
+    ensure_database_initialized()
+    
     user = User.query.filter_by(google_user_id=google_user_id).first()
     
     if not user:
