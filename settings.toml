@@ -10,7 +10,6 @@ MAX_CARDS_PER_SESSION = 20
 SESSION_TYPE = "filesystem"
 SESSION_PERMANENT = false
 SESSION_USE_SIGNER = true
-SESSION_COOKIE_SECURE = false
 SESSION_COOKIE_HTTPONLY = true
 SESSION_COOKIE_SAMESITE = "Lax"
 JSON_AS_ASCII = false
@@ -18,7 +17,9 @@ JSONIFY_MIMETYPE = "application/json; charset=utf-8"
 
 [development]
 DEBUG = true
+SESSION_COOKIE_SECURE = false
 
 [production]
 DEBUG = false
-SESSION_COOKIE_SECURE = true 
+SESSION_COOKIE_SECURE = true
+# In production, we'll use environment variables for sensitive data 

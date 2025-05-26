@@ -8,6 +8,8 @@ import pathlib
 from src import create_app
 from src.config import FLASK_DEBUG, CLIENT_SECRETS_FILE
 
+# Create the app instance for Gunicorn
+app = create_app()
 
 if __name__ == '__main__':
     # Check if the client secrets file exists
@@ -22,6 +24,5 @@ if __name__ == '__main__':
     print("NOTICE: OAuth insecure transport enabled for local development")
     print("IMPORTANT: Don't use this in production!")
     
-    # Create and run the app
-    app = create_app()
+    # Run the app in development mode
     app.run(debug=FLASK_DEBUG, host='localhost', port=8080)
