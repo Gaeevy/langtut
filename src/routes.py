@@ -856,3 +856,88 @@ def execute_query():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/volume-check')
+def volume_check():
+    """Check Railway volume mount status and persistence"""
+    try:
+        import os
+        import time
+        from datetime import datetime
+        
+        # Get database path
+        database_path = os.getenv('DATABASE_PATH', '/app/data/app.db')
+        database_dir = os.path.dirname(database_path)
+        
+        info = {
+            'database_path': database_path,
+            'database_dir': database_dir,
+            'database_dir_exists': os.path.exists(database_dir),
+            'database_file_exists': os.path.exists(database_path),
+            'environment': 'Railway' if os.getenv('RAILWAY_ENVIRONMENT') else 'Local'
+        }
+        
+        # Check directory permissions
+        if os.path.exists(database_dir):
+            info['dir_writable'] = os.access(database_dir, os.W_OK)
+            info['dir_readable'] = os.access(database_dir, os.R_OK)
+            
+            # List files in directory
+            try:
+                files = os.listdir(database_dir)
+                info['files_in_dir'] = files
+            except Exception as e:
+                info['files_in_dir'] = f"Error: {e}"
+        
+        # Check database file details
+        if os.path.exists(database_path):
+            stat = os.stat(database_path)
+            info['db_file_size'] = stat.st_size
+            info['db_file_modified'] = datetime.fromtimestamp(stat.st_mtime).isoformat()
+            info['db_file_created'] = datetime.fromtimestamp(stat.st_ctime).isoformat()
+        
+        # Create a test persistence file
+        test_file = os.path.join(database_dir, 'persistence_test.txt')
+        current_time = datetime.now().isoformat()
+        
+        try:
+            # Try to read existing test file
+            if os.path.exists(test_file):
+                with open(test_file, 'r') as f:
+                    info['previous_deployment_time'] = f.read().strip()
+                info['persistence_test'] = 'PASS - File persisted from previous deployment'
+            else:
+                info['persistence_test'] = 'NEW - No previous test file found'
+            
+            # Write current deployment time
+            with open(test_file, 'w') as f:
+                f.write(current_time)
+            info['current_deployment_time'] = current_time
+            
+        except Exception as e:
+            info['persistence_test'] = f'FAIL - Cannot write test file: {e}'
+        
+        # Check if volume is actually mounted (Railway specific)
+        if os.getenv('RAILWAY_ENVIRONMENT'):
+            # Check if /app/data is a mount point
+            try:
+                # This will show different device IDs if it's a mount point
+                root_stat = os.stat('/app')
+                data_stat = os.stat('/app/data') if os.path.exists('/app/data') else None
+                
+                if data_stat:
+                    info['volume_mounted'] = root_stat.st_dev != data_stat.st_dev
+                    info['root_device'] = root_stat.st_dev
+                    info['data_device'] = data_stat.st_dev
+                else:
+                    info['volume_mounted'] = False
+                    info['mount_error'] = '/app/data does not exist'
+                    
+            except Exception as e:
+                info['volume_check_error'] = str(e)
+        
+        return jsonify(info)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
