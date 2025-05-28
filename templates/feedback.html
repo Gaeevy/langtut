@@ -171,16 +171,31 @@
                 
                 if (speakCardBtn) {
                     speakCardBtn.addEventListener('click', function() {
+                        console.log('🔊 Manual TTS button clicked');
                         window.ttsManager.speakCard(cardData.word, cardData.example, null, true);
                     });
                 }
                 
-                // Autoplay TTS after feedback is shown (with delay)
-                setTimeout(function() {
-                    if (cardData.word || cardData.example) {
-                        window.ttsManager.speakCard(cardData.word, cardData.example, null, true);
+                // Mobile-aware autoplay
+                var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                
+                if (isMobile) {
+                    console.log('🔊 Mobile device detected - autoplay disabled, manual interaction required');
+                    // On mobile, don't autoplay - require user interaction
+                    // Show a subtle hint that audio is available
+                    if (speakCardBtn) {
+                        speakCardBtn.style.animation = 'pulse 2s infinite';
+                        speakCardBtn.title = 'Tap to hear pronunciation (autoplay disabled on mobile)';
                     }
-                }, 1500); // Wait 1.5 seconds after page load
+                } else {
+                    // Desktop autoplay with delay
+                    setTimeout(function() {
+                        console.log('🔊 Desktop autoplay starting...');
+                        if (cardData.word || cardData.example) {
+                            window.ttsManager.speakCard(cardData.word, cardData.example, null, true);
+                        }
+                    }, 1500); // Wait 1.5 seconds after page load
+                }
             });
         }
         
