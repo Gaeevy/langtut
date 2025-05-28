@@ -11,6 +11,13 @@ API_SERVICE_NAME = "sheets"
 API_VERSION = "v4"
 MAX_CARDS_PER_SESSION = 20
 
+# Google Cloud Text-to-Speech settings
+TTS_ENABLED = true
+TTS_LANGUAGE_CODE = "pt-PT"  # European Portuguese
+TTS_VOICE_NAME = "pt-PT-Standard-A"  # Female voice (you can also use pt-PT-Standard-B, pt-PT-Standard-C, pt-PT-Standard-D)
+TTS_AUDIO_ENCODING = "MP3"
+GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE = "google-cloud-service-account.json"
+
 # Flask settings
 SESSION_TYPE = "filesystem"
 SESSION_PERMANENT = false

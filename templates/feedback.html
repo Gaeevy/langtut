@@ -21,22 +21,20 @@
     <div class="language-card feedback-card {% if correct %}correct-card{% else %}incorrect-card{% endif %} mb-4">
         <div class="row">
             <div class="col-md-12 text-center">
-                <!-- 1. Word itself (main focus) -->
-                <p class="card-word">{{ card.word }}</p>
+                <!-- 1. Word itself (main focus) with TTS button -->
+                <div class="word-with-audio mb-3">
+                    <p class="card-word" data-tts="{{ card.word }}">{{ card.word }}</p>
+                    <button type="button" class="btn-audio-minimal tts-speak-btn" id="speak-card-btn" title="Listen to pronunciation">
+                        <i class="bi bi-volume-up"></i>
+                    </button>
+                </div>
                 
                 <!-- 2. Translation (smaller) -->
                 <p class="card-translation text-muted mb-2" style="font-size: 1.1rem;">{{ card.translation }}</p>
                 
                 <!-- 3. Example of word usage -->
                 {% if card.example %}
-                <p class="card-example text-muted mb-3" style="font-style: italic; font-size: 0.95rem;">{{ card.example }}</p>
-                {% endif %}
-                
-                <!-- 4. English equivalent (last) -->
-                {% if card.equivalent %}
-                <div class="equivalent-content mb-3">
-                    <p class="text-muted" style="font-size: 0.9rem;"><strong>English:</strong> {{ card.equivalent }}</p>
-                </div>
+                <p class="card-example text-muted mb-3" style="font-style: italic; font-size: 0.95rem;" data-tts="{{ card.example }}">{{ card.example }}</p>
                 {% endif %}
                 
                 <!-- Animated Level Progress Dots -->
@@ -80,11 +78,29 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Include TTS JavaScript -->
+<script src="{{ url_for('static', filename='js/tts.js') }}"></script>
+
+<!-- Card data for JavaScript -->
+<script type="application/json" id="card-data">
+{
+    "word": {{ card.word|tojson }},
+    "example": {{ card.example|tojson if card.example else 'null' }},
+    "correct": {{ 'true' if correct else 'false' }},
+    "level": {{ card.level.value }}
+}
+</script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        var isCorrect = {% if correct %}true{% else %}false{% endif %};
-        var currentLevel = {{ card.level.value }};
+        // Get card data from JSON script tag
+        var cardDataElement = document.getElementById('card-data');
+        var cardData = JSON.parse(cardDataElement.textContent);
         
+        var isCorrect = cardData.correct;
+        var currentLevel = cardData.level;
+        
+        // Level progression animation
         if (isCorrect && currentLevel > 0) {
             // For correct answers, the level has already been incremented
             // So we need to animate the PREVIOUS level dot (the one that was just completed)
@@ -130,6 +146,46 @@
                 }
             }, 500);
         }
+        
+        // TTS functionality
+        function initializeTTS() {
+            // Wait for TTS manager to be ready
+            if (typeof window.ttsManager === 'undefined') {
+                setTimeout(initializeTTS, 100);
+                return;
+            }
+            
+            // Check if TTS is available
+            window.ttsManager.checkTTSStatus().then(function(available) {
+                if (!available) {
+                    // Hide TTS controls if not available
+                    var ttsControls = document.querySelector('.tts-controls');
+                    if (ttsControls) {
+                        ttsControls.style.display = 'none';
+                    }
+                    return;
+                }
+                
+                // Set up TTS button event listeners
+                var speakCardBtn = document.getElementById('speak-card-btn');
+                
+                if (speakCardBtn) {
+                    speakCardBtn.addEventListener('click', function() {
+                        window.ttsManager.speakCard(cardData.word, cardData.example, null, true);
+                    });
+                }
+                
+                // Autoplay TTS after feedback is shown (with delay)
+                setTimeout(function() {
+                    if (cardData.word || cardData.example) {
+                        window.ttsManager.speakCard(cardData.word, cardData.example, null, true);
+                    }
+                }, 1500); // Wait 1.5 seconds after page load
+            });
+        }
+        
+        // Initialize TTS
+        initializeTTS();
     });
 </script>
 {% endblock %} 

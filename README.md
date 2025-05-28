@@ -1,6 +1,6 @@
 # Language Learning Flashcard App
 
-A simple Flask web application that integrates with Google Sheets to provide ANKI-style language learning flashcards.
+A simple Flask web application that integrates with Google Sheets to provide ANKI-style language learning flashcards with European Portuguese text-to-speech.
 
 ## Features
 
@@ -8,7 +8,13 @@ A simple Flask web application that integrates with Google Sheets to provide ANK
 - Shows flashcards to users one by one
 - Tracks correct/incorrect answers
 - Updates statistics (times shown, correct answers, last shown) back to the spreadsheet
+- **European Portuguese Text-to-Speech** using Google Cloud TTS
+  - Automatic pronunciation on feedback pages
+  - Manual controls for word and example pronunciation
+  - Audio caching for improved performance
+  - Multiple voice options available
 - Simple, responsive UI
+- Progressive Web App (PWA) support for mobile devices
 
 ## Setup Instructions
 
@@ -33,6 +39,8 @@ poetry run python app.py
 ```
 
 4. Open your browser and navigate to http://127.0.0.1:5000
+
+**Note**: The `requirements.txt` file is maintained for Railway deployment. For local development, use Poetry as shown above.
 
 ### Google Sheets Setup
 
@@ -69,6 +77,21 @@ By default, the application can read public Google Sheets but cannot write back 
 6. Rename it to `client_secret.json` and place it in the root directory of this project
 
 After setting up the credentials, users will be able to authenticate with their Google account and allow the app to modify their sheets.
+
+### Setting up Text-to-Speech (Optional)
+
+The application supports European Portuguese text-to-speech using Google Cloud TTS. To enable this feature:
+
+1. **Enable Google Cloud TTS API** in your Google Cloud project
+2. **Create a service account** with "Cloud Text-to-Speech User" role
+3. **Download the service account key** as JSON
+4. **Configure the application**:
+   - For local development: Save the key as `google-cloud-service-account.json` in the project root
+   - For production: Set the `LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON` environment variable
+
+For detailed setup instructions, see [TTS_SETUP.md](TTS_SETUP.md).
+
+**Note**: Google Cloud TTS requires a billing account, but offers 1 million characters free per month. Typical usage costs are very low (around $0.14 per 1000 cards).
 
 ## Usage
 

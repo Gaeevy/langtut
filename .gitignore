@@ -26,6 +26,10 @@ client_secret.json
 credentials.json
 token.json
 
+# Google Cloud credentials - IMPORTANT: Do not commit these!
+google-cloud-service-account.json
+*service-account*.json
+
 # Environment variables
 .env
 

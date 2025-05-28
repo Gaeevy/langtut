@@ -935,3 +935,118 @@ def volume_check():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# Text-to-Speech Routes
+@app.route('/api/tts/status')
+def tts_status():
+    """Check TTS service availability"""
+    try:
+        from src.tts_service import is_tts_available, get_portuguese_voices, tts_service
+        
+        status = {
+            'available': is_tts_available(),
+            'language_code': 'pt-PT',
+            'voices': get_portuguese_voices() if is_tts_available() else [],
+            'credential_info': tts_service.get_credential_info()
+        }
+        
+        return jsonify(status)
+        
+    except Exception as e:
+        return jsonify({'error': str(e), 'available': False}), 500
+
+
+@app.route('/api/tts/speak', methods=['POST'])
+def generate_speech():
+    """Generate speech from text"""
+    try:
+        from src.tts_service import generate_portuguese_speech, is_tts_available
+        
+        if not is_tts_available():
+            return jsonify({'error': 'TTS service is not available'}), 503
+        
+        data = request.get_json()
+        if not data or 'text' not in data:
+            return jsonify({'error': 'Text is required'}), 400
+        
+        text = data.get('text', '').strip()
+        voice_name = data.get('voice_name')  # Optional voice override
+        
+        if not text:
+            return jsonify({'error': 'Text cannot be empty'}), 400
+        
+        # Generate speech
+        audio_base64 = generate_portuguese_speech(text, voice_name)
+        
+        if audio_base64:
+            return jsonify({
+                'success': True,
+                'audio_base64': audio_base64,
+                'text': text,
+                'voice_name': voice_name,
+                'format': 'mp3'
+            })
+        else:
+            return jsonify({'error': 'Failed to generate speech'}), 500
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tts/speak-card', methods=['POST'])
+def speak_card_content():
+    """Generate speech for card content (word and example)"""
+    try:
+        from src.tts_service import generate_portuguese_speech, is_tts_available
+        
+        if not is_tts_available():
+            return jsonify({'error': 'TTS service is not available'}), 503
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Request data is required'}), 400
+        
+        word = data.get('word', '').strip()
+        example = data.get('example', '').strip()
+        voice_name = data.get('voice_name')  # Optional voice override
+        
+        result = {
+            'success': True,
+            'audio': {}
+        }
+        
+        # Generate speech for word
+        if word:
+            word_audio = generate_portuguese_speech(word, voice_name)
+            if word_audio:
+                result['audio']['word'] = {
+                    'text': word,
+                    'audio_base64': word_audio,
+                    'format': 'mp3'
+                }
+        
+        # Generate speech for example
+        if example:
+            example_audio = generate_portuguese_speech(example, voice_name)
+            if example_audio:
+                result['audio']['example'] = {
+                    'text': example,
+                    'audio_base64': example_audio,
+                    'format': 'mp3'
+                }
+        
+        # Check if we generated any audio
+        if not result['audio']:
+            return jsonify({'error': 'No valid text provided for speech generation'}), 400
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/test-tts')
+def test_tts():
+    """Test page for TTS functionality"""
+    return render_template('test_tts.html')

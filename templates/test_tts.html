@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}TTS Test{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <h2>Text-to-Speech Test</h2>
+    <p class="text-muted">Test the European Portuguese TTS functionality</p>
+    
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5 class="card-title">TTS Status</h5>
+            <div id="tts-status" class="mb-3">
+                <span class="badge bg-secondary">Checking...</span>
+            </div>
+            
+            <div id="tts-controls" style="display: none;">
+                <h6>Test Phrases</h6>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" onclick="testSpeak('Olá, como está?')">
+                        <i class="bi bi-volume-up"></i> Test: "Olá, como está?"
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="testSpeak('Obrigado pela ajuda')">
+                        <i class="bi bi-volume-up"></i> Test: "Obrigado pela ajuda"
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="testSpeak('Eu gosto de aprender português')">
+                        <i class="bi bi-volume-up"></i> Test: "Eu gosto de aprender português"
+                    </button>
+                </div>
+                
+                <hr>
+                
+                <h6>Custom Text</h6>
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="custom-text" placeholder="Enter Portuguese text...">
+                    <button class="btn btn-outline-secondary" onclick="testCustomText()">
+                        <i class="bi bi-volume-up"></i> Speak
+                    </button>
+                </div>
+                
+                <hr>
+                
+                <h6>Available Voices</h6>
+                <div id="voices-list" class="small text-muted">Loading...</div>
+            </div>
+            
+            <div id="tts-error" style="display: none;" class="alert alert-warning">
+                <h6>TTS Not Available</h6>
+                <p>Text-to-Speech is not configured or available. Please check:</p>
+                <ul class="text-start">
+                    <li>Google Cloud TTS API is enabled</li>
+                    <li>Service account credentials are configured</li>
+                    <li>Project has billing enabled</li>
+                </ul>
+                <p><a href="/TTS_SETUP.md" target="_blank">View setup guide</a></p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-4">
+        <a href="/" class="btn btn-secondary">← Back to Home</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/tts.js') }}"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const statusElement = document.getElementById('tts-status');
+    const controlsElement = document.getElementById('tts-controls');
+    const errorElement = document.getElementById('tts-error');
+    const voicesElement = document.getElementById('voices-list');
+    
+    // Check TTS status
+    fetch('/api/tts/status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.available) {
+                statusElement.innerHTML = '<span class="badge bg-success">Available</span>';
+                controlsElement.style.display = 'block';
+                
+                // Show available voices
+                if (data.voices && data.voices.length > 0) {
+                    const voicesList = data.voices.map(voice => 
+                        `${voice.name} (${voice.gender})`
+                    ).join(', ');
+                    voicesElement.textContent = voicesList;
+                } else {
+                    voicesElement.textContent = 'No voice information available';
+                }
+            } else {
+                statusElement.innerHTML = '<span class="badge bg-danger">Not Available</span>';
+                errorElement.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            console.error('Error checking TTS status:', error);
+            statusElement.innerHTML = '<span class="badge bg-danger">Error</span>';
+            errorElement.style.display = 'block';
+        });
+});
+
+function testSpeak(text) {
+    if (window.ttsManager) {
+        window.ttsManager.speak(text);
+    } else {
+        alert('TTS Manager not available');
+    }
+}
+
+function testCustomText() {
+    const text = document.getElementById('custom-text').value.trim();
+    if (text) {
+        testSpeak(text);
+    } else {
+        alert('Please enter some text to speak');
+    }
+}
+</script>
+{% endblock %} 
