@@ -9,7 +9,7 @@ SCOPES = [
 ]
 API_SERVICE_NAME = "sheets"
 API_VERSION = "v4"
-MAX_CARDS_PER_SESSION = 20
+MAX_CARDS_PER_SESSION = 10
 
 # Google Cloud Text-to-Speech settings
 TTS_ENABLED = true
