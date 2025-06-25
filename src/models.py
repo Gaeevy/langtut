@@ -96,9 +96,11 @@ class CardSet(BaseModel):
     
     Attributes:
         name: The name of the tab
+        gid: The permanent sheet ID (numeric)
         cards: List of Card objects in this tab
     """
     name: str
+    gid: int  # Permanent sheet ID from Google Sheets
     cards: List[Card] = []
 
     @property

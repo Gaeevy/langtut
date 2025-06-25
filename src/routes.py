@@ -962,6 +962,7 @@ def generate_speech():
     """Generate speech from text"""
     try:
         from src.tts_service import generate_portuguese_speech, is_tts_available
+        from src.gsheet import read_card_set
         
         if not is_tts_available():
             return jsonify({'error': 'TTS service is not available'}), 503
@@ -976,8 +977,26 @@ def generate_speech():
         if not text:
             return jsonify({'error': 'Text cannot be empty'}), 400
         
-        # Generate speech
-        audio_base64 = generate_portuguese_speech(text, voice_name)
+        # Get caching context from session (if available)
+        spreadsheet_id = None
+        sheet_gid = None
+        
+        try:
+            # Get current user's spreadsheet
+            user_spreadsheet_id = get_user_spreadsheet_id(session)
+            if user_spreadsheet_id and 'active_tab' in session:
+                spreadsheet_id = user_spreadsheet_id
+                # Get the current tab's gid
+                active_tab = session['active_tab']
+                card_set = read_card_set(active_tab, user_spreadsheet_id)
+                if card_set:
+                    sheet_gid = card_set.gid
+        except Exception as e:
+            print(f"⚠️ Could not get caching context: {e}")
+            # Continue without caching context
+        
+        # Generate speech (with caching if context available)
+        audio_base64 = generate_portuguese_speech(text, voice_name, spreadsheet_id, sheet_gid)
         
         if audio_base64:
             return jsonify({
@@ -999,6 +1018,7 @@ def speak_card_content():
     """Generate speech for card content (word and example)"""
     try:
         from src.tts_service import generate_portuguese_speech, is_tts_available
+        from src.gsheet import read_card_set
         
         if not is_tts_available():
             return jsonify({'error': 'TTS service is not available'}), 503
@@ -1011,6 +1031,24 @@ def speak_card_content():
         example = data.get('example', '').strip()
         voice_name = data.get('voice_name')  # Optional voice override
         
+        # Get caching context from session (if available)
+        spreadsheet_id = None
+        sheet_gid = None
+        
+        try:
+            # Get current user's spreadsheet
+            user_spreadsheet_id = get_user_spreadsheet_id(session)
+            if user_spreadsheet_id and 'active_tab' in session:
+                spreadsheet_id = user_spreadsheet_id
+                # Get the current tab's gid
+                active_tab = session['active_tab']
+                card_set = read_card_set(active_tab, user_spreadsheet_id)
+                if card_set:
+                    sheet_gid = card_set.gid
+        except Exception as e:
+            print(f"⚠️ Could not get caching context: {e}")
+            # Continue without caching context
+        
         result = {
             'success': True,
             'audio': {}
@@ -1018,7 +1056,7 @@ def speak_card_content():
         
         # Generate speech for word
         if word:
-            word_audio = generate_portuguese_speech(word, voice_name)
+            word_audio = generate_portuguese_speech(word, voice_name, spreadsheet_id, sheet_gid)
             if word_audio:
                 result['audio']['word'] = {
                     'text': word,
@@ -1028,7 +1066,7 @@ def speak_card_content():
         
         # Generate speech for example
         if example:
-            example_audio = generate_portuguese_speech(example, voice_name)
+            example_audio = generate_portuguese_speech(example, voice_name, spreadsheet_id, sheet_gid)
             if example_audio:
                 result['audio']['example'] = {
                     'text': example,

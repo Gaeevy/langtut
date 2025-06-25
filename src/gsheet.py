@@ -123,7 +123,11 @@ def read_all_card_sets(spreadsheet_id: str = None) -> list[CardSet]:
 
     for worksheet in worksheets:
         cards = read_cards_from_worksheet(worksheet)
-        worksheet_parsed = CardSet(name=worksheet.title, cards=cards)
+        worksheet_parsed = CardSet(
+            name=worksheet.title, 
+            gid=worksheet.id,  # Capture the permanent sheet ID
+            cards=cards
+        )
         worksheets_parsed.append(worksheet_parsed)
 
     return worksheets_parsed
@@ -135,7 +139,11 @@ def read_card_set(worksheet_name, spreadsheet_id: str = None) -> CardSet | None:
         return None
 
     cards = read_cards_from_worksheet(worksheet)
-    worksheet_parsed = CardSet(name=worksheet.title, cards=cards)
+    worksheet_parsed = CardSet(
+        name=worksheet.title, 
+        gid=worksheet.id,  # Capture the permanent sheet ID
+        cards=cards
+    )
     return worksheet_parsed
 
 

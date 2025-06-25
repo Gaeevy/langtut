@@ -18,6 +18,9 @@ TTS_VOICE_NAME = "pt-PT-Standard-A"  # Female voice (you can also use pt-PT-Stan
 TTS_AUDIO_ENCODING = "MP3"
 GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE = "google-cloud-service-account.json"
 
+# Google Cloud Storage settings for TTS audio caching
+GCS_AUDIO_BUCKET = "langtut-tts"
+
 # Flask settings
 SESSION_TYPE = "filesystem"
 SESSION_PERMANENT = false
