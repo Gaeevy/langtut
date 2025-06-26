@@ -53,4 +53,4 @@ data/*.db
 *.sqlite3
 
 # Railway
-.railway/ 
+.railway/

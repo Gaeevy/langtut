@@ -45,14 +45,14 @@ def generate_audio(text, file_name, text_type: TextType, dry_run=False):
     if dry_run:
         logger.info(f"Dry run enabled. Skipping audio generation for {file_name}.")
         return
-    
+
     # Ensure output directory exists
     RAW_AUDIO_FILES.mkdir(parents=True, exist_ok=True)
 
     voice = "coral" # Default voice — goes for questions
     if text_type == TextType.ANSWER:
         voice = "nova"
-    
+
     output_path = RAW_AUDIO_FILES / file_name
     with client.audio.speech.with_streaming_response.create(
             model="gpt-4o-mini-tts",

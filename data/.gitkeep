@@ -1,2 +1,2 @@
 # This file ensures the data directory is tracked in git
-# The actual database file (app.db) should be ignored via .gitignore 
+# The actual database file (app.db) should be ignored via .gitignore

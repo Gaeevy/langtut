@@ -88,12 +88,12 @@
         padding-left: 30px;
         padding-right: 30px;
     }
-    
+
     .language-card {
         padding: 30px;
         margin: 20px 0;
     }
-    
+
     .btn {
         min-height: auto;
         padding: 8px 16px;
@@ -107,7 +107,7 @@
         max-width: 900px;
         padding: 40px;
     }
-    
+
     .language-card {
         padding: 40px;
     }
@@ -119,19 +119,19 @@
         background-color: #1a1a1a;
         color: #ffffff;
     }
-    
+
     .card-container,
     .language-card {
         background-color: #2d2d2d;
         color: #ffffff;
     }
-    
+
     .form-control {
         background-color: #3d3d3d;
         border-color: #555;
         color: #ffffff;
     }
-    
+
     .alert {
         background-color: #3d3d3d;
         border-color: #555;
@@ -199,12 +199,12 @@
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
-    
+
     #equivalent-content {
         animation: none;
     }
-    
+
     .login-icon {
         animation: none;
     }
-} 
+}

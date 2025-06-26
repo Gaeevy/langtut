@@ -147,7 +147,7 @@ The application uses Dynaconf for configuration management, allowing for:
 
 ### Configuration Files
 
-- `settings.toml` - Contains default non-sensitive configuration 
+- `settings.toml` - Contains default non-sensitive configuration
 - `.secrets.toml` - Contains sensitive configuration (not in Git)
 - `.secrets.toml.example` - Template for creating your secrets file
 
@@ -166,4 +166,4 @@ You can override any configuration value using environment variables with the `L
 
 ```bash
 export LANGTUT_DEBUG=false
-``` 
+```

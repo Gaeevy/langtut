@@ -12,4 +12,4 @@ DATABASE_PATH = "/app/data/app.db"
 RAILWAY_ENVIRONMENT = "production"
 
 # Note: Volumes are now created and attached through Railway dashboard
-# The volume should be mounted to /app/data in the Railway dashboard 
+# The volume should be mounted to /app/data in the Railway dashboard

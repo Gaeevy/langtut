@@ -60,16 +60,16 @@ def index():
 
     # Get the user's active spreadsheet ID
     user_spreadsheet_id = get_user_spreadsheet_id(session)
-    
+
     # If no spreadsheet set, show setup screen
     if not user_spreadsheet_id:
         return render_template('setup.html', is_authenticated=is_authenticated)
-    
+
     # Normal app flow with user's spreadsheet
     card_sets = read_all_card_sets(user_spreadsheet_id)
-    
-    return render_template('index.html', 
-                         is_authenticated=is_authenticated, 
+
+    return render_template('index.html',
+                         is_authenticated=is_authenticated,
                          tabs=card_sets,
                          user_spreadsheet_id=user_spreadsheet_id)
 
@@ -78,7 +78,7 @@ def index():
 def start_learning(tab_name):
     # Get user's active spreadsheet
     user_spreadsheet_id = get_user_spreadsheet_id(session)
-    
+
     # Read cards from the specified tab
     card_set = read_card_set(worksheet_name=tab_name, spreadsheet_id=user_spreadsheet_id)
     cards = card_set.get_cards_to_review(limit=MAX_CARDS_PER_SESSION, ignore_unshown=False)
@@ -110,10 +110,10 @@ def auth():
         # Get the current request URL and determine the correct redirect URI
         current_url = request.url
         print(f"Auth request URL: {current_url}")
-        
+
         # Determine if we're in production or development
         is_production = request.host.endswith('.railway.app') or request.host.endswith('.up.railway.app')
-        
+
         if is_production:
             # In production, use the Railway domain
             redirect_uri = f"https://{request.host}/oauth2callback"
@@ -185,7 +185,7 @@ def oauth2callback():
             # Fallback if we don't have it in the session
             print("Warning: No redirect_uri in session, constructing one...")
             is_production = request.host.endswith('.railway.app') or request.host.endswith('.up.railway.app')
-            
+
             if is_production:
                 redirect_uri = f"https://{request.host}/oauth2callback"
             else:
@@ -203,7 +203,7 @@ def oauth2callback():
         # Get the authorization response from the request
         authorization_response = request.url
         print(f"Authorization response: {authorization_response}")
-        
+
         # Fix for Railway: ensure HTTPS in authorization response URL
         if authorization_response.startswith('http://') and (request.host.endswith('.railway.app') or request.host.endswith('.up.railway.app')):
             authorization_response = authorization_response.replace('http://', 'https://', 1)
@@ -504,7 +504,7 @@ def test():
         db_status = f"Database connected. Users: {user_count}"
     except Exception as e:
         db_status = f"Database error: {str(e)}"
-    
+
     return f"""
     <h2>🚀 Language Learning App - Health Check</h2>
     <p>✅ Server is working correctly!</p>
@@ -611,10 +611,10 @@ def settings():
     if 'credentials' not in session:
         flash('Please log in with Google to manage your spreadsheet settings.', 'warning')
         return redirect(url_for('index'))
-    
+
     user_spreadsheet_id = get_user_spreadsheet_id(session)
-    
-    return render_template('settings.html', 
+
+    return render_template('settings.html',
                          user_spreadsheet_id=user_spreadsheet_id)
 
 
@@ -623,28 +623,28 @@ def validate_spreadsheet():
     """Validate a spreadsheet URL/ID via AJAX"""
     if 'credentials' not in session:
         return jsonify({'success': False, 'error': 'Not authenticated'})
-    
+
     spreadsheet_url = request.json.get('spreadsheet_url', '').strip()
     if not spreadsheet_url:
         return jsonify({'success': False, 'error': 'Please provide a spreadsheet URL or ID'})
-    
+
     try:
         # Extract spreadsheet ID from URL
         spreadsheet_id = extract_spreadsheet_id(spreadsheet_url)
-        
+
         # Validate access and format
         is_valid, error_message, worksheet_names = validate_spreadsheet_access(spreadsheet_id)
-        
+
         if is_valid:
             return jsonify({
-                'success': True, 
+                'success': True,
                 'spreadsheet_id': spreadsheet_id,
                 'worksheets': worksheet_names,
                 'message': 'Spreadsheet is valid and accessible!'
             })
         else:
             return jsonify({'success': False, 'error': error_message})
-            
+
     except Exception as e:
         return jsonify({'success': False, 'error': f'Error validating spreadsheet: {str(e)}'})
 
@@ -655,17 +655,17 @@ def set_spreadsheet():
     if 'credentials' not in session:
         flash('Please log in with Google to set your spreadsheet.', 'error')
         return redirect(url_for('settings'))
-    
+
     spreadsheet_url = request.form.get('spreadsheet_url', '').strip()
     if not spreadsheet_url:
         flash('Please provide a spreadsheet URL or ID.', 'error')
         return redirect(url_for('settings'))
-    
+
     try:
         # Extract and validate spreadsheet ID
         spreadsheet_id = extract_spreadsheet_id(spreadsheet_url)
         is_valid, error_message, worksheet_names = validate_spreadsheet_access(spreadsheet_id)
-        
+
         if is_valid:
             # Store in database
             try:
@@ -675,10 +675,10 @@ def set_spreadsheet():
                 flash(f'Error saving spreadsheet: {str(e)}', 'error')
         else:
             flash(f'Error: {error_message}', 'error')
-            
+
     except Exception as e:
         flash(f'Error setting spreadsheet: {str(e)}', 'error')
-    
+
     return redirect(url_for('settings'))
 
 
@@ -691,7 +691,7 @@ def reset_spreadsheet():
         from src.database import UserSpreadsheet, db
         UserSpreadsheet.query.filter_by(user_id=user.id, is_active=True).update({'is_active': False})
         db.session.commit()
-    
+
     flash('Spreadsheet reset. Please set up a new one.', 'info')
     return redirect(url_for('index'))  # Will show setup screen
 
@@ -702,18 +702,18 @@ def db_info():
     try:
         from src.database import db, User, UserSpreadsheet, ensure_tables
         ensure_tables()
-        
+
         # Get database stats
         user_count = User.query.count()
         spreadsheet_count = UserSpreadsheet.query.count()
         active_spreadsheets = UserSpreadsheet.query.filter_by(is_active=True).count()
-        
+
         # Get recent users
         recent_users = User.query.order_by(User.last_login.desc()).limit(5).all()
-        
+
         # Get recent spreadsheets
         recent_spreadsheets = UserSpreadsheet.query.order_by(UserSpreadsheet.last_used.desc()).limit(5).all()
-        
+
         info = {
             'database_stats': {
                 'total_users': user_count,
@@ -725,9 +725,9 @@ def db_info():
             'environment': 'Railway' if os.getenv('RAILWAY_ENVIRONMENT') else 'Local',
             'database_path': app.config.get('SQLALCHEMY_DATABASE_URI', 'Not configured')
         }
-        
+
         return jsonify(info)
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -775,29 +775,29 @@ def export_database():
         import sqlite3
         import tempfile
         from flask import Response
-        
+
         # Get database path from config
         db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
         if db_uri.startswith('sqlite:///'):
             db_path = db_uri.replace('sqlite:///', '')
         else:
             return jsonify({'error': 'Not a SQLite database'}), 400
-        
+
         # Create SQL dump
         conn = sqlite3.connect(db_path)
         dump_lines = []
         for line in conn.iterdump():
             dump_lines.append(line)
         conn.close()
-        
+
         dump_content = '\n'.join(dump_lines)
-        
+
         return Response(
             dump_content,
             mimetype='application/sql',
             headers={'Content-Disposition': 'attachment; filename=database_dump.sql'}
         )
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -808,46 +808,46 @@ def execute_query():
     try:
         import sqlite3
         from flask import request
-        
+
         query = request.json.get('query', '').strip()
         if not query:
             return jsonify({'error': 'No query provided'}), 400
-        
+
         # Safety check - only allow SELECT queries
         if not query.upper().startswith('SELECT'):
             return jsonify({'error': 'Only SELECT queries are allowed'}), 400
-        
+
         # Get database path
         db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
         if db_uri.startswith('sqlite:///'):
             db_path = db_uri.replace('sqlite:///', '')
         else:
             return jsonify({'error': 'Not a SQLite database'}), 400
-        
+
         # Execute query
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row  # Enable column access by name
         cursor = conn.cursor()
         cursor.execute(query)
-        
+
         # Fetch results
         rows = cursor.fetchall()
         columns = [description[0] for description in cursor.description]
-        
+
         # Convert to list of dictionaries
         results = []
         for row in rows:
             results.append(dict(zip(columns, row)))
-        
+
         conn.close()
-        
+
         return jsonify({
             'query': query,
             'columns': columns,
             'rows': results,
             'count': len(results)
         })
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -859,11 +859,11 @@ def volume_check():
         import os
         import time
         from datetime import datetime
-        
+
         # Get database path
         database_path = os.getenv('DATABASE_PATH', '/app/data/app.db')
         database_dir = os.path.dirname(database_path)
-        
+
         info = {
             'database_path': database_path,
             'database_dir': database_dir,
@@ -871,30 +871,30 @@ def volume_check():
             'database_file_exists': os.path.exists(database_path),
             'environment': 'Railway' if os.getenv('RAILWAY_ENVIRONMENT') else 'Local'
         }
-        
+
         # Check directory permissions
         if os.path.exists(database_dir):
             info['dir_writable'] = os.access(database_dir, os.W_OK)
             info['dir_readable'] = os.access(database_dir, os.R_OK)
-            
+
             # List files in directory
             try:
                 files = os.listdir(database_dir)
                 info['files_in_dir'] = files
             except Exception as e:
                 info['files_in_dir'] = f"Error: {e}"
-        
+
         # Check database file details
         if os.path.exists(database_path):
             stat = os.stat(database_path)
             info['db_file_size'] = stat.st_size
             info['db_file_modified'] = datetime.fromtimestamp(stat.st_mtime).isoformat()
             info['db_file_created'] = datetime.fromtimestamp(stat.st_ctime).isoformat()
-        
+
         # Create a test persistence file
         test_file = os.path.join(database_dir, 'persistence_test.txt')
         current_time = datetime.now().isoformat()
-        
+
         try:
             # Try to read existing test file
             if os.path.exists(test_file):
@@ -903,15 +903,15 @@ def volume_check():
                 info['persistence_test'] = 'PASS - File persisted from previous deployment'
             else:
                 info['persistence_test'] = 'NEW - No previous test file found'
-            
+
             # Write current deployment time
             with open(test_file, 'w') as f:
                 f.write(current_time)
             info['current_deployment_time'] = current_time
-            
+
         except Exception as e:
             info['persistence_test'] = f'FAIL - Cannot write test file: {e}'
-        
+
         # Check if volume is actually mounted (Railway specific)
         if os.getenv('RAILWAY_ENVIRONMENT'):
             # Check if /app/data is a mount point
@@ -919,7 +919,7 @@ def volume_check():
                 # This will show different device IDs if it's a mount point
                 root_stat = os.stat('/app')
                 data_stat = os.stat('/app/data') if os.path.exists('/app/data') else None
-                
+
                 if data_stat:
                     info['volume_mounted'] = root_stat.st_dev != data_stat.st_dev
                     info['root_device'] = root_stat.st_dev
@@ -927,12 +927,12 @@ def volume_check():
                 else:
                     info['volume_mounted'] = False
                     info['mount_error'] = '/app/data does not exist'
-                    
+
             except Exception as e:
                 info['volume_check_error'] = str(e)
-        
+
         return jsonify(info)
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -943,16 +943,16 @@ def tts_status():
     """Check TTS service availability"""
     try:
         from src.tts_service import is_tts_available, get_portuguese_voices, tts_service
-        
+
         status = {
             'available': is_tts_available(),
             'language_code': 'pt-PT',
             'voices': get_portuguese_voices() if is_tts_available() else [],
             'credential_info': tts_service.get_credential_info()
         }
-        
+
         return jsonify(status)
-        
+
     except Exception as e:
         return jsonify({'error': str(e), 'available': False}), 500
 
@@ -963,24 +963,24 @@ def generate_speech():
     try:
         from src.tts_service import generate_portuguese_speech, is_tts_available
         from src.gsheet import read_card_set
-        
+
         if not is_tts_available():
             return jsonify({'error': 'TTS service is not available'}), 503
-        
+
         data = request.get_json()
         if not data or 'text' not in data:
             return jsonify({'error': 'Text is required'}), 400
-        
+
         text = data.get('text', '').strip()
         voice_name = data.get('voice_name')  # Optional voice override
-        
+
         if not text:
             return jsonify({'error': 'Text cannot be empty'}), 400
-        
+
         # Get caching context from session (if available)
         spreadsheet_id = None
         sheet_gid = None
-        
+
         try:
             # Get current user's spreadsheet
             user_spreadsheet_id = get_user_spreadsheet_id(session)
@@ -994,10 +994,10 @@ def generate_speech():
         except Exception as e:
             print(f"⚠️ Could not get caching context: {e}")
             # Continue without caching context
-        
+
         # Generate speech (with caching if context available)
         audio_base64 = generate_portuguese_speech(text, voice_name, spreadsheet_id, sheet_gid)
-        
+
         if audio_base64:
             return jsonify({
                 'success': True,
@@ -1008,7 +1008,7 @@ def generate_speech():
             })
         else:
             return jsonify({'error': 'Failed to generate speech'}), 500
-            
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1019,22 +1019,22 @@ def speak_card_content():
     try:
         from src.tts_service import generate_portuguese_speech, is_tts_available
         from src.gsheet import read_card_set
-        
+
         if not is_tts_available():
             return jsonify({'error': 'TTS service is not available'}), 503
-        
+
         data = request.get_json()
         if not data:
             return jsonify({'error': 'Request data is required'}), 400
-        
+
         word = data.get('word', '').strip()
         example = data.get('example', '').strip()
         voice_name = data.get('voice_name')  # Optional voice override
-        
+
         # Get caching context from session (if available)
         spreadsheet_id = None
         sheet_gid = None
-        
+
         try:
             # Get current user's spreadsheet
             user_spreadsheet_id = get_user_spreadsheet_id(session)
@@ -1048,12 +1048,12 @@ def speak_card_content():
         except Exception as e:
             print(f"⚠️ Could not get caching context: {e}")
             # Continue without caching context
-        
+
         result = {
             'success': True,
             'audio': {}
         }
-        
+
         # Generate speech for word
         if word:
             word_audio = generate_portuguese_speech(word, voice_name, spreadsheet_id, sheet_gid)
@@ -1063,7 +1063,7 @@ def speak_card_content():
                     'audio_base64': word_audio,
                     'format': 'mp3'
                 }
-        
+
         # Generate speech for example
         if example:
             example_audio = generate_portuguese_speech(example, voice_name, spreadsheet_id, sheet_gid)
@@ -1073,13 +1073,13 @@ def speak_card_content():
                     'audio_base64': example_audio,
                     'format': 'mp3'
                 }
-        
+
         # Check if we generated any audio
         if not result['audio']:
             return jsonify({'error': 'No valid text provided for speech generation'}), 400
-        
+
         return jsonify(result)
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

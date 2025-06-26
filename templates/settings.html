@@ -7,7 +7,7 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
             <h2 class="mb-4">📊 Spreadsheet Settings</h2>
-            
+
             <!-- Flash messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -58,7 +58,7 @@
                     <!-- Validation Form -->
                     <div class="mb-3">
                         <label for="spreadsheet_url" class="form-label">Google Sheets URL or ID</label>
-                        <input type="text" class="form-control" id="spreadsheet_url" 
+                        <input type="text" class="form-control" id="spreadsheet_url"
                                placeholder="https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit or just the ID">
                         <div class="form-text">
                             Paste the full URL from your Google Sheets or just the spreadsheet ID.
@@ -144,20 +144,20 @@ document.getElementById('validate-btn').addEventListener('click', function() {
     const resultsDiv = document.getElementById('validation-results');
     const confirmForm = document.getElementById('confirm-form');
     const btn = this;
-    
+
     if (!url) {
         resultsDiv.innerHTML = '<div class="alert alert-danger">Please enter a spreadsheet URL or ID.</div>';
         resultsDiv.style.display = 'block';
         return;
     }
-    
+
     // Show loading
     btn.disabled = true;
     btn.innerHTML = '⏳ Validating...';
     resultsDiv.innerHTML = '<div class="alert alert-info">Checking spreadsheet access and format...</div>';
     resultsDiv.style.display = 'block';
     confirmForm.style.display = 'none';
-    
+
     // Make AJAX request
     fetch('/validate-spreadsheet', {
         method: 'POST',
@@ -172,7 +172,7 @@ document.getElementById('validate-btn').addEventListener('click', function() {
     .then(data => {
         btn.disabled = false;
         btn.innerHTML = '🔍 Validate Spreadsheet';
-        
+
         if (data.success) {
             resultsDiv.innerHTML = `
                 <div class="alert alert-success">
@@ -181,11 +181,11 @@ document.getElementById('validate-btn').addEventListener('click', function() {
                     <strong>Worksheets found:</strong> ${data.worksheets.join(', ')}
                 </div>
             `;
-            
+
             // Show confirmation form
             document.getElementById('confirmed_url').value = url;
             confirmForm.style.display = 'block';
-            
+
             // Store the validated spreadsheet ID for localStorage
             window.validatedSpreadsheetId = data.spreadsheet_id;
         } else {
@@ -220,4 +220,4 @@ function resetSpreadsheet() {
     return true;
 }
 </script>
-{% endblock %} 
+{% endblock %}

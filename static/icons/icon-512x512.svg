@@ -10,10 +10,10 @@
   <text x="256" y="230" font-family="Arial, sans-serif" font-size="96" fill="#4a6da7" text-anchor="middle" font-weight="bold">LT</text>
   <text x="256" y="350" font-family="Arial, sans-serif" font-size="48" fill="white" text-anchor="middle" font-weight="500">LangTut</text>
   <text x="256" y="390" font-family="Arial, sans-serif" font-size="28" fill="#e0e0e0" text-anchor="middle">Learn & Practice</text>
-  
+
   <!-- Decorative elements -->
   <circle cx="120" cy="400" r="8" fill="white" opacity="0.3"/>
   <circle cx="392" cy="400" r="8" fill="white" opacity="0.3"/>
   <circle cx="180" cy="450" r="6" fill="white" opacity="0.2"/>
   <circle cx="332" cy="450" r="6" fill="white" opacity="0.2"/>
-</svg> 
+</svg>

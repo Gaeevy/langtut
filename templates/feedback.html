@@ -16,7 +16,7 @@
         </div>
         {% endif %}
     </div>
-    
+
     <!-- Card with visual border feedback -->
     <div class="language-card feedback-card {% if correct %}correct-card{% else %}incorrect-card{% endif %} mb-4">
         <div class="row">
@@ -28,21 +28,21 @@
                         <i class="bi bi-volume-up"></i>
                     </button>
                 </div>
-                
+
                 <!-- 2. Translation (smaller) -->
                 <p class="card-translation text-muted mb-2" style="font-size: 1.1rem;">{{ card.translation }}</p>
-                
+
                 <!-- 3. Example of word usage -->
                 {% if card.example %}
                 <p class="card-example text-muted mb-3" style="font-style: italic; font-size: 0.95rem;" data-tts="{{ card.example }}">{{ card.example }}</p>
                 {% endif %}
-                
+
                 <!-- Animated Level Progress Dots -->
                 <div class="level-progress-container">
                     <div class="level-tooltip">Level {{ card.level.value }}</div>
                     <div class="level-progress">
                         {% for i in range(8) %}
-                        <div class="level-dot {% if i < card.level.value %}completed{% elif i == card.level.value %}current{% endif %}" 
+                        <div class="level-dot {% if i < card.level.value %}completed{% elif i == card.level.value %}current{% endif %}"
                              data-level="{{ i }}"></div>
                         {% endfor %}
                     </div>
@@ -50,17 +50,17 @@
                     <small class="text-warning"><i class="bi bi-arrow-repeat"></i> Review</small>
                     {% endif %}
                 </div>
-                
+
                 <!-- Difficulty rating for correct answers -->
                 {% if correct and not reviewing %}
                 <div class="difficulty-rating mt-4">
                     <p class="small text-muted mb-2">How was this card?</p>
                     <div class="btn-group" role="group">
-                        <a href="{{ url_for('rate_difficulty', card_index=card_index, difficulty='easy') }}" 
+                        <a href="{{ url_for('rate_difficulty', card_index=card_index, difficulty='easy') }}"
                            class="btn btn-sm btn-outline-success">
                             <i class="bi bi-emoji-smile"></i> Easy
                         </a>
-                        <a href="{{ url_for('rate_difficulty', card_index=card_index, difficulty='difficult') }}" 
+                        <a href="{{ url_for('rate_difficulty', card_index=card_index, difficulty='difficult') }}"
                            class="btn btn-sm btn-outline-warning">
                             <i class="bi bi-emoji-frown"></i> Hard
                         </a>
@@ -70,7 +70,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="d-grid gap-2">
         <a href="{{ url_for('next_card') }}" class="btn btn-primary">Next Card</a>
     </div>
@@ -96,10 +96,10 @@
         // Get card data from JSON script tag
         var cardDataElement = document.getElementById('card-data');
         var cardData = JSON.parse(cardDataElement.textContent);
-        
+
         var isCorrect = cardData.correct;
         var currentLevel = cardData.level;
-        
+
         // Level progression animation
         if (isCorrect && currentLevel > 0) {
             // For correct answers, the level has already been incremented
@@ -107,23 +107,23 @@
             var previousLevel = currentLevel - 1;
             var previousDot = document.querySelector('[data-level="' + previousLevel + '"]');
             var currentDot = document.querySelector('[data-level="' + currentLevel + '"]');
-            
+
             // Reset the dots to show the animation properly
             if (previousDot && currentDot) {
                 // Temporarily reset to pre-answer state
                 previousDot.classList.remove('completed');
                 previousDot.classList.add('current');
                 currentDot.classList.remove('current');
-                
+
                 // Animate the progression
                 setTimeout(function() {
                     previousDot.classList.add('shake-success');
-                    
+
                     // After shake, complete the progression
                     setTimeout(function() {
                         previousDot.classList.remove('current', 'shake-success');
                         previousDot.classList.add('completed');
-                        
+
                         // Current dot becomes active
                         if (currentLevel < 8) {
                             currentDot.classList.add('current');
@@ -134,11 +134,11 @@
         } else if (!isCorrect) {
             // For incorrect answers, animate the current level dot
             var currentDot = document.querySelector('[data-level="' + currentLevel + '"]');
-            
+
             setTimeout(function() {
                 if (currentDot) {
                     currentDot.classList.add('shake-error');
-                    
+
                     // Remove shake after animation
                     setTimeout(function() {
                         currentDot.classList.remove('shake-error');
@@ -146,7 +146,7 @@
                 }
             }, 500);
         }
-        
+
         // TTS functionality
         function initializeTTS() {
             // Wait for TTS manager to be ready
@@ -154,7 +154,7 @@
                 setTimeout(initializeTTS, 100);
                 return;
             }
-            
+
             // Check if TTS is available
             window.ttsManager.checkTTSStatus().then(function(available) {
                 if (!available) {
@@ -165,20 +165,20 @@
                     }
                     return;
                 }
-                
+
                 // Set up TTS button event listeners
                 var speakCardBtn = document.getElementById('speak-card-btn');
-                
+
                 if (speakCardBtn) {
                     speakCardBtn.addEventListener('click', function() {
                         console.log('🔊 Manual TTS button clicked');
                         window.ttsManager.speakCard(cardData.word, cardData.example, null, true);
                     });
                 }
-                
+
                 // Mobile-aware autoplay
                 var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                
+
                 if (isMobile) {
                     console.log('🔊 Mobile device detected - autoplay disabled, manual interaction required');
                     // On mobile, don't autoplay - require user interaction
@@ -198,9 +198,9 @@
                 }
             });
         }
-        
+
         // Initialize TTS
         initializeTTS();
     });
 </script>
-{% endblock %} 
+{% endblock %}

@@ -12,30 +12,30 @@ class TTSManager {
         this.isLoading = false;
         this.audioContext = null;
         this.userInteracted = false;
-        
+
         // Initialize mobile audio handling
         this.initializeMobileAudio();
-        
+
         // Initialize TTS status
         this.checkTTSStatus();
     }
-    
+
     /**
      * Initialize mobile audio handling
      */
     initializeMobileAudio() {
         // Detect mobile
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
+
         if (isMobile) {
             console.log('🔊 Mobile device detected, setting up audio context');
-            
+
             // Set up user interaction detection
             const enableAudio = () => {
                 if (!this.userInteracted) {
                     console.log('🔊 User interaction detected, enabling audio');
                     this.userInteracted = true;
-                    
+
                     // Create and play a silent audio to unlock audio context
                     const silentAudio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU4Ljk1AAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABmwQ+XAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABrTjOWAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
                     silentAudio.play().catch(() => {
@@ -43,14 +43,14 @@ class TTSManager {
                     });
                 }
             };
-            
+
             // Listen for user interactions
             ['touchstart', 'touchend', 'mousedown', 'keydown'].forEach(event => {
                 document.addEventListener(event, enableAudio, { once: true, passive: true });
             });
         }
     }
-    
+
     /**
      * Check if TTS service is available
      */
@@ -58,15 +58,15 @@ class TTSManager {
         try {
             const response = await fetch('/api/tts/status');
             const data = await response.json();
-            
+
             this.isAvailable = data.available;
             this.voices = data.voices || [];
-            
+
             console.log('TTS Status:', {
                 available: this.isAvailable,
                 voices: this.voices.length
             });
-            
+
             return this.isAvailable;
         } catch (error) {
             console.error('Error checking TTS status:', error);
@@ -74,7 +74,7 @@ class TTSManager {
             return false;
         }
     }
-    
+
     /**
      * Generate and play speech for given text
      */
@@ -83,21 +83,21 @@ class TTSManager {
             console.warn('TTS service is not available');
             return false;
         }
-        
+
         if (!text || !text.trim()) {
             console.warn('No text provided for TTS');
             return false;
         }
-        
+
         // Check cache first
         const cacheKey = `${text.trim()}_${voiceName || 'default'}`;
         if (this.audioCache.has(cacheKey)) {
             return this.playAudio(this.audioCache.get(cacheKey));
         }
-        
+
         // Show loading state
         this.setLoadingState(true);
-        
+
         try {
             const response = await fetch('/api/tts/speak', {
                 method: 'POST',
@@ -109,13 +109,13 @@ class TTSManager {
                     voice_name: voiceName
                 })
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success && data.audio_base64) {
                 // Cache the audio
                 this.audioCache.set(cacheKey, data.audio_base64);
-                
+
                 // Play the audio
                 return this.playAudio(data.audio_base64);
             } else {
@@ -129,7 +129,7 @@ class TTSManager {
             this.setLoadingState(false);
         }
     }
-    
+
     /**
      * Generate and play speech for card content (word and example)
      */
@@ -138,9 +138,9 @@ class TTSManager {
             console.warn('TTS service is not available');
             return false;
         }
-        
+
         this.setLoadingState(true);
-        
+
         try {
             const response = await fetch('/api/tts/speak-card', {
                 method: 'POST',
@@ -153,26 +153,26 @@ class TTSManager {
                     voice_name: voiceName
                 })
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success && data.audio) {
                 // Cache the audio
                 if (data.audio.word) {
                     const wordCacheKey = `${word}_${voiceName || 'default'}`;
                     this.audioCache.set(wordCacheKey, data.audio.word.audio_base64);
                 }
-                
+
                 if (data.audio.example) {
                     const exampleCacheKey = `${example}_${voiceName || 'default'}`;
                     this.audioCache.set(exampleCacheKey, data.audio.example.audio_base64);
                 }
-                
+
                 // Play audio if autoplay is enabled
                 if (autoplay) {
                     await this.playCardAudio(data.audio);
                 }
-                
+
                 return data.audio;
             } else {
                 console.error('TTS card generation failed:', data.error);
@@ -185,7 +185,7 @@ class TTSManager {
             this.setLoadingState(false);
         }
     }
-    
+
     /**
      * Play audio from base64 data
      */
@@ -193,22 +193,22 @@ class TTSManager {
         try {
             // Stop current audio if playing
             this.stopCurrentAudio();
-            
+
             // Mobile debugging
             console.log('🔊 Attempting to play audio on:', {
                 userAgent: navigator.userAgent,
                 isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
                 audioContext: typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined'
             });
-            
+
             // Create audio element
             const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
             this.currentAudio = audio;
-            
+
             // Add mobile-specific audio settings
             audio.preload = 'auto';
             audio.volume = 1.0;
-            
+
             // Mobile debugging events
             audio.addEventListener('loadstart', () => console.log('🔊 Audio loadstart'));
             audio.addEventListener('loadeddata', () => console.log('🔊 Audio loadeddata'));
@@ -229,41 +229,41 @@ class TTSManager {
                     readyState: audio.readyState
                 });
             });
-            
+
             // Wait for audio to be ready
             await new Promise((resolve, reject) => {
                 const timeout = setTimeout(() => {
                     reject(new Error('Audio loading timeout'));
                 }, 10000); // 10 second timeout
-                
+
                 audio.addEventListener('canplaythrough', () => {
                     clearTimeout(timeout);
                     resolve();
                 }, { once: true });
-                
+
                 audio.addEventListener('error', () => {
                     clearTimeout(timeout);
                     reject(new Error('Audio loading failed'));
                 });
-                
+
                 // Start loading
                 audio.load();
             });
-            
+
             console.log('🔊 Audio ready, attempting to play...');
-            
+
             // Try to play the audio
             const playPromise = audio.play();
-            
+
             if (playPromise !== undefined) {
                 await playPromise;
                 console.log('🔊 Audio play promise resolved successfully');
             }
-            
+
             return true;
         } catch (error) {
             console.error('🔊 Error playing audio:', error);
-            
+
             // Mobile-specific error handling
             if (error.name === 'NotAllowedError') {
                 console.error('🔊 Audio blocked by browser autoplay policy');
@@ -274,11 +274,11 @@ class TTSManager {
             } else {
                 console.error('🔊 Unknown audio error:', error.message);
             }
-            
+
             return false;
         }
     }
-    
+
     /**
      * Play card audio with delay between word and example
      */
@@ -287,7 +287,7 @@ class TTSManager {
             // Play word first
             if (audioData.word) {
                 await this.playAudio(audioData.word.audio_base64);
-                
+
                 // Wait for word to finish + delay
                 if (this.currentAudio) {
                     await new Promise(resolve => {
@@ -297,19 +297,19 @@ class TTSManager {
                     });
                 }
             }
-            
+
             // Play example
             if (audioData.example) {
                 await this.playAudio(audioData.example.audio_base64);
             }
-            
+
             return true;
         } catch (error) {
             console.error('Error playing card audio:', error);
             return false;
         }
     }
-    
+
     /**
      * Stop currently playing audio
      */
@@ -320,13 +320,13 @@ class TTSManager {
             this.currentAudio = null;
         }
     }
-    
+
     /**
      * Set loading state for UI feedback
      */
     setLoadingState(loading) {
         this.isLoading = loading;
-        
+
         // Update minimal audio buttons
         const minimalButtons = document.querySelectorAll('.btn-audio-minimal');
         minimalButtons.forEach(btn => {
@@ -338,7 +338,7 @@ class TTSManager {
                 btn.innerHTML = '<i class="bi bi-volume-up"></i>';
             }
         });
-        
+
         // Update legacy TTS buttons (for other pages)
         const speakButtons = document.querySelectorAll('.tts-speak-btn:not(.btn-audio-minimal)');
         speakButtons.forEach(btn => {
@@ -351,7 +351,7 @@ class TTSManager {
             }
         });
     }
-    
+
     /**
      * Create a speak button for text
      */
@@ -360,15 +360,15 @@ class TTSManager {
         button.className = className;
         button.innerHTML = '<i class="bi bi-volume-up"></i> Listen';
         button.title = 'Listen to pronunciation';
-        
+
         button.addEventListener('click', async (e) => {
             e.preventDefault();
             await this.speak(text);
         });
-        
+
         return button;
     }
-    
+
     /**
      * Add speak buttons to elements with data-tts attribute
      */
@@ -378,13 +378,13 @@ class TTSManager {
             const text = element.getAttribute('data-tts') || element.textContent;
             if (text && text.trim()) {
                 const button = this.createSpeakButton(text.trim());
-                
+
                 // Add button after the element
                 element.parentNode.insertBefore(button, element.nextSibling);
             }
         });
     }
-    
+
     /**
      * Clear audio cache
      */
@@ -392,7 +392,7 @@ class TTSManager {
         this.audioCache.clear();
         console.log('TTS audio cache cleared');
     }
-    
+
     /**
      * Get cache statistics
      */
@@ -417,4 +417,4 @@ document.addEventListener('DOMContentLoaded', () => {
 // Export for module use
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = TTSManager;
-} 
+}
