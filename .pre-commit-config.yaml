@@ -1,0 +1,93 @@
+# Pre-commit hooks for Language Learning Flashcard App
+# Run with: pre-commit run --all-files
+
+repos:
+  # Ruff - Fast Python linter and formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.0
+    hooks:
+      # Linter
+      - id: ruff
+        name: ruff lint
+        args: [--fix]
+        types_or: [python, pyi]
+      # Formatter
+      - id: ruff-format
+        name: ruff format
+        types_or: [python, pyi]
+
+  # Basic file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      # File formatting
+      - id: trailing-whitespace
+        name: trim trailing whitespace
+      - id: end-of-file-fixer
+        name: fix end of files
+      - id: mixed-line-ending
+        name: fix mixed line endings
+        args: [--fix=lf]
+
+      # JSON/YAML validation
+      - id: check-json
+        name: check json files
+      - id: check-yaml
+        name: check yaml files
+        exclude: |
+          (?x)^(
+              railway\.toml
+          )$
+      - id: check-toml
+        name: check toml files
+
+      # Python-specific
+      - id: check-ast
+        name: check python ast
+      - id: check-builtin-literals
+        name: check builtin literals
+      - id: check-docstring-first
+        name: check docstring first
+      - id: debug-statements
+        name: debug statements (Python)
+
+      # Security
+      - id: detect-private-key
+        name: detect private keys
+
+  # Security checks
+  - repo: https://github.com/PyCQA/bandit
+    rev: '1.8.5'
+    hooks:
+      - id: bandit
+        name: bandit security check
+        args: ['-ll', '--exclude', 'src/routes_original_backup.py']
+        exclude: |
+          (?x)^(
+              src/routes_original_backup\.py|
+              simple_.*\.py|
+              misc/.*
+          )$
+
+  # Custom local hooks
+  - repo: local
+    hooks:
+      - id: poetry-export
+        name: export poetry dependencies to requirements.txt
+        entry: poetry export --format=requirements.txt --output=requirements.txt --without-hashes
+        language: system
+        files: pyproject.toml
+        pass_filenames: false
+
+# Global settings
+default_language_version:
+  python: python3.11
+
+# Performance: run hooks in parallel when possible
+default_stages: [commit]
+
+# Fail fast - stop on first failure
+fail_fast: false
+
+# Minimum version
+minimum_pre_commit_version: '3.0.0'

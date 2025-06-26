@@ -4,12 +4,12 @@ Data models for the application.
 This module contains Pydantic models for representing data structures
 in the application, such as language cards and tab collections.
 """
-import random
-from pydantic import BaseModel, computed_field
-from typing import List, Optional
-from enum import Enum
-from datetime import datetime, timedelta
 
+import random
+from datetime import datetime, timedelta
+from enum import Enum
+
+from pydantic import BaseModel, computed_field
 
 NEVER_SHOWN = datetime(1970, 1, 1)  # Unix epoch start date
 
@@ -48,7 +48,7 @@ days_to_review = {
 class Card(BaseModel):
     """
     Represents a language learning flashcard.
-    
+
     Attributes:
         id: Unique identifier for the card
         word: The word in the language being learned
@@ -61,6 +61,7 @@ class Card(BaseModel):
         level: Proficiency level of the user for this card
         last_shown: Timestamp of when the card was last shown
     """
+
     id: int
     word: str
     translation: str
@@ -71,18 +72,18 @@ class Card(BaseModel):
     cnt_corr_answers: int = 0
     level: Levels = Levels.LEVEL_0
     last_shown: datetime = NEVER_SHOWN
-    
+
     @computed_field
     def next_review(self) -> datetime:
         """Calculate when this card should be reviewed next based on its level."""
         return self.last_shown + timedelta(days=days_to_review[self.level])
-    
+
     @computed_field
     def seconds_to_next_review(self) -> int:
         """Calculate seconds until the next review is due."""
         time_delta = self.next_review - datetime.now()
         return int(time_delta.total_seconds())
-    
+
     @computed_field
     def is_delayed(self) -> bool:
         """Check if this card is overdue for review."""
@@ -93,15 +94,16 @@ class Card(BaseModel):
 class CardSet(BaseModel):
     """
     Represents a collection of cards (a tab in the spreadsheet).
-    
+
     Attributes:
         name: The name of the tab
         gid: The permanent sheet ID (numeric)
         cards: List of Card objects in this tab
     """
+
     name: str
     gid: int  # Permanent sheet ID from Google Sheets
-    cards: List[Card] = []
+    cards: list[Card] = []
 
     @property
     def card_count(self) -> int:
@@ -115,14 +117,16 @@ class CardSet(BaseModel):
             return 0.0
         return round(sum(card.level.value for card in self.cards) / len(self.cards), 1)
 
-    def cards_to_review(self, ignore_unshown: bool) -> List[Card]:
+    def cards_to_review(self, ignore_unshown: bool) -> list[Card]:
         """Returns the list of cards that are due for review."""
         if ignore_unshown:
             return [card for card in self.cards if card.is_delayed and card.cnt_shown > 0]
         else:
             return [card for card in self.cards if card.is_delayed]
 
-    def get_cards_to_review(self, limit: int | None = None, ignore_unshown: bool = False) -> List[Card]:
+    def get_cards_to_review(
+        self, limit: int | None = None, ignore_unshown: bool = False
+    ) -> list[Card]:
         """Returns the number of cards that are due for review."""
         cards_to_review = self.cards_to_review(ignore_unshown)
         sorted_cards = sorted(cards_to_review, key=lambda card: card.seconds_to_next_review)

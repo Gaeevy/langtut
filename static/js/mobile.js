@@ -16,7 +16,7 @@ class MobileEnhancements {
     // PWA Installation
     setupPWA() {
         let deferredPrompt;
-        
+
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
@@ -46,7 +46,7 @@ class MobileEnhancements {
             <span><i class="bi bi-download"></i> Install app for better experience</span>
             <button id="install-btn" class="btn btn-sm btn-primary">Install</button>
         `;
-        
+
         const container = document.querySelector('.container');
         if (container) {
             container.insertBefore(installBanner, container.firstChild);
@@ -76,18 +76,18 @@ class MobileEnhancements {
 
         card.addEventListener('touchmove', (e) => {
             if (!isSwipeActive) return;
-            
+
             currentX = e.touches[0].clientX;
             currentY = e.touches[0].clientY;
-            
+
             const deltaX = currentX - startX;
             const deltaY = currentY - startY;
-            
+
             // Only handle horizontal swipes
             if (Math.abs(deltaX) > Math.abs(deltaY)) {
                 e.preventDefault();
                 card.style.transform = `translateX(${deltaX}px) rotate(${deltaX * 0.1}deg)`;
-                
+
                 // Visual feedback
                 if (deltaX > 50) {
                     card.style.backgroundColor = '#d4edda'; // Green tint
@@ -102,13 +102,13 @@ class MobileEnhancements {
         card.addEventListener('touchend', (e) => {
             if (!isSwipeActive) return;
             isSwipeActive = false;
-            
+
             const deltaX = currentX - startX;
-            
+
             // Reset card position
             card.style.transform = '';
             card.style.backgroundColor = '';
-            
+
             // Trigger actions based on swipe distance
             if (Math.abs(deltaX) > 100) {
                 if (deltaX > 0) {
@@ -135,12 +135,12 @@ class MobileEnhancements {
     // Touch feedback for buttons
     setupTouchFeedback() {
         const buttons = document.querySelectorAll('.btn');
-        
+
         buttons.forEach(button => {
             button.addEventListener('touchstart', () => {
                 button.style.transform = 'scale(0.95)';
             }, { passive: true });
-            
+
             button.addEventListener('touchend', () => {
                 setTimeout(() => {
                     button.style.transform = '';
@@ -156,11 +156,11 @@ class MobileEnhancements {
 
         // Handle virtual keyboard
         let initialViewportHeight = window.innerHeight;
-        
+
         window.addEventListener('resize', () => {
             const currentHeight = window.innerHeight;
             const heightDifference = initialViewportHeight - currentHeight;
-            
+
             // If keyboard is likely open (height reduced significantly)
             if (heightDifference > 150) {
                 document.body.classList.add('keyboard-open');
@@ -197,9 +197,9 @@ class MobileEnhancements {
         toast.className = `alert alert-${type} position-fixed top-0 start-50 translate-middle-x mt-3`;
         toast.style.zIndex = '9999';
         toast.textContent = message;
-        
+
         document.body.appendChild(toast);
-        
+
         setTimeout(() => {
             toast.remove();
         }, 3000);
@@ -222,4 +222,4 @@ if ('serviceWorker' in navigator) {
                 console.log('SW registration failed: ', registrationError);
             });
     });
-} 
+}

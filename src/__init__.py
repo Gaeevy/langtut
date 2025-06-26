@@ -1,12 +1,22 @@
 import os
+
 from flask import Flask
+
 from flask_session import Session
-from src.utils import ensure_utf8_encoding
 from src.config import (
-    SECRET_KEY, SESSION_TYPE, SESSION_PERMANENT, SESSION_USE_SIGNER,
-    SESSION_COOKIE_SECURE, SESSION_COOKIE_HTTPONLY, SESSION_COOKIE_SAMESITE,
-    JSON_AS_ASCII, JSONIFY_MIMETYPE, FLASK_DEBUG
+    FLASK_DEBUG,
+    JSON_AS_ASCII,
+    JSONIFY_MIMETYPE,
+    SECRET_KEY,
+    SESSION_COOKIE_HTTPONLY,
+    SESSION_COOKIE_SAMESITE,
+    SESSION_COOKIE_SECURE,
+    SESSION_PERMANENT,
+    SESSION_TYPE,
+    SESSION_USE_SIGNER,
 )
+from src.routes import register_blueprints
+from src.utils import ensure_utf8_encoding
 
 # Set default encoding to UTF-8
 ensure_utf8_encoding()
@@ -31,9 +41,10 @@ app.config['JSONIFY_MIMETYPE'] = JSONIFY_MIMETYPE
 # Initialize Flask-Session
 Session(app)
 
-# Import routes after app is created to avoid circular imports
-from src import routes
+# Register blueprints
+register_blueprints(app)
+
 
 def create_app():
     """Function to create and configure the Flask app."""
-    return app 
+    return app

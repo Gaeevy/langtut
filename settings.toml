@@ -37,4 +37,4 @@ SESSION_COOKIE_SECURE = false
 [production]
 DEBUG = false
 SESSION_COOKIE_SECURE = true
-# In production, we'll use environment variables for sensitive data 
+# In production, we'll use environment variables for sensitive data

@@ -3,49 +3,87 @@ Language Tutor Application
 
 This is the main entry point for the application.
 """
+
 import os
-import pathlib
+from pathlib import Path
+
 from src import create_app
-from src.config import FLASK_DEBUG, CLIENT_SECRETS_FILE, settings
+from src.config import CLIENT_SECRETS_FILE, FLASK_DEBUG, logger, settings
 from src.database import init_database
 
+# Log startup information
+logger.info('=== LANGUAGE TUTOR STARTUP ===')
+logger.info(f'Python working directory: {Path.cwd()}')
+logger.info(f'Flask debug mode: {FLASK_DEBUG}')
+logger.info(f'Environment: {os.getenv("ENVIRONMENT", "unknown")}')
+
 # Create the app instance for Gunicorn
+logger.info('Creating Flask application instance...')
 app = create_app()
 
 # Initialize database
+logger.info('Initializing database...')
 init_database(app)
+logger.info('✅ Database initialization completed')
 
 # Database tables will be created automatically when first accessed
 
 if __name__ == '__main__':
-    # Detect if we're in development (running directly with python app.py)
-    is_development = True
-    
-    # Only set insecure transport for local development
+    # Determine if we're in development or production
+    # Default to development when running python app.py directly
+    is_development = (
+        os.getenv('FLASK_ENV') == 'development'
+        or os.getenv('ENVIRONMENT') == 'development'
+        or FLASK_DEBUG  # Use the FLASK_DEBUG setting from config
+        or not os.getenv('PORT')  # If no PORT env var, assume development
+    )
+
+    # Add development setup
     if is_development:
         os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-        print("NOTICE: OAuth insecure transport enabled for local development")
-        print("IMPORTANT: Don't use this in production!")
-        
+        logger.info('OAuth insecure transport enabled for local development')
+        logger.warning('⚠️  IMPORTANT: Do not use this in production!')
+
         # Check if the client secrets file exists (only relevant in development)
-        if not pathlib.Path(CLIENT_SECRETS_FILE).exists():
-            print(f"WARNING: {CLIENT_SECRETS_FILE} not found. OAuth authentication will not work.")
-            print("You'll need to create a project in Google Cloud Console and download the client secret.")
-            print("See README.md for instructions.")
-    
-    # Run the app in development mode
-    app.run(debug=FLASK_DEBUG, host='localhost', port=8080)
+        if not Path(CLIENT_SECRETS_FILE).exists():
+            logger.warning(f'Client secrets file not found: {CLIENT_SECRETS_FILE}')
+            logger.warning('OAuth authentication will not work without client secrets')
+            logger.info('See README.md for setup instructions')
+
+    if is_development:
+        logger.info('🚀 Starting in DEVELOPMENT mode')
+        logger.info('   - Debug mode enabled')
+        logger.info('   - Auto-reload enabled')
+        logger.info('   - Server: http://127.0.0.1:8080')
+        app.run(debug=True, port=8080)
+    else:
+        # Production mode (Railway, Heroku, etc.)
+        port = int(os.environ.get('PORT', 5000))
+        logger.info('🚀 Starting in PRODUCTION mode')
+        logger.info(f'   - Port: {port}')
+        logger.info('   - Debug mode disabled')
+        logger.info('   - Host: 0.0.0.0')
+        app.run(host='0.0.0.0', port=port, debug=False)  # nosec B104
 else:
     # Production mode (running with Gunicorn)
-    # Don't set OAUTHLIB_INSECURE_TRANSPORT in production
-    print("Running in production mode")
-    
+    logger.info('🚀 Running in PRODUCTION mode (Gunicorn)')
+
     # Check if we have client secrets configured (via env var or file)
     has_client_secrets = (
-        settings.get("CLIENT_SECRETS_JSON") is not None or 
-        pathlib.Path(CLIENT_SECRETS_FILE).exists()
+        settings.get('CLIENT_SECRETS_JSON') is not None or Path(CLIENT_SECRETS_FILE).exists()
     )
-    
-    if not has_client_secrets:
-        print("WARNING: No client secrets configured. OAuth authentication will not work.")
-        print("Set LANGTUT_CLIENT_SECRETS_JSON environment variable or provide client_secret.json file.")
+
+    if has_client_secrets:
+        logger.info('✅ Client secrets configured - OAuth authentication available')
+    else:
+        logger.warning(
+            '⚠️  WARNING: No client secrets configured. OAuth authentication will not work.'
+        )
+        logger.warning(
+            'Set LANGTUT_CLIENT_SECRETS_JSON environment variable or provide client_secret.json file.'
+        )
+
+    # Log configuration status
+    logger.info(f'TTS enabled: {settings.get("TTS_ENABLED", False)}')
+    logger.info(f'Spreadsheet ID configured: {bool(settings.get("SPREADSHEET_ID"))}')
+    logger.info('✅ Application startup completed')

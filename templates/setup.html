@@ -7,18 +7,18 @@
     <div class="row justify-content-center">
         <div class="col-md-8 text-center">
             <h2 class="mb-4">📊 Set Up Your Learning Spreadsheet</h2>
-            
+
             <div class="alert alert-success mb-4">
                 <h5>✅ You're logged in with Google!</h5>
                 <p>Now let's link your vocabulary spreadsheet to start learning.</p>
             </div>
-            
+
             <div class="mb-4">
-                <a href="{{ url_for('settings') }}" class="btn btn-primary btn-lg">
+                <a href="{{ url_for('settings.settings') }}" class="btn btn-primary btn-lg">
                     📊 Link My Spreadsheet
                 </a>
             </div>
-            
+
             <!-- Instructions -->
             <div class="card mt-4">
                 <div class="card-header">
@@ -75,4 +75,4 @@
 </div>
 
 
-{% endblock %} 
+{% endblock %}

@@ -9,11 +9,11 @@
         <strong>Review Mode:</strong> Let's practice the cards you missed earlier.
     </div>
     {% endif %}
-    
+
     <div class="progress-container">
         <div class="progress" style="height: 10px;">
-            <div class="progress-bar {% if reviewing %}bg-warning{% endif %}" role="progressbar" 
-                 style="width: {{ (index / total * 100)|round }}%;" 
+            <div class="progress-bar {% if reviewing %}bg-warning{% endif %}" role="progressbar"
+                 style="width: {{ (index / total * 100)|round }}%;"
                  aria-valuenow="{{ index }}" aria-valuemin="0" aria-valuemax="{{ total }}"></div>
         </div>
         <div class="d-flex justify-content-between mt-1">
@@ -27,12 +27,12 @@
     <div class="row">
         <div class="col-md-12 text-center">
             <p class="card-word">{{ card.translation }}</p>
-            
+
             <!-- Always show example translation -->
             {% if card.example_translation %}
             <p class="card-example-translation text-muted mb-3" style="font-style: italic;">{{ card.example_translation }}</p>
             {% endif %}
-            
+
             <!-- Toggle for English equivalent only -->
             {% if card.equivalent %}
             <div class="equivalent-toggle mb-3">
@@ -44,13 +44,14 @@
                 </div>
             </div>
             {% endif %}
-            
+
             <!-- Level Progress Dots -->
             <div class="level-progress-container">
-                <div class="level-tooltip">Level {{ card.level.value }}</div>
+                <div class="level-tooltip">Level {{ card.level.value if card.level.value is defined else card.level }}</div>
                 <div class="level-progress">
+                    {% set level_value = card.level.value if card.level.value is defined else card.level %}
                     {% for i in range(8) %}
-                    <div class="level-dot {% if i < card.level.value %}completed{% elif i == card.level.value %}current{% endif %}"></div>
+                    <div class="level-dot {% if i < level_value %}completed{% elif i == level_value %}current{% endif %}"></div>
                     {% endfor %}
                 </div>
                 {% if card.is_review %}
@@ -61,42 +62,47 @@
     </div>
 </div>
 
-<form action="{{ url_for('process_answer') }}" method="post">
+<form action="{{ url_for('flashcard.process_answer') }}" method="post">
     <div class="mb-3">
-        <label for="answer" class="form-label">Your answer:</label>
-        <input type="text" class="form-control" id="answer" name="answer" placeholder="Type your answer here" autocomplete="off" autofocus required>
+        <input type="text" name="user_answer" class="form-control form-control-lg"
+               placeholder="Type your answer..." autocomplete="off" required>
     </div>
-    <div class="d-grid gap-2">
-        <button type="submit" class="btn btn-primary">Submit Answer</button>
+    <div class="d-grid">
+        <button type="submit" class="btn btn-primary btn-lg">Submit</button>
     </div>
 </form>
 
-<div class="mt-4 text-center">
-    <p class="text-muted small">Type the word in the target language</p>
-    
-    <div class="mt-3">
-        <a href="{{ url_for('end_session_early') }}" class="btn btn-outline-secondary btn-sm" 
-           onclick="return confirm('Are you sure you want to end the session? Your progress so far will be saved.');">
-            End Session Early
-        </a>
-    </div>
+<div class="text-center mt-3">
+    <a href="{{ url_for('flashcard.end_session_early') }}" class="btn btn-outline-secondary btn-sm"
+       onclick="return confirm('Are you sure you want to end the session? Your progress so far will be saved.');">
+        End Session Early
+    </a>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+    // Card context for potential TTS usage
+    window.cardContext = {
+        spreadsheetId: {{ user_spreadsheet_id|tojson if user_spreadsheet_id else 'null' }},
+        sheetGid: {{ sheet_gid|tojson if sheet_gid else 'null' }}
+    };
+
     // Set focus to the answer input field when the page loads
     document.addEventListener('DOMContentLoaded', function() {
-        document.getElementById('answer').focus();
+        const answerInput = document.querySelector('input[name="user_answer"]');
+        if (answerInput) {
+            answerInput.focus();
+        }
     });
-    
+
     // Toggle equivalent content
     function toggleEquivalent() {
         const content = document.getElementById('equivalent-content');
         const button = document.querySelector('.equivalent-toggle button');
-        
+
         if (!content || !button) return;
-        
+
         if (content.style.display === 'none' || content.style.display === '') {
             content.style.display = 'block';
             button.innerHTML = '<i class="bi bi-eye-slash"></i> Hide hint';
@@ -106,4 +112,4 @@
         }
     }
 </script>
-{% endblock %} 
+{% endblock %}

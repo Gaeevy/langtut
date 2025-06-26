@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="text-center">
-    
+
     <div class="row row-cols-1 row-cols-md-2 g-4 mb-4">
         {% for tab in tabs %}
         <div class="col">
@@ -18,8 +18,8 @@
                         <span class="badge bg-warning">{{ tab.cards_to_review(True)|length }} cards to review</span>
                         {% endif %}
                     </p>
-                    <form action="{{ url_for('start_learning', tab_name=tab.name) }}" method="post">
-                        <button type="submit" class="btn btn-primary">Practice {{ tab.name }}</button>
+                    <form action="{{ url_for('flashcard.start_learning', tab_name=tab.name) }}" method="post">
+                        <button type="submit" class="btn btn-primary btn-sm">Study</button>
                     </form>
                 </div>
             </div>
@@ -29,7 +29,7 @@
             <div class="alert alert-warning">
                 No vocabulary sets found in your spreadsheet.
                 {% if is_authenticated %}
-                    <br><a href="{{ url_for('settings') }}" class="btn btn-outline-primary btn-sm mt-2">🔗 Check Your Spreadsheet</a>
+                    <br><a href="{{ url_for('settings.settings') }}" class="btn btn-outline-primary btn-sm mt-2">🔗 Check Your Spreadsheet</a>
                 {% endif %}
             </div>
         </div>
@@ -41,14 +41,14 @@
         <div class="alert alert-light border-0 mt-4">
             <small class="text-muted">📊 Using spreadsheet: <code>{{ user_spreadsheet_id[:20] }}...</code></small>
             <div class="mt-2">
-                <a href="{{ url_for('settings') }}" class="btn btn-outline-primary btn-sm me-2">Settings</a>
-                <a href="{{ url_for('clear_credentials') }}" class="btn btn-outline-secondary btn-sm">Log Out</a>
+                <a href="{{ url_for('settings.settings') }}" class="btn btn-outline-primary btn-sm me-2">Settings</a>
+                <a href="{{ url_for('auth.clear_credentials') }}" class="btn btn-outline-secondary btn-sm">Log Out</a>
             </div>
         </div>
     {% else %}
         <div class="mt-4">
-            <a href="{{ url_for('auth') }}" class="btn btn-primary">Sign in with Google</a>
+            <a href="{{ url_for('auth.auth') }}" class="btn btn-primary">Sign in with Google</a>
         </div>
     {% endif %}
 </div>
-{% endblock %} 
+{% endblock %}

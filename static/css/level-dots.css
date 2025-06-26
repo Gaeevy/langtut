@@ -62,12 +62,12 @@
     .level-progress {
         gap: 6px;
     }
-    
+
     .level-dot {
         width: 10px;
         height: 10px;
     }
-    
+
     .level-dot:not(:last-child)::after {
         width: 6px;
     }
@@ -101,12 +101,12 @@
 
 /* Animations */
 @keyframes pulse-current {
-    0%, 100% { 
-        transform: scale(1); 
+    0%, 100% {
+        transform: scale(1);
         box-shadow: 0 0 8px rgba(40, 167, 69, 0.4);
     }
-    50% { 
-        transform: scale(1.1); 
+    50% {
+        transform: scale(1.1);
         box-shadow: 0 0 12px rgba(40, 167, 69, 0.6);
     }
 }
@@ -130,4 +130,4 @@
     .level-dot.shake-error {
         animation: none;
     }
-} 
+}

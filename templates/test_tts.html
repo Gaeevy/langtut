@@ -5,7 +5,7 @@
 {% block content %}
 <div class="container mt-4">
     <h2>🔊 Text-to-Speech Test</h2>
-    
+
     <!-- Mobile Detection -->
     <div class="alert alert-info" id="device-info">
         <h5>Device Information</h5>
@@ -14,7 +14,7 @@
         <p><strong>Audio Context Support:</strong> <span id="audio-context"></span></p>
         <p><strong>User Interacted:</strong> <span id="user-interacted">No</span></p>
     </div>
-    
+
     <!-- TTS Status -->
     <div class="card mb-4">
         <div class="card-header">
@@ -24,7 +24,7 @@
             <div id="tts-status">Loading...</div>
         </div>
     </div>
-    
+
     <!-- Audio Test Controls -->
     <div class="card mb-4">
         <div class="card-header">
@@ -38,7 +38,7 @@
                 </button>
                 <small class="form-text text-muted">Click this first on mobile devices to enable audio</small>
             </div>
-            
+
             <!-- Simple Audio Test -->
             <div class="mb-3">
                 <button type="button" class="btn btn-secondary" id="simple-audio-test">
@@ -46,7 +46,7 @@
                 </button>
                 <small class="form-text text-muted">Test basic HTML5 audio playback</small>
             </div>
-            
+
             <!-- Portuguese TTS Test -->
             <div class="mb-3">
                 <button type="button" class="btn btn-success" id="portuguese-test">
@@ -54,7 +54,7 @@
                 </button>
                 <small class="form-text text-muted">Test "Olá, como está?"</small>
             </div>
-            
+
             <!-- Custom Text Test -->
             <div class="mb-3">
                 <div class="input-group">
@@ -66,7 +66,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Debug Console -->
     <div class="card">
         <div class="card-header">
@@ -87,17 +87,17 @@
 document.addEventListener('DOMContentLoaded', function() {
     const debugConsole = document.getElementById('debug-console');
     const userInteractedSpan = document.getElementById('user-interacted');
-    
+
     // Override console.log to show in debug console
     const originalLog = console.log;
     const originalError = console.error;
-    
+
     function addToDebug(message, type = 'log') {
         const timestamp = new Date().toLocaleTimeString();
         const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
         debugConsole.textContent += logEntry;
         debugConsole.scrollTop = debugConsole.scrollHeight;
-        
+
         // Also log to browser console
         if (type === 'error') {
             originalError(message);
@@ -105,20 +105,20 @@ document.addEventListener('DOMContentLoaded', function() {
             originalLog(message);
         }
     }
-    
+
     console.log = function(...args) {
         addToDebug(args.join(' '), 'log');
     };
-    
+
     console.error = function(...args) {
         addToDebug(args.join(' '), 'error');
     };
-    
+
     // Display device information
     document.getElementById('user-agent').textContent = navigator.userAgent;
     document.getElementById('is-mobile').textContent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Yes' : 'No';
     document.getElementById('audio-context').textContent = (typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined') ? 'Yes' : 'No';
-    
+
     // Track user interaction
     ['touchstart', 'touchend', 'mousedown', 'keydown'].forEach(event => {
         document.addEventListener(event, function() {
@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
             userInteractedSpan.className = 'text-success';
         }, { once: true, passive: true });
     });
-    
+
     // Load TTS status
     function loadTTSStatus() {
         fetch('/api/tts/status')
@@ -148,13 +148,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('tts-status').innerHTML = `<div class="text-danger">❌ Error: ${error.message}</div>`;
             });
     }
-    
+
     // Test functions
     document.getElementById('interaction-test').addEventListener('click', function() {
         console.log('🎯 User interaction test clicked');
         alert('User interaction registered! Audio should now work on mobile.');
     });
-    
+
     document.getElementById('simple-audio-test').addEventListener('click', function() {
         console.log('🔊 Testing simple audio...');
         const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
@@ -164,7 +164,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('🔊 Simple audio failed:', error);
         });
     });
-    
+
     document.getElementById('portuguese-test').addEventListener('click', function() {
         console.log('🇵🇹 Testing Portuguese TTS...');
         if (window.ttsManager) {
@@ -173,7 +173,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('🇵🇹 TTS Manager not available');
         }
     });
-    
+
     document.getElementById('custom-test').addEventListener('click', function() {
         const text = document.getElementById('custom-text').value;
         console.log('🎤 Testing custom text:', text);
@@ -183,14 +183,14 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('🎤 TTS Manager not available or no text provided');
         }
     });
-    
+
     document.getElementById('clear-console').addEventListener('click', function() {
         debugConsole.textContent = '';
     });
-    
+
     // Initialize
     loadTTSStatus();
     console.log('🚀 TTS Test page loaded');
 });
 </script>
-{% endblock %} 
+{% endblock %}
