@@ -133,7 +133,7 @@ class TTSManager {
     /**
      * Generate and play speech for card content (word and example)
      */
-    async speakCard(word, example, voiceName = null, autoplay = false) {
+    async speakCard(word, example, voiceName = null, autoplay = false, spreadsheetId = null, sheetGid = null) {
         if (!this.isAvailable) {
             console.warn('TTS service is not available');
             return false;
@@ -142,16 +142,25 @@ class TTSManager {
         this.setLoadingState(true);
 
         try {
+            const requestBody = {
+                word: word,
+                example: example,
+                voice_name: voiceName
+            };
+
+            // Add caching context if available
+            if (spreadsheetId && sheetGid !== null) {
+                requestBody.spreadsheet_id = spreadsheetId;
+                requestBody.sheet_gid = sheetGid;
+                console.log('🎯 TTS caching context:', { spreadsheetId, sheetGid });
+            }
+
             const response = await fetch('/api/tts/speak-card', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    word: word,
-                    example: example,
-                    voice_name: voiceName
-                })
+                body: JSON.stringify(requestBody)
             });
 
             const data = await response.json();

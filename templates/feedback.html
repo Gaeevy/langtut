@@ -39,10 +39,11 @@
 
                 <!-- Animated Level Progress Dots -->
                 <div class="level-progress-container">
-                    <div class="level-tooltip">Level {{ card.level.value }}</div>
+                    <div class="level-tooltip">Level {{ card.level.value if card.level.value is defined else card.level }}</div>
                     <div class="level-progress">
+                        {% set level_value = card.level.value if card.level.value is defined else card.level %}
                         {% for i in range(8) %}
-                        <div class="level-dot {% if i < card.level.value %}completed{% elif i == card.level.value %}current{% endif %}"
+                        <div class="level-dot {% if i < level_value %}completed{% elif i == level_value %}current{% endif %}"
                              data-level="{{ i }}"></div>
                         {% endfor %}
                     </div>
@@ -56,13 +57,13 @@
                 <div class="difficulty-rating mt-4">
                     <p class="small text-muted mb-2">How was this card?</p>
                     <div class="btn-group" role="group">
-                        <a href="{{ url_for('rate_difficulty', card_index=card_index, difficulty='easy') }}"
-                           class="btn btn-sm btn-outline-success">
-                            <i class="bi bi-emoji-smile"></i> Easy
+                        <a href="{{ url_for('flashcard.rate_difficulty', card_index=card_index, difficulty='easy') }}"
+                           class="btn btn-outline-success">
+                            😊 Easy
                         </a>
-                        <a href="{{ url_for('rate_difficulty', card_index=card_index, difficulty='difficult') }}"
-                           class="btn btn-sm btn-outline-warning">
-                            <i class="bi bi-emoji-frown"></i> Hard
+                        <a href="{{ url_for('flashcard.rate_difficulty', card_index=card_index, difficulty='difficult') }}"
+                           class="btn btn-outline-warning">
+                            😰 Difficult
                         </a>
                     </div>
                 </div>
@@ -71,8 +72,8 @@
         </div>
     </div>
 
-    <div class="d-grid gap-2">
-        <a href="{{ url_for('next_card') }}" class="btn btn-primary">Next Card</a>
+    <div class="d-grid gap-2 mt-3">
+        <a href="{{ url_for('flashcard.next_card') }}" class="btn btn-primary">Next Card</a>
     </div>
 </div>
 {% endblock %}
@@ -87,7 +88,10 @@
     "word": {{ card.word|tojson }},
     "example": {{ card.example|tojson if card.example else 'null' }},
     "correct": {{ 'true' if correct else 'false' }},
-    "level": {{ card.level.value }}
+    "level": {{ card.level.value if card.level.value is defined else card.level }},
+    "levelChange": {{ level_change|tojson if level_change else 'null' }},
+    "spreadsheetId": {{ user_spreadsheet_id|tojson if user_spreadsheet_id else 'null' }},
+    "sheetGid": {{ sheet_gid|tojson if sheet_gid else 'null' }}
 }
 </script>
 
@@ -99,52 +103,42 @@
 
         var isCorrect = cardData.correct;
         var currentLevel = cardData.level;
+        var levelChange = cardData.levelChange;
 
         // Level progression animation
-        if (isCorrect && currentLevel > 0) {
-            // For correct answers, the level has already been incremented
-            // So we need to animate the PREVIOUS level dot (the one that was just completed)
-            var previousLevel = currentLevel - 1;
-            var previousDot = document.querySelector('[data-level="' + previousLevel + '"]');
-            var currentDot = document.querySelector('[data-level="' + currentLevel + '"]');
+        if (levelChange) {
+            console.log('🎯 Level change detected:', levelChange);
 
-            // Reset the dots to show the animation properly
-            if (previousDot && currentDot) {
-                // Temporarily reset to pre-answer state
-                previousDot.classList.remove('completed');
-                previousDot.classList.add('current');
-                currentDot.classList.remove('current');
+            if (levelChange.is_correct && levelChange.to > levelChange.from) {
+                // Level increased - animate the progression
+                var newLevelDot = document.querySelector('[data-level="' + (levelChange.to - 1) + '"]');
+                var currentDot = document.querySelector('[data-level="' + levelChange.to + '"]');
 
-                // Animate the progression
-                setTimeout(function() {
-                    previousDot.classList.add('shake-success');
-
-                    // After shake, complete the progression
+                if (newLevelDot) {
                     setTimeout(function() {
-                        previousDot.classList.remove('current', 'shake-success');
-                        previousDot.classList.add('completed');
+                        newLevelDot.classList.add('shake-success');
+                        console.log('✅ Animating level increase from', levelChange.from, 'to', levelChange.to);
 
-                        // Current dot becomes active
-                        if (currentLevel < 8) {
-                            currentDot.classList.add('current');
-                        }
-                    }, 600);
-                }, 500);
-            }
-        } else if (!isCorrect) {
-            // For incorrect answers, animate the current level dot
-            var currentDot = document.querySelector('[data-level="' + currentLevel + '"]');
-
-            setTimeout(function() {
-                if (currentDot) {
-                    currentDot.classList.add('shake-error');
-
-                    // Remove shake after animation
-                    setTimeout(function() {
-                        currentDot.classList.remove('shake-error');
-                    }, 600);
+                        setTimeout(function() {
+                            newLevelDot.classList.remove('shake-success');
+                        }, 600);
+                    }, 500);
                 }
-            }, 500);
+            } else if (!levelChange.is_correct && levelChange.to < levelChange.from) {
+                // Level decreased - animate the regression
+                var currentDot = document.querySelector('[data-level="' + levelChange.to + '"]');
+
+                if (currentDot) {
+                    setTimeout(function() {
+                        currentDot.classList.add('shake-error');
+                        console.log('❌ Animating level decrease from', levelChange.from, 'to', levelChange.to);
+
+                        setTimeout(function() {
+                            currentDot.classList.remove('shake-error');
+                        }, 600);
+                    }, 500);
+                }
+            }
         }
 
         // TTS functionality
@@ -172,7 +166,7 @@
                 if (speakCardBtn) {
                     speakCardBtn.addEventListener('click', function() {
                         console.log('🔊 Manual TTS button clicked');
-                        window.ttsManager.speakCard(cardData.word, cardData.example, null, true);
+                        window.ttsManager.speakCard(cardData.word, cardData.example, null, true, cardData.spreadsheetId, cardData.sheetGid);
                     });
                 }
 
@@ -192,7 +186,7 @@
                     setTimeout(function() {
                         console.log('🔊 Desktop autoplay starting...');
                         if (cardData.word || cardData.example) {
-                            window.ttsManager.speakCard(cardData.word, cardData.example, null, true);
+                            window.ttsManager.speakCard(cardData.word, cardData.example, null, true, cardData.spreadsheetId, cardData.sheetGid);
                         }
                     }, 1500); // Wait 1.5 seconds after page load
                 }

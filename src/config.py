@@ -1,8 +1,45 @@
 import json
+import logging
 import os
+import sys
 import tempfile
 
 from dynaconf import Dynaconf
+
+
+# Configure logging
+def setup_logging():
+    """Configure logging for both local development and Railway deployment."""
+    # Create logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+
+    # Remove existing handlers to avoid duplicates
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+
+    # Create formatter
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
+    # Console handler (works on both local and Railway)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    # Set specific logger levels
+    logging.getLogger('werkzeug').setLevel(logging.WARNING)  # Reduce Flask request noise
+    logging.getLogger('googleapiclient.discovery').setLevel(
+        logging.WARNING
+    )  # Reduce Google API noise
+
+    return logger
+
+
+# Initialize logging
+logger = setup_logging()
 
 settings = Dynaconf(
     envvar_prefix='LANGTUT',

@@ -64,7 +64,7 @@
                 </div>
                 {% else %}
                 <div class="alert alert-warning mt-4" role="alert">
-                    You're not authenticated with Google Sheets. <a href="{{ url_for('auth') }}" class="alert-link">Sign in</a> to save your progress.
+                    You're not authenticated with Google Sheets. <a href="{{ url_for('auth.auth') }}" class="alert-link">Sign in</a> to save your progress.
                 </div>
                 {% endif %}
             {% endif %}
@@ -72,7 +72,7 @@
     </div>
 
     <div class="d-grid gap-2">
-        <a href="{{ url_for('index') }}" class="btn btn-primary">Start Again</a>
+        <a href="{{ url_for('flashcard.index') }}" class="btn btn-primary">Start Again</a>
     </div>
 </div>
 {% endblock %}

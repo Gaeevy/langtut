@@ -7,6 +7,7 @@ specifically configured for European Portuguese language learning.
 
 import base64
 import hashlib
+import logging
 import os
 
 from google.cloud import storage, texttospeech
@@ -18,7 +19,11 @@ from src.config import (
     TTS_ENABLED,
     TTS_LANGUAGE_CODE,
     TTS_VOICE_NAME,
+    settings,
 )
+
+# Create logger
+logger = logging.getLogger(__name__)
 
 
 class TTSService:
@@ -34,11 +39,11 @@ class TTSService:
     def _initialize_clients(self):
         """Initialize the Google Cloud TTS and Storage clients"""
         if not self.enabled:
-            print('TTS is disabled in configuration')
+            logger.info('TTS is disabled in configuration')
             return
 
-        print(f'Checking for service account file: {GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE}')
-        print(
+        logger.info(f'Checking for service account file: {GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE}')
+        logger.info(
             f'File exists: {GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE and os.path.exists(GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE) if GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE else False}'
         )
 
@@ -47,60 +52,62 @@ class TTSService:
                 GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE
             ):
                 # Use service account file
-                print(f'Loading service account from file: {GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE}')
+                logger.info(
+                    f'Loading service account from file: {GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE}'
+                )
                 credentials = service_account.Credentials.from_service_account_file(
                     GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE
                 )
                 self.tts_client = texttospeech.TextToSpeechClient(credentials=credentials)
                 self.storage_client = storage.Client(credentials=credentials)
                 self.credential_source = 'service_account_file'
-                print('✅ TTS client initialized with service account file')
-                print(f'   Service account email: {credentials.service_account_email}')
-                print(f'   Project ID: {credentials.project_id}')
+                logger.info('✅ TTS client initialized with service account file')
+                logger.info(f'   Service account email: {credentials.service_account_email}')
+                logger.info(f'   Project ID: {credentials.project_id}')
             else:
                 # Try to use default credentials (for production with environment variables)
-                print('Service account file not found, trying default credentials...')
+                logger.info('Service account file not found, trying default credentials...')
                 try:
                     self.tts_client = texttospeech.TextToSpeechClient()
                     self.storage_client = storage.Client()
                     self.credential_source = 'default_credentials'
-                    print('✅ TTS client initialized with default credentials')
+                    logger.info('✅ TTS client initialized with default credentials')
 
                     # Try to get more info about default credentials
                     try:
                         import google.auth
 
                         default_creds, project = google.auth.default()
-                        print(f'   Default credentials type: {type(default_creds).__name__}')
+                        logger.info(f'   Default credentials type: {type(default_creds).__name__}')
                         if hasattr(default_creds, 'service_account_email'):
-                            print(
+                            logger.info(
                                 f'   Service account email: {default_creds.service_account_email}'
                             )
                         if project:
-                            print(f'   Project ID: {project}')
+                            logger.info(f'   Project ID: {project}')
                     except Exception as e:
-                        print(f'   Could not get default credential details: {e}')
+                        logger.info(f'   Could not get default credential details: {e}')
 
                 except Exception as e:
-                    print(f'❌ Failed to initialize TTS client with default credentials: {e}')
+                    logger.error(
+                        f'❌ Failed to initialize TTS client with default credentials: {e}'
+                    )
                     self.enabled = False
                     self.credential_source = 'none'
                     return
 
             # Initialize GCS bucket for audio caching
             try:
-                from src.config import settings
-
                 bucket_name = settings.get('GCS_AUDIO_BUCKET', 'langtut-tts')
                 self.bucket = self.storage_client.bucket(bucket_name)
-                print(f'✅ GCS bucket initialized: {bucket_name}')
+                logger.info(f'✅ GCS bucket initialized: {bucket_name}')
             except Exception as e:
-                print(f'⚠️ GCS bucket initialization failed: {e}')
-                print('   Continuing without GCS caching...')
+                logger.warning(f'⚠️ GCS bucket initialization failed: {e}')
+                logger.warning('   Continuing without GCS caching...')
                 self.bucket = None
 
         except Exception as e:
-            print(f'❌ Failed to initialize TTS client: {e}')
+            logger.error(f'❌ Failed to initialize TTS client: {e}')
             self.enabled = False
             self.credential_source = 'none'
 
@@ -120,11 +127,11 @@ class TTSService:
             Audio content as bytes, or None if generation fails
         """
         if not self.is_available():
-            print('TTS service is not available')
+            logger.info('TTS service is not available')
             return None
 
         if not text or not text.strip():
-            print('Empty text provided for TTS')
+            logger.info('Empty text provided for TTS')
             return None
 
         try:
@@ -149,7 +156,7 @@ class TTSService:
             return response.audio_content
 
         except Exception as e:
-            print(f'Error generating speech: {e}')
+            logger.error(f'Error generating speech: {e}')
             return None
 
     def generate_speech_base64(self, text: str, voice_name: str | None = None) -> str | None:
@@ -224,14 +231,14 @@ class TTSService:
             blob = self.bucket.blob(gcs_path)
 
             if blob.exists():
-                print(f'🎯 Cache HIT: {gcs_path}')
+                logger.info(f'🎯 Cache HIT: {gcs_path}')
                 return blob.download_as_bytes()
             else:
-                print(f'🎯 Cache MISS: {gcs_path}')
+                logger.info(f'🎯 Cache MISS: {gcs_path}')
                 return None
 
         except Exception as e:
-            print(f'⚠️ Error checking GCS cache: {e}')
+            logger.warning(f'⚠️ Error checking GCS cache: {e}')
             return None
 
     def cache_audio(
@@ -264,11 +271,11 @@ class TTSService:
 
             # Upload with MP3 content type
             blob.upload_from_string(audio_content, content_type='audio/mpeg')
-            print(f'💾 Cached audio: {gcs_path}')
+            logger.info(f'💾 Cached audio: {gcs_path}')
             return True
 
         except Exception as e:
-            print(f'⚠️ Error caching audio to GCS: {e}')
+            logger.warning(f'⚠️ Error caching audio to GCS: {e}')
             return False
 
     def generate_speech_with_cache(
@@ -291,11 +298,11 @@ class TTSService:
             Base64 encoded audio content, or None if generation fails
         """
         if not self.is_available():
-            print('TTS service is not available')
+            logger.info('TTS service is not available')
             return None
 
         if not text or not text.strip():
-            print('Empty text provided for TTS')
+            logger.info('Empty text provided for TTS')
             return None
 
         # Try to get from cache first (if we have caching context)
@@ -346,7 +353,7 @@ class TTSService:
             return portuguese_voices
 
         except Exception as e:
-            print(f'Error listing voices: {e}')
+            logger.error(f'Error listing voices: {e}')
             return []
 
     def get_credential_info(self) -> dict:

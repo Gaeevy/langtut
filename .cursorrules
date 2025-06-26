@@ -2,6 +2,16 @@
 
 @README.md
 
+## Git Commit Rules ✅ **NEW**
+- **CONCISE commit messages** - Maximum 200 characters total
+- **FORMAT**: `type: brief description (max 150 chars)`
+- **TYPES**: feat, fix, refactor, docs, style, test, chore
+- **FOCUS**: What changed, not why (details in code/docs)
+- **EXAMPLES**:
+  - `feat: add TTS caching with GCS integration`
+  - `fix: resolve blueprint URL routing issues`
+  - `refactor: simplify level progression logic`
+
 ## Project Overview
 This is a Flask-based Language Learning Flashcard App with the following key characteristics:
 - **Core Purpose**: ANKI-style flashcards with European Portuguese text-to-speech
@@ -97,6 +107,13 @@ src/routes_original_backup.py  # Backup of original monolithic routes
 4. **✅ Error Handling** - Improved exception handling in all modules
 5. **✅ Data Persistence Strategy** - Deliberate dual-store architecture implemented
 6. **✅ Pre-commit Code Quality** - Automated linting, formatting, and security checks
+7. **✅ TTS Caching System** - GCS-based caching with spreadsheet-specific organization
+8. **✅ Comprehensive Logging** - Structured logging across all modules for debugging
+9. **✅ Level Progression Simplification** - Simple +1/-1 system replacing complex logic
+10. **✅ Development Experience** - Port 8080 default, improved mode detection
+11. **✅ Blueprint URL Routing** - All templates updated to use blueprint.endpoint format
+12. **✅ Answer Validation Logic** - Fixed form fields and validation direction
+13. **✅ TTS Integration** - Fixed API endpoints and JavaScript integration
 
 ### 🟡 YELLOW FLAGS - Technical Debt
 1. **Large TTS service (14KB)** - Consider splitting into smaller components
@@ -203,17 +220,21 @@ src/routes_original_backup.py  # Backup of original monolithic routes
 4. **✅ Error handling** - Improved exception handling
 5. **✅ Data persistence strategy** - Dual-store architecture decision made
 6. **✅ Pre-commit setup** - Automated code quality with ruff, security scanning
+7. **✅ TTS caching implementation** - GCS-based caching with spreadsheet organization
+8. **✅ Comprehensive logging** - Structured logging across all modules
+9. **✅ Level progression simplification** - Replaced complex logic with simple +1/-1
+10. **✅ Development experience** - Port 8080 default, improved development detection
+11. **✅ Blueprint URL routing fixes** - All templates use blueprint.endpoint format
+12. **✅ Answer validation fixes** - Corrected form fields and validation logic
 
 #### High Priority (Do Next)
 1. **Create comprehensive service layer** for business logic
-2. **Split large TTS service** into smaller components
-3. **Add comprehensive logging**
+2. **Add comprehensive testing** - Unit and integration tests for all blueprints
+3. **Add API rate limiting** - Implement proper request throttling
 
 #### Medium Priority
-1. **Add comprehensive testing**
-2. **Add API rate limiting**
-3. **Optimize database queries**
-4. **Resolve dual dependency management**
+1. **Optimize database queries**
+2. **Resolve dual dependency management**
 
 #### Low Priority
 1. **Add Docker support**
@@ -333,54 +354,4 @@ return redirect(url_for('auth.auth'))
 - `/oauth2callback` - OAuth callback handler
 - `/clear` - Clear credentials
 
-### Core Flashcard Routes (`flashcard.py`) - 306 lines
-- `/` - Homepage/flashcard selection
-- `/start/<tab_name>` - Start learning session
-- `/card` - Display current flashcard
-- `/answer` - Process user answer
-- `/feedback/<correct>` - Show answer feedback
-- `/next` - Move to next card
-- `/results` - Session results
-- `/end-session` - End session early
-
-### Settings Routes (`settings.py`) - 119 lines
-- `/settings` - Settings page
-- `/validate-spreadsheet` - Validate Google Sheets access
-- `/set-spreadsheet` - Set active spreadsheet
-- `/reset-spreadsheet` - Reset to default
-
-### API Routes (`api.py`) - 121 lines
-- `/api/tts/status` - TTS service status
-- `/api/tts/speak` - Generate speech
-- `/api/tts/speak-card` - Generate speech for cards
-
-### Admin Routes (`admin.py`) - 237 lines
-- `/admin/db-info` - Database statistics
-- `/admin/users` - List users
-- `/admin/spreadsheets` - List spreadsheets
-- `/admin/user/<id>` - User details
-- `/admin/export-db` - Export database
-- `/admin/query` - Execute read-only queries
-- `/admin/volume-check` - File system info
-
-### Test Routes (`test.py`) - 81 lines
-- `/test` - System status check
-- `/test-tts` - TTS testing page
-
-## Blueprint Success Metrics ✅ **ACHIEVED**
-
-- **File Count**: 1 → 6 blueprints
-- **Average File Size**: 1,090 lines → 165 lines average
-- **Complexity Reduction**: 83% per file
-- **Type Safety**: 100% coverage in new blueprints
-- **Error Handling**: Comprehensive try/catch blocks
-- **Import Issues**: Zero circular dependencies
-- **Maintainability**: Dramatically improved
-
-## Next Development Priorities
-
-1. **Service Layer Architecture** - Extract business logic from routes
-2. **Data Persistence Decision** - Choose between Sheets vs SQLite
-3. **TTS Service Refactoring** - Break down large tts_service.py
-4. **Comprehensive Testing** - Unit and integration tests for all blueprints
-5. **API Rate Limiting** - Implement proper request throttling
+### Core Flashcard Routes (`
