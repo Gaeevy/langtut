@@ -6,7 +6,6 @@ Handles the core flashcard learning functionality.
 
 import json
 import logging
-from datetime import datetime
 
 from flask import Blueprint, redirect, render_template, request, session, url_for
 
@@ -23,25 +22,13 @@ logger = logging.getLogger(__name__)
 flashcard_bp = Blueprint('flashcard', __name__)
 
 
-# Custom JSON encoder to handle datetime objects
 class CustomJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle datetime and Level objects."""
+
     def default(self, obj):
-        if isinstance(obj, datetime):
-            return format_timestamp(obj)
+        if hasattr(obj, 'isoformat'):
+            return obj.isoformat()
         return super().default(obj)
-
-
-def get_sheet_gid_for_tab(tab_name: str, spreadsheet_id: str) -> int | None:
-    """Get the sheet GID for a given tab name."""
-    try:
-        card_sets = read_all_card_sets(spreadsheet_id)
-        for card_set in card_sets:
-            if card_set.name == tab_name:
-                return card_set.gid
-        return None
-    except Exception as e:
-        logger.error(f'Error getting sheet GID for tab {tab_name}: {e}')
-        return None
 
 
 @flashcard_bp.route('/')
@@ -137,6 +124,10 @@ def start_learning(tab_name: str):
         session['active_tab'] = tab_name
         session['original_card_count'] = len(cards)  # Store total card count for reference
 
+        # Cache the sheet GID to avoid repeated API calls
+        session['sheet_gid'] = card_set.gid
+        logger.info(f'Cached sheet GID in session: {card_set.gid}')
+
         logger.info(f'Session initialized: {len(cards)} cards, starting at index 0')
         logger.info(f'Active tab set to: {tab_name}')
 
@@ -202,10 +193,11 @@ def show_card():
 
     user_spreadsheet_id = get_user_spreadsheet_id(session)
     active_tab = session.get('active_tab', 'Sheet1')
-    sheet_gid = get_sheet_gid_for_tab(active_tab, user_spreadsheet_id)
+    # Use cached sheet GID instead of making API call
+    sheet_gid = session.get('sheet_gid')
 
     logger.info(
-        f'Template context: spreadsheet_id={user_spreadsheet_id}, tab={active_tab}, sheet_gid={sheet_gid}'
+        f'Template context: spreadsheet_id={user_spreadsheet_id}, tab={active_tab}, sheet_gid={sheet_gid} (cached)'
     )
 
     return render_template(
@@ -395,9 +387,8 @@ def show_feedback(correct: str):
         level_change=level_change,
         user_spreadsheet_id=get_user_spreadsheet_id(session),
         active_tab=session.get('active_tab', 'Sheet1'),
-        sheet_gid=get_sheet_gid_for_tab(
-            session.get('active_tab', 'Sheet1'), get_user_spreadsheet_id(session)
-        ),
+        # Use cached sheet GID instead of making API call
+        sheet_gid=session.get('sheet_gid'),
     )
 
 
@@ -481,6 +472,7 @@ def end_session_early():
         'reviewing_incorrect',
         'active_tab',
         'original_card_count',
+        'sheet_gid',
     ]:
         session.pop(key, None)
 
