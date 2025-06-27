@@ -18,9 +18,10 @@ def setup_logging():
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
 
-    # Create formatter
+    # Create formatter with milliseconds for performance debugging
     formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S'
+        '%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
     )
 
     # Console handler (works on both local and Railway)
