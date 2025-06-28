@@ -25,10 +25,6 @@ REGISTERED_REDIRECT_URIS = load_redirect_uris()
 def auth():
     """Initiate the OAuth flow to authorize the application."""
     try:
-        # Get the current request URL and determine the correct redirect URI
-        current_url = request.url
-        print(f'Auth request URL: {current_url}')
-
         # Determine if we're in production or development
         is_production = request.host.endswith('.railway.app') or request.host.endswith(
             '.up.railway.app'
@@ -38,26 +34,40 @@ def auth():
             # In production, use the Railway domain
             redirect_uri = f'https://{request.host}/oauth2callback'
         else:
-            # In development, use localhost with the appropriate port
-            parts = request.host.split(':')
-            port = parts[1] if len(parts) > 1 else '8080'
-            redirect_uri = f'http://localhost:{port}/oauth2callback'
+            # In development, support localhost, network IP, and ngrok
+            host_parts = request.host.split(':')
+            host_ip = host_parts[0]
+            port = host_parts[1] if len(host_parts) > 1 else '8080'
+
+            if host_ip == 'localhost' or host_ip == '127.0.0.1':
+                # Standard localhost development
+                redirect_uri = f'http://localhost:{port}/oauth2callback'
+            elif 'ngrok' in request.host:
+                # Ngrok tunnel for mobile testing
+                redirect_uri = f'https://{request.host}/oauth2callback'
+            else:
+                # Network IP for mobile testing
+                redirect_uri = f'http://{request.host}/oauth2callback'
 
         # Verify the redirect URI is in our registered list
         if REGISTERED_REDIRECT_URIS and redirect_uri not in REGISTERED_REDIRECT_URIS:
-            print(f'Warning: {redirect_uri} not in registered URIs: {REGISTERED_REDIRECT_URIS}')
-            # Fall back to a registered URI that matches our environment
-            if is_production:
-                production_uris = [uri for uri in REGISTERED_REDIRECT_URIS if 'railway.app' in uri]
-                if production_uris:
-                    redirect_uri = production_uris[0]
-            else:
-                localhost_uris = [uri for uri in REGISTERED_REDIRECT_URIS if 'localhost' in uri]
-                if localhost_uris:
-                    redirect_uri = localhost_uris[0]
+            # For development: allow network IP redirects for mobile testing
+            is_dev_mobile_testing = (
+                not is_production and host_ip != 'localhost' and host_ip != '127.0.0.1'
+            )
 
-        print(f'Using redirect URI for auth: {redirect_uri}')
-        print(f'Using OAuth scopes: {SCOPES}')
+            if not is_dev_mobile_testing:
+                # Fall back to a registered URI that matches our environment
+                if is_production:
+                    production_uris = [
+                        uri for uri in REGISTERED_REDIRECT_URIS if 'railway.app' in uri
+                    ]
+                    if production_uris:
+                        redirect_uri = production_uris[0]
+                else:
+                    localhost_uris = [uri for uri in REGISTERED_REDIRECT_URIS if 'localhost' in uri]
+                    if localhost_uris:
+                        redirect_uri = localhost_uris[0]
 
         # Create flow instance to manage the OAuth 2.0 Authorization Grant Flow steps
         flow = Flow.from_client_secrets_file(
@@ -73,23 +83,14 @@ def auth():
         sm.set(sk.AUTH_STATE, state)
         sm.set(sk.AUTH_REDIRECT_URI, redirect_uri)
 
-        print(f'Authorization URL: {authorization_url}')
         return redirect(authorization_url)
     except Exception as e:
-        print(f'Authentication error: {e!s}')
         return render_template('error.html', message=f'Authentication error: {e!s}')
 
 
 @auth_bp.route('/oauth2callback')
 def oauth2callback():
     """Callback function for the OAuth flow."""
-    # Print detailed debug information
-    print('\n--- OAuth Callback Debug Info ---')
-    print(f'Request URL: {request.url}')
-    print(f'Request Args: {request.args}')
-    print(f'Session Data: {session}')
-    print('--------------------------------\n')
-
     # Ensure that the request is not a forgery and that the user sending
     # this connect request is the expected user
     state = sm.get(sk.AUTH_STATE)
@@ -103,7 +104,6 @@ def oauth2callback():
         redirect_uri = sm.get(sk.AUTH_REDIRECT_URI)
         if not redirect_uri:
             # Fallback if we don't have it in the session
-            print('Warning: No redirect_uri in session, constructing one...')
             is_production = request.host.endswith('.railway.app') or request.host.endswith(
                 '.up.railway.app'
             )
@@ -111,11 +111,17 @@ def oauth2callback():
             if is_production:
                 redirect_uri = f'https://{request.host}/oauth2callback'
             else:
-                parts = request.host.split(':')
-                port = parts[1] if len(parts) > 1 else '8080'
-                redirect_uri = f'http://localhost:{port}/oauth2callback'
+                # Same logic as auth route: support localhost, network IP, and ngrok
+                host_parts = request.host.split(':')
+                host_ip = host_parts[0]
+                port = host_parts[1] if len(host_parts) > 1 else '8080'
 
-        print(f'Using redirect URI for callback: {redirect_uri}')
+                if host_ip == 'localhost' or host_ip == '127.0.0.1':
+                    redirect_uri = f'http://localhost:{port}/oauth2callback'
+                elif 'ngrok' in request.host:
+                    redirect_uri = f'https://{request.host}/oauth2callback'
+                else:
+                    redirect_uri = f'http://{request.host}/oauth2callback'
 
         flow = Flow.from_client_secrets_file(
             CLIENT_SECRETS_FILE, scopes=SCOPES, state=state, redirect_uri=redirect_uri
@@ -123,14 +129,12 @@ def oauth2callback():
 
         # Get the authorization response from the request
         authorization_response = request.url
-        print(f'Authorization response: {authorization_response}')
 
         # Fix for Railway: ensure HTTPS in authorization response URL
         if authorization_response.startswith('http://') and (
             request.host.endswith('.railway.app') or request.host.endswith('.up.railway.app')
         ):
             authorization_response = authorization_response.replace('http://', 'https://', 1)
-            print(f'Fixed authorization response for Railway: {authorization_response}')
 
         flow.fetch_token(authorization_response=authorization_response)
 
@@ -141,16 +145,13 @@ def oauth2callback():
 
         # Login user and create/update user record
         try:
-            user = login_user(session, credentials_dict)
-            print(f'User {user.email} logged in successfully')
+            login_user(session, credentials_dict)
         except Exception as e:
-            print(f'Error during user login: {e}')
             return render_template('error.html', message=f'Login error: {e!s}')
 
         # After authentication, redirect to index which will check for existing spreadsheet
         return redirect(url_for('flashcard.index'))
     except Exception as e:
-        print(f'OAuth callback error: {e!s}')
         return render_template('error.html', message=f'OAuth callback error: {e!s}')
 
 

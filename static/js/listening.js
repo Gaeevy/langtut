@@ -21,8 +21,6 @@ class ListeningManager {
         this.audioUnlocked = false;
         this.audioContext = null;
 
-        console.log(`🎵 ListeningManager initialized - Mobile: ${this.isMobile}`);
-
         // Initialize UI elements
         this.initializeUI();
     }
@@ -54,7 +52,6 @@ class ListeningManager {
         const modal = document.getElementById('listeningModal');
         if (modal) {
             modal.addEventListener('hidden.bs.modal', () => {
-                console.log('❌ Modal closed - stopping infinite playback');
                 this.stopPlayback();
             });
         }
@@ -67,8 +64,6 @@ class ListeningManager {
         if (!this.isMobile || this.audioUnlocked) {
             return true;
         }
-
-        console.log('🔓 Attempting to unlock audio context for mobile...');
 
         try {
             // Create audio context if needed
@@ -91,25 +86,67 @@ class ListeningManager {
             // Also unlock existing TTSManager if available
             if (window.ttsManager && !window.ttsManager.userInteracted) {
                 window.ttsManager.userInteracted = true;
-                console.log('🔓 Unlocked TTSManager for mobile');
             }
 
             this.audioUnlocked = true;
-            console.log('✅ Audio context unlocked successfully');
             return true;
 
         } catch (error) {
-            console.error('❌ Failed to unlock audio context:', error);
+            console.error('Failed to unlock audio context:', error);
             return false;
         }
+    }
+
+    /**
+     * Chrome iOS-specific immediate audio unlock
+     */
+    async unlockAudioForChromeIOS() {
+        try {
+            // Create Audio element during user interaction (don't play yet)
+            // This "touches" the audio subsystem and unlocks it for Chrome iOS
+            const touchedAudio = new Audio();
+            touchedAudio.volume = 1.0;
+            touchedAudio.preload = 'auto';
+
+            // Set a minimal audio source but don't play yet
+            touchedAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+
+            // Just loading the audio during user interaction unlocks it for Chrome iOS
+            touchedAudio.load();
+
+            // Store for TTSManager to reuse
+            if (window.ttsManager) {
+                window.ttsManager.primedAudioForChromeIOS = touchedAudio;
+                window.ttsManager.userInteracted = true;
+            }
+
+            this.audioUnlocked = true;
+            return true;
+
+        } catch (error) {
+            console.error('Chrome iOS audio unlock failed:', error);
+
+            // Fallback: Just set the flag anyway
+            if (window.ttsManager) {
+                window.ttsManager.userInteracted = true;
+            }
+
+            this.audioUnlocked = true;
+            return true; // Continue anyway, might still work
+        }
+    }
+
+    /**
+     * Detect Chrome iOS specifically
+     */
+    isChromeIOS() {
+        return /CriOS/i.test(navigator.userAgent) && /iPhone|iPad|iPod/i.test(navigator.userAgent);
     }
 
     /**
      * Start listening session for a tab
      */
     async startListening(tabName) {
-        console.log(`🎵 Starting listening mode for: ${tabName}`);
-
         this.tabName = tabName;
         this.currentCardIndex = 0;
         this.isPlaying = false;
@@ -121,7 +158,6 @@ class ListeningManager {
 
             // For mobile, show unlock prompt first
             if (this.isMobile && !this.audioUnlocked) {
-                console.log('📱 Mobile detected, showing unlock prompt');
                 this.showMobileUnlockPrompt();
                 return;
             }
@@ -130,7 +166,7 @@ class ListeningManager {
             this.showDesktopStartPrompt();
 
         } catch (error) {
-            console.error('❌ Error starting listening mode:', error);
+            console.error('Error starting listening mode:', error);
             this.updateStatus(`Error: ${error.message}`, false);
         }
     }
@@ -152,11 +188,9 @@ class ListeningManager {
     }
 
     /**
-     * Show mobile audio unlock prompt using pre-defined HTML elements
+     * Enhanced mobile unlock prompt with Chrome iOS support
      */
     showMobileUnlockPrompt() {
-        console.log('📱 Showing mobile unlock prompt');
-
         // Hide desktop start button, show mobile unlock
         const mobileUnlock = document.getElementById('mobileAudioUnlock');
         const desktopStart = document.getElementById('desktopAudioStart');
@@ -176,23 +210,30 @@ class ListeningManager {
             const newUnlockBtn = document.getElementById('unlockAudioBtn');
 
             newUnlockBtn.addEventListener('click', async () => {
-                console.log('🔓 User tapped unlock button');
-
                 // Show loading
                 newUnlockBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Unlocking...';
                 newUnlockBtn.disabled = true;
 
-                // Unlock audio context
-                const unlocked = await this.unlockAudioContext();
+                // Chrome iOS specific immediate unlock
+                if (this.isChromeIOS()) {
+                    const unlocked = await this.unlockAudioForChromeIOS();
 
-                if (unlocked) {
-                    console.log('✅ Audio unlocked, starting session...');
-                    // Now continue with normal flow
-                    await this.continueAfterUnlock();
+                    if (unlocked) {
+                        await this.continueAfterUnlock();
+                    } else {
+                        newUnlockBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Chrome iOS - Try Safari';
+                        newUnlockBtn.disabled = false;
+                    }
                 } else {
-                    // Show error
-                    newUnlockBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Unlock Failed - Try Refresh';
-                    newUnlockBtn.disabled = false;
+                    // Standard unlock for Safari iOS and other browsers
+                    const unlocked = await this.unlockAudioContext();
+
+                    if (unlocked) {
+                        await this.continueAfterUnlock();
+                    } else {
+                        newUnlockBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Unlock Failed - Try Refresh';
+                        newUnlockBtn.disabled = false;
+                    }
                 }
             }, { once: true });
         }
@@ -202,8 +243,6 @@ class ListeningManager {
      * Show desktop start prompt using pre-defined HTML elements
      */
     showDesktopStartPrompt() {
-        console.log('🖥️ Showing desktop start prompt');
-
         // Hide mobile unlock, show desktop start
         const mobileUnlock = document.getElementById('mobileAudioUnlock');
         const desktopStart = document.getElementById('desktopAudioStart');
@@ -223,8 +262,6 @@ class ListeningManager {
             const newStartBtn = document.getElementById('startListeningBtn');
 
             newStartBtn.addEventListener('click', async () => {
-                console.log('▶️ User clicked start listening');
-
                 // Show loading
                 newStartBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading...';
                 newStartBtn.disabled = true;
@@ -267,7 +304,7 @@ class ListeningManager {
             await this.beginPlayback();
 
         } catch (error) {
-            console.error('❌ Error continuing after unlock:', error);
+            console.error('Error continuing after unlock:', error);
             this.updateStatus(`Error: ${error.message}`, false);
         }
     }
@@ -356,7 +393,7 @@ class ListeningManager {
             console.log(`✅ Audio cache populated: ${cachedCount} items cached`);
 
         } catch (error) {
-            console.error('❌ Error populating audio cache:', error);
+            console.error('Error populating audio cache:', error);
             // Continue anyway - we'll fall back to on-demand generation
         }
     }
@@ -367,7 +404,6 @@ class ListeningManager {
     async playNextCard() {
         // Check if we should continue playing
         if (!this.isPlaying || this.isPaused) {
-            console.log('🛑 Playback stopped or paused');
             return;
         }
 
@@ -380,7 +416,6 @@ class ListeningManager {
         }
 
         const card = this.cards[this.currentCardIndex];
-        console.log(`🎵 Playing card ${this.currentCardIndex + 1}/${this.totalCount}: ${card.word}`);
 
         // Update progress UI
         this.updateProgress();
@@ -401,7 +436,7 @@ class ListeningManager {
             }, 500);
 
         } catch (error) {
-            console.error(`❌ Error playing card ${this.currentCardIndex + 1}:`, error);
+            console.error(`Error playing card ${this.currentCardIndex + 1}:`, error);
 
             // Skip to next card on error
             this.currentCardIndex++;
@@ -419,8 +454,6 @@ class ListeningManager {
      * Restart the card loop for infinite playback
      */
     restartLoop() {
-        console.log(`🔄 Restarting infinite loop - ${this.totalCount} cards (cache pre-populated) - Loop ${this.loopCount}`);
-
         // Reset to beginning
         this.currentCardIndex = 0;
 
@@ -431,7 +464,6 @@ class ListeningManager {
                 const j = Math.floor(Math.random() * (i + 1));
                 [this.cards[i], this.cards[j]] = [this.cards[j], this.cards[i]];
             }
-            console.log(`🎲 Reshuffled ${this.cards.length} cards for loop ${this.loopCount} (audio cached)`);
         }
 
         // Update UI to show new loop starting
@@ -443,7 +475,6 @@ class ListeningManager {
         // Continue playing if still active
         if (this.isPlaying && !this.isPaused) {
             setTimeout(() => {
-                console.log(`▶️ Starting loop ${this.loopCount} with cached audio...`);
                 this.playNextCard();
             }, 1000); // Slightly longer pause between loops
         }
@@ -455,18 +486,6 @@ class ListeningManager {
     async playCardAudio(card) {
         return new Promise(async (resolve, reject) => {
             try {
-                console.log(`🎵 Playing cached audio for: "${card.word}" -> "${card.example}"`);
-
-                // Use TTSManager's individual speak method which checks cache first
-                const wordCacheKey = `${card.word.trim()}_default`;
-                const exampleCacheKey = `${card.example.trim()}_default`;
-
-                // Check if both are cached
-                const wordCached = window.ttsManager.audioCache.has(wordCacheKey);
-                const exampleCached = window.ttsManager.audioCache.has(exampleCacheKey);
-
-                console.log(`🗂️ Cache status - Word: ${wordCached ? '✅' : '❌'}, Example: ${exampleCached ? '✅' : '❌'}`);
-
                 // Play word first (cache-first approach)
                 await this.playIndividualAudio(card.word, 'word');
 
@@ -476,11 +495,10 @@ class ListeningManager {
                 // Play example (cache-first approach)
                 await this.playIndividualAudio(card.example, 'example');
 
-                console.log(`✅ Completed cached audio for: ${card.word}`);
                 resolve();
 
             } catch (error) {
-                console.error(`❌ Cache-first audio error for card: ${card.word}`, error);
+                console.error(`Audio error for card: ${card.word}`, error);
                 reject(error);
             }
         });
@@ -517,14 +535,13 @@ class ListeningManager {
                     // Fallback timeout
                     setTimeout(() => {
                         if (!resolved) {
-                            console.log(`⏰ Audio timeout for ${type}: ${text}`);
                             resolveOnce();
                         }
                     }, 10000); // 10 second timeout
 
                     // Error handling
                     audio.addEventListener('error', (e) => {
-                        console.error(`🔊 Audio error for ${type}:`, e);
+                        console.error(`Audio error for ${type}:`, e);
                         if (!resolved) {
                             resolved = true;
                             reject(new Error(`Audio playback failed for ${type}`));
@@ -537,7 +554,7 @@ class ListeningManager {
                 }
 
             } catch (error) {
-                console.error(`❌ Individual audio error for ${type}:`, error);
+                console.error(`Individual audio error for ${type}:`, error);
                 reject(error);
             }
         });
@@ -548,9 +565,7 @@ class ListeningManager {
      */
     async simulateCardPlayback(card) {
         return new Promise(resolve => {
-            console.log(`🎭 Simulating audio: "${card.word}" -> "${card.example}"`);
             // Simulate typical card duration (word + example + pauses)
-            // Longer simulation for mobile testing
             const duration = this.isMobile ? 4000 : 3000;
             setTimeout(resolve, duration);
         });
@@ -563,7 +578,6 @@ class ListeningManager {
         if (!this.isPlaying) return;
 
         this.isPaused = true;
-        console.log('⏸️ Pausing playback');
 
         // Stop current audio
         if (window.ttsManager && window.ttsManager.currentAudio) {
@@ -587,7 +601,6 @@ class ListeningManager {
         if (!this.isPlaying || !this.isPaused) return;
 
         this.isPaused = false;
-        console.log('▶️ Resuming playback');
 
         // Update button
         const pauseResumeBtn = document.getElementById('pauseResumeBtn');
@@ -603,7 +616,6 @@ class ListeningManager {
      * Stop playback completely (called when modal is closed)
      */
     stopPlayback() {
-        console.log('⏹️ Stopping infinite listening mode');
         this.isPlaying = false;
         this.isPaused = false;
 
@@ -662,8 +674,6 @@ class ListeningManager {
      * Update status text and loading state
      */
     updateStatus(message, isLoading = false) {
-        console.log(`📊 Status: ${message}`);
-
         // Update status text element
         const statusTextEl = document.getElementById('statusText');
         if (statusTextEl) {

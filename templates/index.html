@@ -171,10 +171,18 @@
 <!-- Include Listening Manager -->
 <script src="{{ url_for('static', filename='js/listening.js') }}"></script>
 
+<!-- Mobile debugging console (development only) -->
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
 <script>
+// Mobile debugging console for development
+if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+    eruda.init();
+}
+
 // Card context for TTS usage (needed by ListeningManager)
 window.cardContext = {
-    spreadsheetId: {{ user_spreadsheet_id|tojson if user_spreadsheet_id else 'null' }}
+    spreadsheetId: "{{ user_spreadsheet_id }}",
+    sheetGid: null
 };
 
 // Initialize listening functionality when page loads
@@ -188,30 +196,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const tabName = this.getAttribute('data-tab-name');
             const cardCount = this.getAttribute('data-card-count');
 
-            console.log(`Starting listening mode for: ${tabName} (${cardCount} cards)`);
-
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('listeningModal'));
             modal.show();
 
             // Update modal title
-            document.getElementById('listeningModalLabel').textContent = `🎵 Listening: ${tabName}`;
+            document.getElementById('listeningModalLabel').textContent = `Listen: ${tabName}`;
 
-            // Reset modal state to setup view
-            document.getElementById('listeningSetup').style.display = 'block';
-            document.getElementById('listeningProgress').style.display = 'none';
-
-            // Start listening using ListeningManager
-            if (window.listeningManager) {
-                await window.listeningManager.startListening(tabName);
-            } else {
-                console.error('❌ ListeningManager not available');
-                // Show error in setup view
-                document.getElementById('listeningSetupDescription').innerHTML = `
-                    <span class="text-danger">⚠️ Listening functionality not available</span><br>
-                    <small class="text-muted">ListeningManager failed to initialize</small>
-                `;
-            }
+            // Start listening session
+            await window.listeningManager.startListening(tabName);
         });
     });
 });
