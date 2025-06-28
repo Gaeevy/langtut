@@ -12,7 +12,9 @@ from flask import Blueprint, redirect, render_template, request, session, url_fo
 from src.config import MAX_CARDS_PER_SESSION
 from src.gsheet import read_all_card_sets, read_card_set, update_spreadsheet
 from src.models import Card
-from src.user_manager import get_user_spreadsheet_id
+from src.session_manager import SessionKeys as sk
+from src.session_manager import SessionManager as sm
+from src.user_manager import get_user_spreadsheet_id, is_authenticated
 from src.utils import format_timestamp, get_timestamp
 
 # Create logger
@@ -40,25 +42,25 @@ def index():
     logger.info(f'User agent: {request.headers.get("User-Agent", "Unknown")}')
 
     # Check if session is working
-    if 'test' not in session:
-        session['test'] = 'Session is working'
+    if not sm.has(sk.TEST_SESSION):
+        sm.set(sk.TEST_SESSION, 'Session is working')
 
-    # Check authentication status
-    is_authenticated = 'credentials' in session
+    # Check authentication status using SessionManager
+    user_is_authenticated = is_authenticated()
     user_spreadsheet_id = get_user_spreadsheet_id(session)
 
-    logger.info(f'Authentication status: {is_authenticated}')
+    logger.info(f'Authentication status: {user_is_authenticated}')
     logger.info(f'User spreadsheet ID: {user_spreadsheet_id}')
 
     # If not authenticated, show login screen
-    if not is_authenticated:
+    if not user_is_authenticated:
         logger.info('User not authenticated, showing login screen')
         return render_template('login.html')
 
     # If no spreadsheet set, show setup screen
     if not user_spreadsheet_id:
         logger.info('No spreadsheet configured, showing setup screen')
-        return render_template('setup.html', is_authenticated=is_authenticated)
+        return render_template('setup.html', is_authenticated=user_is_authenticated)
 
     # Normal app flow with user's spreadsheet
     try:
@@ -72,7 +74,7 @@ def index():
 
     return render_template(
         'index.html',
-        is_authenticated=is_authenticated,
+        is_authenticated=user_is_authenticated,
         tabs=card_sets,
         user_spreadsheet_id=user_spreadsheet_id,
     )
@@ -114,18 +116,18 @@ def start_learning(tab_name: str):
             card_dict['last_shown'] = format_timestamp(card.last_shown)
             cards_data.append(card_dict)
 
-        session['cards'] = cards_data
-        session['current_index'] = 0
-        session['answers'] = []
-        session['incorrect_cards'] = []  # Track indices of incorrectly answered cards
-        session['reviewing_incorrect'] = (
-            False  # Flag to indicate if we're reviewing incorrect cards
-        )
-        session['active_tab'] = tab_name
-        session['original_card_count'] = len(cards)  # Store total card count for reference
+        sm.set(sk.LEARNING_CARDS, cards_data)
+        sm.set(sk.LEARNING_CURRENT_INDEX, 0)
+        sm.set(sk.LEARNING_ANSWERS, [])
+        sm.set(sk.LEARNING_INCORRECT_CARDS, [])  # Track indices of incorrectly answered cards
+        sm.set(
+            sk.LEARNING_REVIEWING_INCORRECT, False
+        )  # Flag to indicate if we're reviewing incorrect cards
+        sm.set(sk.LEARNING_ACTIVE_TAB, tab_name)
+        sm.set(sk.LEARNING_ORIGINAL_COUNT, len(cards))  # Store total card count for reference
 
         # Cache the sheet GID to avoid repeated API calls
-        session['sheet_gid'] = card_set.gid
+        sm.set(sk.LEARNING_SHEET_GID, card_set.gid)
         logger.info(f'Cached sheet GID in session: {card_set.gid}')
 
         logger.info(f'Session initialized: {len(cards)} cards, starting at index 0')
@@ -144,24 +146,24 @@ def show_card():
     """Display the current flashcard."""
     logger.info('=== SHOW CARD ROUTE ===')
 
-    if 'cards' not in session or 'current_index' not in session:
+    if not sm.has(sk.LEARNING_CARDS) or not sm.has(sk.LEARNING_CURRENT_INDEX):
         logger.warning('Cards or current_index not in session, redirecting to index')
         return redirect(url_for('flashcard.index'))
 
-    cards = session['cards']
-    index = session['current_index']
-    reviewing = session.get('reviewing_incorrect', False)
+    cards = sm.get(sk.LEARNING_CARDS)
+    index = sm.get(sk.LEARNING_CURRENT_INDEX)
+    reviewing = sm.get(sk.LEARNING_REVIEWING_INCORRECT, False)
 
     logger.info(f'Current index: {index}, Total cards: {len(cards)}, Reviewing: {reviewing}')
 
     # Check if we've gone through all the initial cards
     if index >= len(cards) and not reviewing:
         # If we have incorrect cards, start reviewing them
-        if session.get('incorrect_cards', []):
-            session['reviewing_incorrect'] = True
-            session['current_index'] = 0
+        if sm.get(sk.LEARNING_INCORRECT_CARDS, []):
+            sm.set(sk.LEARNING_REVIEWING_INCORRECT, True)
+            sm.set(sk.LEARNING_CURRENT_INDEX, 0)
             logger.info(
-                f'Starting review mode with {len(session["incorrect_cards"])} incorrect cards'
+                f'Starting review mode with {len(sm.get(sk.LEARNING_INCORRECT_CARDS))} incorrect cards'
             )
             return redirect(url_for('flashcard.show_card'))
         else:
@@ -170,19 +172,19 @@ def show_card():
             return redirect(url_for('flashcard.show_results'))
 
     # If we're reviewing and reached the end of incorrect cards, go to results
-    if reviewing and index >= len(session['incorrect_cards']):
+    if reviewing and index >= len(sm.get(sk.LEARNING_INCORRECT_CARDS)):
         logger.info('Review completed, redirecting to results')
         return redirect(url_for('flashcard.show_results'))
 
     # Get the current card (either from original list or from incorrect cards)
     if reviewing:
         # Get the incorrect card index from the stored list
-        incorrect_idx = session['incorrect_cards'][index]
+        incorrect_idx = sm.get(sk.LEARNING_INCORRECT_CARDS)[index]
         current_card = cards[incorrect_idx]
         # Add a flag to indicate this is a review card
         current_card['is_review'] = True
         logger.info(
-            f'Showing review card {index + 1}/{len(session["incorrect_cards"])}: {current_card["word"]} (original index {incorrect_idx})'
+            f'Showing review card {index + 1}/{len(sm.get(sk.LEARNING_INCORRECT_CARDS))}: {current_card["word"]} (original index {incorrect_idx})'
         )
     else:
         current_card = cards[index]
@@ -192,9 +194,9 @@ def show_card():
         )
 
     user_spreadsheet_id = get_user_spreadsheet_id(session)
-    active_tab = session.get('active_tab', 'Sheet1')
+    active_tab = sm.get(sk.LEARNING_ACTIVE_TAB, 'Sheet1')
     # Use cached sheet GID instead of making API call
-    sheet_gid = session.get('sheet_gid')
+    sheet_gid = sm.get(sk.LEARNING_SHEET_GID)
 
     logger.info(
         f'Template context: spreadsheet_id={user_spreadsheet_id}, tab={active_tab}, sheet_gid={sheet_gid} (cached)'
@@ -204,7 +206,7 @@ def show_card():
         'card.html',
         card=current_card,
         index=index,
-        total=len(session['incorrect_cards']) if reviewing else len(cards),
+        total=len(sm.get(sk.LEARNING_INCORRECT_CARDS)) if reviewing else len(cards),
         reviewing=reviewing,
         user_spreadsheet_id=user_spreadsheet_id,
         active_tab=active_tab,
@@ -217,7 +219,7 @@ def process_answer():
     """Process the user's answer to a flashcard."""
     logger.info('=== PROCESS ANSWER ROUTE ===')
 
-    if 'cards' not in session or 'current_index' not in session:
+    if not sm.has(sk.LEARNING_CARDS) or not sm.has(sk.LEARNING_CURRENT_INDEX):
         logger.warning('Cards or current_index not in session, redirecting to index')
         return redirect(url_for('flashcard.index'))
 
@@ -226,18 +228,18 @@ def process_answer():
     logger.info(f'User submitted answer: "{user_answer}"')
 
     # Check if we're in review mode
-    reviewing = session.get('reviewing_incorrect', False)
+    reviewing = sm.get(sk.LEARNING_REVIEWING_INCORRECT, False)
 
     # Get current card
-    cards = session['cards']
-    index = session['current_index']
+    cards = sm.get(sk.LEARNING_CARDS)
+    index = sm.get(sk.LEARNING_CURRENT_INDEX)
 
     if reviewing:
         # Get the original index of the card being reviewed
-        original_index = session['incorrect_cards'][index]
+        original_index = sm.get(sk.LEARNING_INCORRECT_CARDS)[index]
         current_card = cards[original_index]
         logger.info(
-            f'Processing review answer for card {index + 1}/{len(session["incorrect_cards"])} (original index {original_index})'
+            f'Processing review answer for card {index + 1}/{len(sm.get(sk.LEARNING_INCORRECT_CARDS))} (original index {original_index})'
         )
     else:
         current_card = cards[index]
@@ -274,25 +276,27 @@ def process_answer():
     }
 
     # Initialize answers list if it doesn't exist
-    if 'answers' not in session:
-        session['answers'] = []
+    if not sm.has(sk.LEARNING_ANSWERS):
+        sm.set(sk.LEARNING_ANSWERS, [])
 
-    session['answers'].append(answer_data)
-    logger.info(f'Answer stored. Total answers so far: {len(session["answers"])}')
+    answers = sm.get(sk.LEARNING_ANSWERS)
+    answers.append(answer_data)
+    sm.set(sk.LEARNING_ANSWERS, answers)
+    logger.info(f'Answer stored. Total answers so far: {len(answers)}')
 
     # Track incorrect cards for review (only during initial round)
     if not reviewing and not is_correct:
-        if 'incorrect_cards' not in session:
-            session['incorrect_cards'] = []
-        session['incorrect_cards'].append(index)
-        logger.info(
-            f'Added card to incorrect list. Total incorrect cards: {len(session["incorrect_cards"])}'
-        )
+        if not sm.has(sk.LEARNING_INCORRECT_CARDS):
+            sm.set(sk.LEARNING_INCORRECT_CARDS, [])
+        incorrect_cards = sm.get(sk.LEARNING_INCORRECT_CARDS)
+        incorrect_cards.append(index)
+        sm.set(sk.LEARNING_INCORRECT_CARDS, incorrect_cards)
+        logger.info(f'Added card to incorrect list. Total incorrect cards: {len(incorrect_cards)}')
 
     # Update card statistics in background (don't wait for response)
     try:
         user_spreadsheet_id = get_user_spreadsheet_id(session)
-        active_tab = session.get('active_tab', 'Sheet1')
+        active_tab = sm.get(sk.LEARNING_ACTIVE_TAB, 'Sheet1')
 
         logger.info(
             f'Updating card statistics: spreadsheet={user_spreadsheet_id}, tab={active_tab}'
@@ -324,20 +328,23 @@ def process_answer():
             )
 
         # Update the session data with the new level
-        cards = session['cards']
+        cards = sm.get(sk.LEARNING_CARDS)
         if reviewing:
             cards[original_index]['level'] = card.level.value
         else:
             cards[index]['level'] = card.level.value
-        session['cards'] = cards
+        sm.set(sk.LEARNING_CARDS, cards)
         logger.info('Session card level updated in memory')
 
         # Store level change information for the feedback page
-        session['last_level_change'] = {
-            'from': original_level,
-            'to': card.level.value,
-            'is_correct': is_correct,
-        }
+        sm.set(
+            sk.LEARNING_LAST_LEVEL_CHANGE,
+            {
+                'from': original_level,
+                'to': card.level.value,
+                'is_correct': is_correct,
+            },
+        )
 
         # Update spreadsheet
         logger.info('Updating spreadsheet with new statistics...')
@@ -357,25 +364,27 @@ def process_answer():
 @flashcard_bp.route('/feedback/<correct>')
 def show_feedback(correct: str):
     """Show feedback after answering a card."""
-    if 'cards' not in session or 'current_index' not in session:
+    if not sm.has(sk.LEARNING_CARDS) or not sm.has(sk.LEARNING_CURRENT_INDEX):
         return redirect(url_for('flashcard.index'))
 
-    cards = session['cards']
-    index = session['current_index']
-    reviewing = session.get('reviewing_incorrect', False)
+    cards = sm.get(sk.LEARNING_CARDS)
+    index = sm.get(sk.LEARNING_CURRENT_INDEX)
+    reviewing = sm.get(sk.LEARNING_REVIEWING_INCORRECT, False)
 
     # Get the current card
     if reviewing:
-        incorrect_idx = session['incorrect_cards'][index]
+        incorrect_idx = sm.get(sk.LEARNING_INCORRECT_CARDS)[index]
         current_card = cards[incorrect_idx]
     else:
         current_card = cards[index]
 
     # Get the last answer
-    last_answer = session.get('answers', [])[-1] if session.get('answers') else None
+    last_answer = sm.get(sk.LEARNING_ANSWERS, [])[-1] if sm.get(sk.LEARNING_ANSWERS) else None
 
     # Get level change information
-    level_change = session.pop('last_level_change', None)
+    level_change = sm.get(sk.LEARNING_LAST_LEVEL_CHANGE)
+    if level_change:
+        sm.remove(sk.LEARNING_LAST_LEVEL_CHANGE)
 
     return render_template(
         'feedback.html',
@@ -386,9 +395,9 @@ def show_feedback(correct: str):
         card_index=index,
         level_change=level_change,
         user_spreadsheet_id=get_user_spreadsheet_id(session),
-        active_tab=session.get('active_tab', 'Sheet1'),
+        active_tab=sm.get(sk.LEARNING_ACTIVE_TAB, 'Sheet1'),
         # Use cached sheet GID instead of making API call
-        sheet_gid=session.get('sheet_gid'),
+        sheet_gid=sm.get(sk.LEARNING_SHEET_GID),
     )
 
 
@@ -404,28 +413,29 @@ def rate_difficulty(card_index: int, difficulty: str):
 @flashcard_bp.route('/next')
 def next_card():
     """Move to the next card in the session."""
-    if 'current_index' not in session:
+    if not sm.has(sk.LEARNING_CURRENT_INDEX):
         return redirect(url_for('flashcard.index'))
 
-    session['current_index'] += 1
+    current_index = sm.get(sk.LEARNING_CURRENT_INDEX)
+    sm.set(sk.LEARNING_CURRENT_INDEX, current_index + 1)
     return redirect(url_for('flashcard.show_card'))
 
 
 @flashcard_bp.route('/results')
 def show_results():
     """Display the results of the learning session."""
-    if 'answers' not in session:
+    if not sm.has(sk.LEARNING_ANSWERS):
         return redirect(url_for('flashcard.index'))
 
-    answers = session.get('answers', [])
-    original_count = session.get('original_card_count', len(answers))
+    answers = sm.get(sk.LEARNING_ANSWERS, [])
+    original_count = sm.get(sk.LEARNING_ORIGINAL_COUNT, len(answers))
 
     # Calculate statistics
     total_answered = len(answers)
     correct_answers = sum(1 for answer in answers if answer['is_correct'])
 
     # Calculate review statistics
-    incorrect_cards = session.get('incorrect_cards', [])
+    incorrect_cards = sm.get(sk.LEARNING_INCORRECT_CARDS, [])
     review_count = len([a for a in answers if a.get('card_index', 0) in incorrect_cards])
     first_attempt_count = total_answered - review_count
 
@@ -441,7 +451,7 @@ def show_results():
         first_attempt_count=first_attempt_count,
         answers=answers,
         original_count=original_count,
-        is_authenticated='credentials' in session,
+        is_authenticated=is_authenticated(),
         updated=False,  # Will be True when spreadsheet updates are working
     )
 
@@ -450,31 +460,21 @@ def show_results():
 def end_session_early():
     """End the current learning session early."""
     # Calculate partial results
-    answers = session.get('answers', [])
-    original_count = session.get('original_card_count', len(answers))
+    answers = sm.get(sk.LEARNING_ANSWERS, [])
+    original_count = sm.get(sk.LEARNING_ORIGINAL_COUNT, len(answers))
 
     total_answered = len(answers)
     correct_answers = sum(1 for answer in answers if answer['is_correct'])
 
     # Calculate review statistics
-    incorrect_cards = session.get('incorrect_cards', [])
+    incorrect_cards = sm.get(sk.LEARNING_INCORRECT_CARDS, [])
     review_count = len([a for a in answers if a.get('card_index', 0) in incorrect_cards])
     first_attempt_count = total_answered - review_count
 
     accuracy = (correct_answers / total_answered * 100) if total_answered > 0 else 0
 
-    # Clear session data
-    for key in [
-        'cards',
-        'current_index',
-        'answers',
-        'incorrect_cards',
-        'reviewing_incorrect',
-        'active_tab',
-        'original_card_count',
-        'sheet_gid',
-    ]:
-        session.pop(key, None)
+    # Clear session data using SessionManager
+    sm.clear_namespace('learning')
 
     return render_template(
         'results.html',
@@ -487,6 +487,6 @@ def end_session_early():
         original_count=original_count,
         ended_early=True,
         cards_remaining=original_count - total_answered,
-        is_authenticated='credentials' in session,
+        is_authenticated=is_authenticated(),
         updated=False,  # Will be True when spreadsheet updates are working
     )

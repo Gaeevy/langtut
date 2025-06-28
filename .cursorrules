@@ -2,71 +2,45 @@
 
 @README.md
 
-## Git Commit Rules ✅ **NEW**
-- **CONCISE commit messages** - Maximum 200 characters total
-- **FORMAT**: `type: brief description (max 150 chars)`
-- **TYPES**: feat, fix, refactor, docs, style, test, chore
-- **FOCUS**: What changed, not why (details in code/docs)
-- **EXAMPLES**:
-  - `feat: add TTS caching with GCS integration`
-  - `fix: resolve blueprint URL routing issues`
-  - `refactor: simplify level progression logic`
-
 ## Project Overview
-This is a Flask-based Language Learning Flashcard App with the following key characteristics:
+This is a Flask-based Language Learning Flashcard App with the following characteristics:
 - **Core Purpose**: ANKI-style flashcards with European Portuguese text-to-speech
 - **Data Source**: Google Sheets integration for vocabulary management
-- **Architecture**: Modular Flask app with Blueprint-based routing ✅ **COMPLETED**
+- **Architecture**: Modular Flask app with Blueprint-based routing
 - **Features**: Statistics tracking, PWA support, OAuth authentication
 - **Deployment**: Railway/Heroku compatible with Poetry + requirements.txt
-- **Code Quality**: Pre-commit hooks with ruff linting/formatting ✅ **COMPLETED**
+- **Code Quality**: Pre-commit hooks with ruff linting/formatting
 
-## Project Structure Analysis
+## Current Project Structure
 
 ### Core Application Files
 ```
 app.py                          # Entry point - creates Flask app and handles dev/prod modes
 src/                           # Main application module
 ├── __init__.py               # Flask app factory with blueprint registration
-├── routes/                   # ✅ NEW: Blueprint-based route organization
-│   ├── __init__.py          # Blueprint registration (23 lines)
-│   ├── auth.py              # Authentication routes (155 lines)
-│   ├── flashcard.py         # Core learning functionality (306 lines)
-│   ├── settings.py          # User settings & spreadsheet config (119 lines)
-│   ├── api.py               # TTS and API endpoints (121 lines)
-│   ├── admin.py             # Database administration (237 lines)
-│   └── test.py              # Testing & debugging (81 lines)
+├── routes/                   # Blueprint-based route organization
+│   ├── __init__.py          # Blueprint registration
+│   ├── auth.py              # Authentication routes
+│   ├── flashcard.py         # Core learning functionality
+│   ├── settings.py          # User settings & spreadsheet config
+│   ├── api.py               # TTS and API endpoints
+│   ├── admin.py             # Database administration
+│   └── test.py              # Testing & debugging
 ├── models.py                # Pydantic data models
 ├── config.py                # Dynaconf configuration management
 ├── gsheet.py                # Google Sheets API integration
 ├── auth.py                  # Google OAuth authentication
 ├── database.py              # SQLAlchemy database operations
-├── tts_service.py           # Text-to-Speech service (14KB)
+├── tts_service.py           # Text-to-Speech service
 ├── user_manager.py          # User management utilities
+├── session_manager.py       # Centralized session management
 └── utils.py                 # Helper utilities
 ```
 
-### Frontend & Templates
+### Templates & Assets
 ```
 templates/                    # Jinja2 HTML templates
-├── base.html                # Base template
-├── index.html              # Homepage
-├── card.html               # Flashcard interface
-├── feedback.html           # Answer feedback
-├── results.html            # Session results
-├── settings.html           # User settings
-├── login.html              # Authentication
-├── setup.html              # Initial setup
-├── test_tts.html           # TTS testing
-├── offline.html            # PWA offline page
-└── error.html              # Error handling
-
-static/                      # Frontend assets
-├── css/                    # Stylesheets
-├── js/                     # JavaScript
-├── icons/                  # PWA icons
-├── manifest.json           # PWA manifest
-└── sw.js                   # Service worker
+static/                      # Frontend assets (CSS, JS, PWA files)
 ```
 
 ### Configuration & Dependencies
@@ -75,240 +49,65 @@ pyproject.toml              # Poetry configuration with dependencies
 requirements.txt            # Railway deployment requirements
 settings.toml              # Main configuration (non-sensitive)
 .secrets.toml              # Sensitive configuration (not in git)
-.secrets.toml.example      # Template for secrets
-.pre-commit-config.yaml    # ✅ NEW: Code quality automation
+.pre-commit-config.yaml    # Code quality automation
 ```
-
-### Data & Authentication
-```
-data/
-├── app.db                 # SQLite database
-└── .gitkeep
-
-google-cloud-service-account.json  # GCloud TTS credentials
-client_secret.json                 # OAuth credentials
-```
-
-### Deployment & Documentation
-```
-Procfile                   # Railway/Heroku process file
-railway.toml              # Railway configuration
-runtime.txt               # Python version specification
-TTS_SETUP.md              # Text-to-speech setup guide
-src/routes_original_backup.py  # Backup of original monolithic routes
-```
-
-## Architecture Analysis
-
-### ✅ COMPLETED IMPROVEMENTS
-1. **✅ Monolithic routes.py SPLIT** - Successfully broken into 6 focused blueprints
-2. **✅ Blueprint Architecture** - Clean separation of concerns by feature
-3. **✅ Type Safety** - Added comprehensive type hints throughout
-4. **✅ Error Handling** - Improved exception handling in all modules
-5. **✅ Data Persistence Strategy** - Deliberate dual-store architecture implemented
-6. **✅ Pre-commit Code Quality** - Automated linting, formatting, and security checks
-7. **✅ TTS Caching System** - GCS-based caching with spreadsheet-specific organization
-8. **✅ Comprehensive Logging** - Structured logging across all modules for debugging
-9. **✅ Level Progression Simplification** - Simple +1/-1 system replacing complex logic
-10. **✅ Development Experience** - Port 8080 default, improved mode detection
-11. **✅ Blueprint URL Routing** - All templates updated to use blueprint.endpoint format
-12. **✅ Answer Validation Logic** - Fixed form fields and validation direction
-13. **✅ TTS Integration** - Fixed API endpoints and JavaScript integration
-
-### 🟡 YELLOW FLAGS - Technical Debt
-1. **Large TTS service (14KB)** - Consider splitting into smaller components
-2. **Dual dependency management** - Poetry (dev) + requirements.txt (prod)
-3. **Configuration complexity** - Multiple config files with different purposes
-
-### 🟢 GREEN FLAGS - Good Practices
-1. **✅ Blueprint Architecture** - Clean feature-based route organization
-2. **✅ Type Safety** - Comprehensive type hints and Pydantic models
-3. **✅ Modular Structure** - Single responsibility per module
-4. **✅ Dual-Store Architecture** - Separation of content vs application data
-5. **✅ Code Quality Automation** - Pre-commit hooks ensure consistency
-6. **Configuration management** with Dynaconf
-7. **PWA support** with service worker and manifest
-8. **Multiple deployment options** (Railway, Heroku)
-9. **Comprehensive documentation**
 
 ## Development Rules
 
-### 1. File Organization Rules ✅ **IMPLEMENTED**
-- **✅ NEVER add code to monolithic files** - Use blueprint pattern
-- **✅ FEATURE-BASED blueprints** implemented:
-  - `routes/auth.py` - Authentication routes ✅
-  - `routes/flashcard.py` - Card-related routes ✅
-  - `routes/settings.py` - Settings and spreadsheet management ✅
-  - `routes/api.py` - API endpoints ✅
-  - `routes/admin.py` - Admin functionality ✅
-  - `routes/test.py` - Testing utilities ✅
-- **✅ BLUEPRINT registration** - Centralized in `routes/__init__.py`
+### 1. File Organization Rules
+- **NEVER add code to monolithic files** - Use blueprint pattern
+- **FEATURE-BASED blueprints**: Each blueprint handles one functional area
+- **BLUEPRINT registration** - Centralized in `routes/__init__.py`
 - **KEEP services focused** - One responsibility per service file
 
-### 2. Code Quality Rules ✅ **IMPLEMENTED**
-- **✅ TYPE HINTS required** - Added throughout all blueprints
-- **✅ PYDANTIC models** for all data validation
-- **✅ ERROR HANDLING** - Comprehensive try/catch blocks
-- **✅ PRE-COMMIT HOOKS** - Automated code quality enforcement:
-  - **Ruff**: Fast Python linting and formatting
-  - **File checks**: Trailing whitespace, JSON/YAML/TOML validation
-  - **Security**: Bandit security scanning, private key detection
-  - **No MyPy**: Removed due to excessive strictness for existing codebase
+### 2. Code Quality Rules
+- **TYPE HINTS required** - Add type hints to all functions
+- **PYDANTIC models** for all data validation
+- **ERROR HANDLING** - Comprehensive try/catch blocks with logging
+- **PRE-COMMIT HOOKS** - All code must pass ruff linting, formatting, and security checks
 - **NO direct database calls** in routes - use service layer
 - **LOGGING** required for all external API calls
 
-### 3. Configuration Rules
-- **NEVER hardcode credentials** - use settings.toml/.secrets.toml
+### 3. Session Management Rules
+- **USE SessionManager** - Never access `session[]` directly
+- **IMPORT PATTERN**: `from src.session_manager import SessionManager as sm, SessionKeys as sk`
+- **USAGE PATTERNS**:
+  - Get: `sm.get(sk.USER_ID, default_value)`
+  - Set: `sm.set(sk.AUTH_STATE, value)`
+  - Check: `if sm.has(sk.AUTH_CREDENTIALS):`
+  - Remove: `sm.remove(sk.LEARNING_CARDS)`
+  - Clear namespace: `sm.clear_namespace('auth')`
+- **SESSION KEY NAMESPACES**:
+  - `auth.*` - OAuth state, credentials, redirect URIs
+  - `user.*` - User ID, Google ID
+  - `learning.*` - Cards, progress, answers, review state
+  - `test.*` - Development/debugging
+
+### 4. Data Persistence Rules
+- **DUAL-STORE ARCHITECTURE**:
+  - **Google Sheets**: Content management (cards, vocabulary, learning material)
+  - **SQLite**: Application data (users, sessions, authentication state)
+- **NEVER raw SQL** - Use SQLAlchemy ORM for application data
+- **USE Google Sheets API** for content data with proper error handling
+
+### 5. Configuration Rules
+- **NEVER hardcode credentials** - Use settings.toml/.secrets.toml
 - **ENVIRONMENT variables** take precedence over file config
 - **VALIDATE configuration** on app startup
-- **DOCUMENT all config options** in settings.toml comments
 
-### 4. Data Persistence Rules ✅ **IMPLEMENTED**
-- **✅ DUAL-STORE ARCHITECTURE** - Deliberate separation of concerns:
-  - **Google Sheets**: Content management (cards, vocabulary, learning material)
-    - Easy for non-technical users to edit and manage content
-    - Natural format for language learning data (rows = cards)
-    - Version control through Google's revision history
-  - **SQLite**: Application data (users, sessions, authentication state)
-    - Proper relational data with foreign keys and constraints
-    - ACID transactions for user management
-    - Fast queries for session and authentication data
-- **✅ NEVER raw SQL** - using SQLAlchemy ORM correctly for application data
-- **USE Google Sheets API** for content data with proper error handling
-- **CONNECTION pooling** for production
-
-### 5. Frontend Rules
-- **PROGRESSIVE enhancement** - work without JS
-- **RESPONSIVE design** - mobile-first approach
-- **ACCESSIBILITY** - proper ARIA labels and semantic HTML
-- **PERFORMANCE** - minimize bundle sizes, lazy loading
-
-### 6. Testing Rules
-- **UNIT tests** for all business logic
-- **INTEGRATION tests** for API endpoints
-- **MOCK external services** (Google Sheets, TTS)
-- **TEST configuration** in separate environment
-
-### 7. Security Rules
-- **✅ VALIDATE all inputs** - Pydantic validation in place
-- **✅ SECURITY SCANNING** - Bandit integration via pre-commit
+### 6. Security Rules
+- **VALIDATE all inputs** - Use Pydantic validation
 - **SANITIZE outputs** to prevent XSS
-- **SECURE sessions** - HTTPOnly, Secure, SameSite
 - **RATE LIMITING** on API endpoints
 - **AUDIT logs** for sensitive operations
 
-### 8. Performance Rules
-- **CACHE TTS audio** (already implemented)
-- **LAZY LOAD** vocabulary data
-- **DATABASE indexes** on frequently queried fields
-- **COMPRESS static assets**
-- **CDN** for static files in production
+### 7. Git Commit Rules
+- **CONCISE commit messages** - Maximum 200 characters total
+- **FORMAT**: `type: brief description (max 150 chars)`
+- **TYPES**: feat, fix, refactor, docs, style, test, chore
+- **FOCUS**: What changed, not why
 
-### 9. Deployment Rules
-- **DOCKER** containerization preferred
-- **ENVIRONMENT parity** - dev should match prod
-- **HEALTH CHECKS** for deployment platforms
-- **GRACEFUL shutdowns** for data integrity
-- **BACKUP strategies** for user data
-
-### 10. Refactoring Priorities
-
-#### ✅ COMPLETED
-1. **✅ Split routes.py** - Successfully broken into 6 blueprints (1,090 → 6 focused files)
-2. **✅ Blueprint architecture** - Clean separation by feature
-3. **✅ Type safety** - Added comprehensive type hints
-4. **✅ Error handling** - Improved exception handling
-5. **✅ Data persistence strategy** - Dual-store architecture decision made
-6. **✅ Pre-commit setup** - Automated code quality with ruff, security scanning
-7. **✅ TTS caching implementation** - GCS-based caching with spreadsheet organization
-8. **✅ Comprehensive logging** - Structured logging across all modules
-9. **✅ Level progression simplification** - Replaced complex logic with simple +1/-1
-10. **✅ Development experience** - Port 8080 default, improved development detection
-11. **✅ Blueprint URL routing fixes** - All templates use blueprint.endpoint format
-12. **✅ Answer validation fixes** - Corrected form fields and validation logic
-
-#### High Priority (Do Next)
-1. **Create comprehensive service layer** for business logic
-2. **Add comprehensive testing** - Unit and integration tests for all blueprints
-3. **Add API rate limiting** - Implement proper request throttling
-
-#### Medium Priority
-1. **Optimize database queries**
-2. **Resolve dual dependency management**
-
-#### Low Priority
-1. **Add Docker support**
-2. **Implement caching layer**
-3. **Add monitoring/metrics**
-4. **Performance optimizations**
-
-## Pre-commit Setup ✅ **COMPLETED**
-
-### Configuration
-```yaml
-# .pre-commit-config.yaml
-repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    hooks:
-      - id: ruff          # Fast Python linting with --fix
-      - id: ruff-format   # Code formatting
-
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    hooks:
-      - id: trailing-whitespace, end-of-file-fixer, mixed-line-ending
-      - id: check-json, check-yaml, check-toml
-      - id: check-ast, check-builtin-literals, debug-statements
-      - id: detect-private-key
-
-  - repo: https://github.com/PyCQA/bandit
-    hooks:
-      - id: bandit        # Security vulnerability scanning
-
-  - repo: local
-    hooks:
-      - id: poetry-export  # Custom hook: sync pyproject.toml → requirements.txt
-```
-
-### Ruff Configuration (in pyproject.toml)
-```toml
-[tool.ruff]
-target-version = "py311"
-line-length = 100
-
-[tool.ruff.lint]
-select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM", "PTH", "RUF"]
-ignore = ["E501", "PTH110", "PTH100", "PTH103", "PTH123", ...]
-```
-
-### Custom Hooks
-- **Poetry Export**: Automatically syncs `pyproject.toml` dependencies to `requirements.txt`
-  - Ensures Railway deployment always has latest dependencies
-  - Runs only when `pyproject.toml` is modified
-  - Uses `poetry export --without-hashes` for clean output
-
-### Usage
-```bash
-# Install hooks (one-time setup)
-pre-commit install
-
-# Run on all files
-pre-commit run --all-files
-
-# Automatic runs on git commit
-git commit -m "message"  # hooks run automatically
-
-# Test specific hook
-pre-commit run poetry-export --all-files
-```
-
-### Success Metrics
-- **All checks passing**: ✅ 14/14 hooks pass successfully
-- **Zero security vulnerabilities**: Fixed MD5 hash usage with `usedforsecurity=False`
-- **Clean code formatting**: Consistent style across entire codebase
-- **Import organization**: Proper import ordering and structure
-- **Dependency sync**: requirements.txt automatically updated from pyproject.toml
-
-## Blueprint Patterns ✅ **IMPLEMENTED**
+## Blueprint Patterns
 
 ### Blueprint Structure
 ```python
@@ -331,13 +130,11 @@ def endpoint_function() -> ReturnType:
 from flask import Flask
 from .auth import auth_bp
 from .flashcard import flashcard_bp
-# ... other imports
 
 def register_blueprints(app: Flask) -> None:
     """Register all blueprints with the Flask app."""
     app.register_blueprint(auth_bp)
     app.register_blueprint(flashcard_bp)
-    # ... register all blueprints
 ```
 
 ### Cross-Blueprint URL Generation
@@ -347,11 +144,45 @@ return redirect(url_for('flashcard.index'))
 return redirect(url_for('auth.auth'))
 ```
 
-## Route Organization by Feature ✅ **IMPLEMENTED**
+## Current Route Organization
 
-### Authentication Routes (`auth.py`) - 155 lines
+### Authentication Routes (`auth.py`)
 - `/auth` - Initiate OAuth flow
 - `/oauth2callback` - OAuth callback handler
 - `/clear` - Clear credentials
 
-### Core Flashcard Routes (`
+### Core Flashcard Routes (`flashcard.py`)
+- `/` - Homepage/flashcard selection
+- `/start/<tab_name>` - Start learning session
+- `/card` - Display current flashcard
+- `/answer` - Process user's answer
+- `/feedback/<correct>` - Show answer feedback
+- `/next` - Move to next card
+- `/results` - Session results
+- `/end-session` - End session early
+
+### Settings Routes (`settings.py`)
+- `/settings` - User settings interface
+- `/validate-spreadsheet` - Validate Google Sheets access
+- `/set-spreadsheet` - Set user's active spreadsheet
+- `/reset-spreadsheet` - Reset to default spreadsheet
+
+### API Routes (`api.py`)
+- `/api/tts` - Text-to-Speech API
+- `/api/cards` - Card management API
+- `/api/stats` - Statistics API
+
+### Admin Routes (`admin.py`)
+- `/admin` - Admin interface
+- `/admin/cards` - Card management
+- `/admin/users` - User management
+
+### Testing Routes (`test.py`)
+- `/test` - Testing interface
+
+## Pre-commit Configuration
+The project uses automated code quality checks via pre-commit hooks:
+- **Ruff**: Fast Python linting and formatting
+- **File checks**: Trailing whitespace, JSON/YAML/TOML validation
+- **Security**: Bandit security scanning, private key detection
+- **Poetry export**: Auto-sync pyproject.toml → requirements.txt
