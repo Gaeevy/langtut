@@ -7,10 +7,13 @@
 
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#4a6da7">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="LangTutor">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+
+    <!-- Simple favicon to avoid 404 errors -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><rect width='32' height='32' fill='%234a6da7'/><text x='16' y='20' font-size='18' fill='white' text-anchor='middle' font-family='Arial'>L</text></svg>" type="image/svg+xml">
 
     <!-- Preconnect for performance -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net">

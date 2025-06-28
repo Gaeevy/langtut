@@ -81,19 +81,71 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Include TTS JavaScript FIRST -->
+<script src="{{ url_for('static', filename='js/tts.js') }}"></script>
+
 <script>
-    // Card context for potential TTS usage
+    // Card context for TTS usage
     window.cardContext = {
         spreadsheetId: {{ user_spreadsheet_id|tojson if user_spreadsheet_id else 'null' }},
         sheetGid: {{ sheet_gid|tojson if sheet_gid else 'null' }}
     };
 
-    // Set focus to the answer input field when the page loads
+    // Card data for TTS prefetching
+    window.cardData = {
+        word: {{ card.word|tojson if card.word else 'null' }},
+        example: {{ card.example|tojson if card.example else 'null' }}
+    };
+
+    // TTS prefetching functionality
+    function prefetchCardTTS() {
+        // Check if TTS manager is available
+        if (typeof window.ttsManager === 'undefined') {
+            setTimeout(prefetchCardTTS, 500);
+            return;
+        }
+
+        // Check if we have data to prefetch
+        if (!window.cardData.word && !window.cardData.example) {
+            return;
+        }
+
+        // Trigger TTS generation (cache only, no autoplay)
+        window.ttsManager.speakCard(
+            window.cardData.word,
+            window.cardData.example,
+            null, // voice name
+            false, // autoplay = false (just cache)
+            window.cardContext.spreadsheetId,
+            window.cardContext.sheetGid
+        ).then(result => {
+            if (!result) {
+                // Retry once if TTS wasn't ready
+                setTimeout(() => {
+                    window.ttsManager.speakCard(
+                        window.cardData.word,
+                        window.cardData.example,
+                        null,
+                        false,
+                        window.cardContext.spreadsheetId,
+                        window.cardContext.sheetGid
+                    );
+                }, 1000);
+            }
+        }).catch(() => {
+            // Silent fail - TTS prefetching is optional
+        });
+    }
+
+    // Initialize when page loads
     document.addEventListener('DOMContentLoaded', function() {
         const answerInput = document.querySelector('input[name="user_answer"]');
         if (answerInput) {
             answerInput.focus();
         }
+
+        // Start TTS prefetching
+        prefetchCardTTS();
     });
 
     // Toggle equivalent content

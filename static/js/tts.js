@@ -28,18 +28,15 @@ class TTSManager {
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
         if (isMobile) {
-            console.log('🔊 Mobile device detected, setting up audio context');
-
             // Set up user interaction detection
             const enableAudio = () => {
                 if (!this.userInteracted) {
-                    console.log('🔊 User interaction detected, enabling audio');
                     this.userInteracted = true;
 
                     // Create and play a silent audio to unlock audio context
-                    const silentAudio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU4Ljk1AAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABmwQ+XAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABrTjOWAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+                    const silentAudio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU4Ljk1AAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABmwQ+XAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABrTjOWAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
                     silentAudio.play().catch(() => {
-                        console.log('🔊 Silent audio play failed, but user interaction registered');
+                        // Silent fail - this is expected on many browsers
                     });
                 }
             };
@@ -61,11 +58,6 @@ class TTSManager {
 
             this.isAvailable = data.available;
             this.voices = data.voices || [];
-
-            console.log('TTS Status:', {
-                available: this.isAvailable,
-                voices: this.voices.length
-            });
 
             return this.isAvailable;
         } catch (error) {
@@ -135,7 +127,6 @@ class TTSManager {
      */
     async speakCard(word, example, voiceName = null, autoplay = false, spreadsheetId = null, sheetGid = null) {
         if (!this.isAvailable) {
-            console.warn('TTS service is not available');
             return false;
         }
 
@@ -152,7 +143,6 @@ class TTSManager {
             if (spreadsheetId && sheetGid !== null) {
                 requestBody.spreadsheet_id = spreadsheetId;
                 requestBody.sheet_gid = sheetGid;
-                console.log('🎯 TTS caching context:', { spreadsheetId, sheetGid });
             }
 
             const response = await fetch('/api/tts/speak-card', {
@@ -203,13 +193,6 @@ class TTSManager {
             // Stop current audio if playing
             this.stopCurrentAudio();
 
-            // Mobile debugging
-            console.log('🔊 Attempting to play audio on:', {
-                userAgent: navigator.userAgent,
-                isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
-                audioContext: typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined'
-            });
-
             // Create audio element
             const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
             this.currentAudio = audio;
@@ -218,25 +201,12 @@ class TTSManager {
             audio.preload = 'auto';
             audio.volume = 1.0;
 
-            // Mobile debugging events
-            audio.addEventListener('loadstart', () => console.log('🔊 Audio loadstart'));
-            audio.addEventListener('loadeddata', () => console.log('🔊 Audio loadeddata'));
-            audio.addEventListener('canplay', () => console.log('🔊 Audio canplay'));
-            audio.addEventListener('canplaythrough', () => console.log('🔊 Audio canplaythrough'));
-            audio.addEventListener('play', () => console.log('🔊 Audio play event'));
-            audio.addEventListener('playing', () => console.log('🔊 Audio playing'));
-            audio.addEventListener('pause', () => console.log('🔊 Audio paused'));
+            // Essential audio events
             audio.addEventListener('ended', () => {
-                console.log('🔊 Audio ended');
                 this.currentAudio = null;
             });
             audio.addEventListener('error', (e) => {
                 console.error('🔊 Audio error:', e);
-                console.error('🔊 Audio error details:', {
-                    error: audio.error,
-                    networkState: audio.networkState,
-                    readyState: audio.readyState
-                });
             });
 
             // Wait for audio to be ready
@@ -259,14 +229,11 @@ class TTSManager {
                 audio.load();
             });
 
-            console.log('🔊 Audio ready, attempting to play...');
-
             // Try to play the audio
             const playPromise = audio.play();
 
             if (playPromise !== undefined) {
                 await playPromise;
-                console.log('🔊 Audio play promise resolved successfully');
             }
 
             return true;
@@ -280,8 +247,6 @@ class TTSManager {
             } else if (error.name === 'NotSupportedError') {
                 console.error('🔊 Audio format not supported');
                 alert('Audio format not supported on this device.');
-            } else {
-                console.error('🔊 Unknown audio error:', error.message);
             }
 
             return false;
@@ -403,13 +368,25 @@ class TTSManager {
     }
 
     /**
-     * Get cache statistics
+     * Get cache statistics for debugging
      */
     getCacheStats() {
         return {
             size: this.audioCache.size,
-            keys: Array.from(this.audioCache.keys())
+            memoryUsage: this.estimateCacheMemoryUsage()
         };
+    }
+
+    /**
+     * Estimate cache memory usage (rough calculation)
+     */
+    estimateCacheMemoryUsage() {
+        let totalSize = 0;
+        for (const [key, value] of this.audioCache) {
+            totalSize += key.length * 2; // rough estimate for string
+            totalSize += value.length * 0.75; // base64 is ~75% of original binary size
+        }
+        return `${Math.round(totalSize / 1024)} KB`;
     }
 }
 

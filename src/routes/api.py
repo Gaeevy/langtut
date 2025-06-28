@@ -115,51 +115,26 @@ def speak_card_content() -> dict[str, Any]:
         logger.info(f'  Voice: {voice_name}')
         logger.info(f'  Spreadsheet ID: {spreadsheet_id}')
         logger.info(f'  Sheet GID: {sheet_gid}')
-        logger.info(f'  Caching enabled: {bool(spreadsheet_id and sheet_gid is not None)}')
 
         result = {'success': True, 'audio': {}}
 
         # Generate speech for word if provided
         if word:
-            logger.info(f'🎯 Generating TTS for word: "{word}"')
-            if spreadsheet_id and sheet_gid is not None:
-                # Use caching
-                word_audio = tts_service.generate_speech_with_cache(
-                    word, spreadsheet_id, sheet_gid, voice_name
-                )
-                logger.info(f'🎯 TTS word with cache: {word} -> {bool(word_audio)}')
-            else:
-                # No caching
-                word_audio = tts_service.generate_speech_base64(word, voice_name)
-                logger.info(f'🎯 TTS word without cache: {word} -> {bool(word_audio)}')
+            word_audio = tts_service.text_to_speech(word, spreadsheet_id, sheet_gid, voice_name)
 
             if word_audio:
                 result['audio']['word'] = {'text': word, 'audio_base64': word_audio}
-                logger.info(
-                    f'✅ Word audio generated successfully (length: {len(word_audio)} chars)'
-                )
             else:
                 logger.warning(f'❌ Failed to generate word audio for: "{word}"')
 
         # Generate speech for example if provided
         if example:
-            logger.info(f'🎯 Generating TTS for example: "{example}"')
-            if spreadsheet_id and sheet_gid is not None:
-                # Use caching
-                example_audio = tts_service.generate_speech_with_cache(
-                    example, spreadsheet_id, sheet_gid, voice_name
-                )
-                logger.info(f'🎯 TTS example with cache: {example} -> {bool(example_audio)}')
-            else:
-                # No caching
-                example_audio = tts_service.generate_speech_base64(example, voice_name)
-                logger.info(f'🎯 TTS example without cache: {example} -> {bool(example_audio)}')
+            example_audio = tts_service.text_to_speech(
+                example, spreadsheet_id, sheet_gid, voice_name
+            )
 
             if example_audio:
                 result['audio']['example'] = {'text': example, 'audio_base64': example_audio}
-                logger.info(
-                    f'✅ Example audio generated successfully (length: {len(example_audio)} chars)'
-                )
             else:
                 logger.warning(f'❌ Failed to generate example audio for: "{example}"')
 
@@ -169,9 +144,6 @@ def speak_card_content() -> dict[str, Any]:
                 {'success': False, 'error': 'No valid text provided for speech generation'}
             ), 400
 
-        logger.info(
-            f'✅ TTS speak-card completed successfully. Generated audio for: {list(result["audio"].keys())}'
-        )
         return jsonify(result)
 
     except Exception as e:
