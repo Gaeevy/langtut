@@ -7,6 +7,8 @@ Handles user settings and spreadsheet configuration.
 from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
 
 from src.gsheet import extract_spreadsheet_id, read_all_card_sets, validate_spreadsheet_access
+from src.session_manager import SessionKeys as sk
+from src.session_manager import SessionManager as sm
 from src.user_manager import get_current_user_from_session, set_user_spreadsheet
 
 # Create blueprint
@@ -17,7 +19,7 @@ settings_bp = Blueprint('settings', __name__)
 def settings():
     """Display user settings page."""
     # Check authentication
-    if 'credentials' not in session:
+    if not sm.has(sk.AUTH_CREDENTIALS):
         return redirect(url_for('auth.auth'))
 
     # Get current user and their spreadsheet
@@ -33,7 +35,7 @@ def settings():
 def validate_spreadsheet():
     """Validate access to a Google Spreadsheet."""
     # Check authentication
-    if 'credentials' not in session:
+    if not sm.has(sk.AUTH_CREDENTIALS):
         return jsonify({'success': False, 'error': 'Not authenticated'})
 
     spreadsheet_url = request.json.get('spreadsheet_url', '').strip()
@@ -88,7 +90,7 @@ def validate_spreadsheet():
 def set_spreadsheet():
     """Set the user's active spreadsheet."""
     # Check authentication
-    if 'credentials' not in session:
+    if not sm.has(sk.AUTH_CREDENTIALS):
         return jsonify({'success': False, 'error': 'Not authenticated'})
 
     spreadsheet_id = request.json.get('spreadsheet_id', '').strip()
@@ -113,7 +115,7 @@ def set_spreadsheet():
 def reset_spreadsheet():
     """Reset the user's spreadsheet to the default."""
     # Check authentication
-    if 'credentials' not in session:
+    if not sm.has(sk.AUTH_CREDENTIALS):
         return jsonify({'success': False, 'error': 'Not authenticated'})
 
     try:
