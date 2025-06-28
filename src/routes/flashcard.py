@@ -15,7 +15,7 @@ from src.models import Card
 from src.session_manager import SessionKeys as sk
 from src.session_manager import SessionManager as sm
 from src.user_manager import get_user_spreadsheet_id, is_authenticated
-from src.utils import format_timestamp, get_timestamp
+from src.utils import format_timestamp, get_timestamp, parse_timestamp
 
 # Create logger
 logger = logging.getLogger(__name__)
@@ -31,6 +31,54 @@ class CustomJSONEncoder(json.JSONEncoder):
         if hasattr(obj, 'isoformat'):
             return obj.isoformat()
         return super().default(obj)
+
+
+def batch_update_session_cards():
+    """
+    Extract modified cards from session and batch update them to Google Sheets.
+
+    Returns:
+        bool: True if update was successful, False otherwise
+    """
+    try:
+        # Get session data
+        cards_data = sm.get(sk.LEARNING_CARDS, [])
+        active_tab = sm.get(sk.LEARNING_ACTIVE_TAB)
+        user_spreadsheet_id = get_user_spreadsheet_id(session)
+
+        if not cards_data or not active_tab or not user_spreadsheet_id:
+            logger.warning('Missing session data for batch update')
+            return False
+
+        # Convert card dictionaries back to Card objects
+        cards_to_update = []
+        for card_data in cards_data:
+            try:
+                # Parse the timestamp back from string format
+                if card_data.get('last_shown'):
+                    card_data['last_shown'] = parse_timestamp(card_data['last_shown'])
+
+                card = Card(**card_data)
+                cards_to_update.append(card)
+            except Exception as e:
+                logger.error(f'Error converting card data to Card object: {e}')
+                continue
+
+        if not cards_to_update:
+            logger.warning('No valid cards to update')
+            return False
+
+        logger.info(f'Batch updating {len(cards_to_update)} cards to spreadsheet')
+        logger.info(f'Worksheet: {active_tab}, Spreadsheet: {user_spreadsheet_id}')
+
+        # Perform the batch update
+        update_spreadsheet(active_tab, cards_to_update, spreadsheet_id=user_spreadsheet_id)
+        logger.info('✅ Batch spreadsheet update completed successfully')
+        return True
+
+    except Exception as e:
+        logger.error(f'❌ Error in batch spreadsheet update: {e}', exc_info=True)
+        return False
 
 
 @flashcard_bp.route('/')
@@ -248,60 +296,35 @@ def process_answer():
     # Check answer (simple exact match for now)
     correct_answers = [current_card['word'].strip().lower()]  # User types Portuguese word
 
-    # Also check the equivalent field if it exists and is different
-    if (
-        current_card.get('equivalent')
-        and current_card['equivalent'].strip().lower() != correct_answers[0]
-    ):
-        correct_answers.append(current_card['equivalent'].strip().lower())
-
+    # Check if answer is correct
     is_correct = user_answer in correct_answers
+    logger.info(f'Answer correctness: {is_correct}')
+    logger.info(f'Expected answers: {correct_answers}')
 
-    # Comprehensive answer validation logging
-    logger.info('🔍 Answer validation details:')
-    logger.info(f'  Card ID: {current_card["id"]}')
-    logger.info(f"  User sees: '{current_card['translation']}' (Russian)")
-    logger.info(f"  User typed: '{user_answer}'")
-    logger.info(f"  Expected Portuguese word: '{current_card['word']}'")
-    logger.info(f'  All correct answers: {correct_answers}')
-    logger.info(f'  Is correct: {is_correct}')
-    logger.info(f'  Review mode: {reviewing}')
-
-    # Store the answer result
+    # Store answer in session for results
+    answers = sm.get(sk.LEARNING_ANSWERS, [])
     answer_data = {
-        'card_id': current_card['id'],
-        'user_answer': user_answer,
-        'is_correct': is_correct,
         'card_index': original_index if reviewing else index,
+        'word': current_card['word'],
+        'translation': current_card['translation'],
+        'user_answer': user_answer,
+        'correct_answer': current_card['word'],
+        'is_correct': is_correct,
+        'timestamp': get_timestamp().isoformat(),
+        'is_review': reviewing,
     }
-
-    # Initialize answers list if it doesn't exist
-    if not sm.has(sk.LEARNING_ANSWERS):
-        sm.set(sk.LEARNING_ANSWERS, [])
-
-    answers = sm.get(sk.LEARNING_ANSWERS)
     answers.append(answer_data)
     sm.set(sk.LEARNING_ANSWERS, answers)
-    logger.info(f'Answer stored. Total answers so far: {len(answers)}')
 
-    # Track incorrect cards for review (only during initial round)
-    if not reviewing and not is_correct:
-        if not sm.has(sk.LEARNING_INCORRECT_CARDS):
-            sm.set(sk.LEARNING_INCORRECT_CARDS, [])
-        incorrect_cards = sm.get(sk.LEARNING_INCORRECT_CARDS)
+    # Track incorrect answers for review
+    if not is_correct and not reviewing:
+        incorrect_cards = sm.get(sk.LEARNING_INCORRECT_CARDS, [])
         incorrect_cards.append(index)
         sm.set(sk.LEARNING_INCORRECT_CARDS, incorrect_cards)
         logger.info(f'Added card to incorrect list. Total incorrect cards: {len(incorrect_cards)}')
 
-    # Update card statistics in background (don't wait for response)
+    # Update card statistics in session (no immediate spreadsheet write)
     try:
-        user_spreadsheet_id = get_user_spreadsheet_id(session)
-        active_tab = sm.get(sk.LEARNING_ACTIVE_TAB, 'Sheet1')
-
-        logger.info(
-            f'Updating card statistics: spreadsheet={user_spreadsheet_id}, tab={active_tab}'
-        )
-
         # Create Card object from current card data
         card = Card(**current_card)
 
@@ -327,14 +350,21 @@ def process_answer():
                 f'❌ Incorrect answer! Card level decreased from {original_level} to {card.level.value}'
             )
 
-        # Update the session data with the new level
+        # Update the session data with the new statistics
         cards = sm.get(sk.LEARNING_CARDS)
+        card_dict = card.model_dump()
+        card_dict['last_shown'] = format_timestamp(
+            card.last_shown
+        )  # Convert back to string for session
+
         if reviewing:
-            cards[original_index]['level'] = card.level.value
+            cards[original_index] = card_dict
         else:
-            cards[index]['level'] = card.level.value
+            cards[index] = card_dict
         sm.set(sk.LEARNING_CARDS, cards)
-        logger.info('Session card level updated in memory')
+        logger.info(
+            '✅ Session card statistics updated in memory (will batch update at session end)'
+        )
 
         # Store level change information for the feedback page
         sm.set(
@@ -346,13 +376,8 @@ def process_answer():
             },
         )
 
-        # Update spreadsheet
-        logger.info('Updating spreadsheet with new statistics...')
-        update_spreadsheet(active_tab, [card], spreadsheet_id=user_spreadsheet_id)
-        logger.info('Spreadsheet update completed successfully')
-
     except Exception as e:
-        logger.error(f'Error updating card statistics: {e}', exc_info=True)
+        logger.error(f'Error updating card statistics in session: {e}', exc_info=True)
         # Continue without showing error to user
 
     # Redirect to feedback page
@@ -442,6 +467,19 @@ def show_results():
     # Calculate accuracy percentage
     accuracy = (correct_answers / total_answered * 100) if total_answered > 0 else 0
 
+    # Batch update all modified cards to Google Sheets
+    logger.info('🔄 Session completed - performing batch spreadsheet update...')
+    update_successful = batch_update_session_cards()
+
+    if update_successful:
+        logger.info('✅ All card statistics successfully saved to spreadsheet')
+    else:
+        logger.warning('⚠️ Some card statistics may not have been saved')
+
+    # Clear session data after successful update
+    sm.clear_namespace('learning')
+    logger.info('Learning session data cleared from memory')
+
     return render_template(
         'results.html',
         total=total_answered,
@@ -452,7 +490,7 @@ def show_results():
         answers=answers,
         original_count=original_count,
         is_authenticated=is_authenticated(),
-        updated=False,  # Will be True when spreadsheet updates are working
+        updated=update_successful,  # Now reflects actual update status
     )
 
 
@@ -473,8 +511,18 @@ def end_session_early():
 
     accuracy = (correct_answers / total_answered * 100) if total_answered > 0 else 0
 
-    # Clear session data using SessionManager
+    # Batch update all modified cards to Google Sheets before ending
+    logger.info('🔄 Session ended early - performing batch spreadsheet update...')
+    update_successful = batch_update_session_cards()
+
+    if update_successful:
+        logger.info('✅ All card statistics successfully saved to spreadsheet')
+    else:
+        logger.warning('⚠️ Some card statistics may not have been saved')
+
+    # Clear session data after update attempt
     sm.clear_namespace('learning')
+    logger.info('Learning session data cleared from memory')
 
     return render_template(
         'results.html',
@@ -488,5 +536,5 @@ def end_session_early():
         ended_early=True,
         cards_remaining=original_count - total_answered,
         is_authenticated=is_authenticated(),
-        updated=False,  # Will be True when spreadsheet updates are working
+        updated=update_successful,  # Now reflects actual update status
     )
