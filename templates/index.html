@@ -50,28 +50,97 @@
                     <h5 class="modal-title" id="listeningModalLabel">🎵 Listening Mode</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body text-center">
-                    <div id="listening-status" class="mb-3">
-                        <p class="mb-1">Loading cards...</p>
-                        <div class="spinner-border spinner-border-sm text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
+                <div class="modal-body">
+                    <!-- Listening Setup View -->
+                    <div id="listeningSetup" style="display: none;">
+                        <div class="text-center">
+                            <div class="mb-3">
+                                <h5 id="listeningSetupTitle">Ready to Listen?</h5>
+                                <p class="text-muted" id="listeningSetupDescription">This will play through all cards with Portuguese audio</p>
+                            </div>
+
+                            <!-- Mobile-specific unlock button -->
+                            <div id="mobileAudioUnlock" style="display: none;">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-mobile-alt"></i>
+                                    <strong>Mobile Device Detected</strong><br>
+                                    Tap below to unlock audio for this session
+                                </div>
+                                <button id="unlockAudioBtn" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-volume-up"></i>
+                                    Start Listening Session
+                                </button>
+                            </div>
+
+                            <!-- Desktop start button -->
+                            <div id="desktopAudioStart">
+                                <button id="startListeningBtn" class="btn btn-success btn-lg">
+                                    <i class="fas fa-play"></i>
+                                    Begin Listening
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <div id="listening-progress" style="display: none;">
-                        <div class="mb-2">
-                            <h6 id="current-card-info">Playing: casa (1/150)</h6>
+
+                    <!-- Listening Progress View -->
+                    <div id="listeningProgress" style="display: none;">
+                        <div class="row align-items-center mb-3">
+                            <div class="col">
+                                <h5 class="mb-1" id="listeningTitle">Portuguese Learning</h5>
+                                <small class="text-muted" id="listeningSubtitle">Infinite loop playback</small>
+                            </div>
+                            <div class="col-auto">
+                                <span class="badge badge-primary" id="loopCounter">Loop 1</span>
+                            </div>
                         </div>
-                        <div class="progress mb-3" style="height: 10px;">
-                            <div id="listening-progress-bar" class="progress-bar" role="progressbar"
-                                 style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+
+                        <!-- Current Card Display -->
+                        <div class="card mb-3" style="background-color: #f8f9fa;">
+                            <div class="card-body text-center">
+                                <h4 class="card-title mb-1" id="currentWord">Loading...</h4>
+                                <p class="card-text text-muted" id="currentExample">Preparing audio...</p>
+                            </div>
                         </div>
-                        <div class="d-flex gap-2 justify-content-center">
-                            <button type="button" class="btn btn-outline-secondary btn-sm" id="pause-listening-btn">
-                                <i class="bi bi-pause"></i> Pause
+
+                        <!-- Progress Bar -->
+                        <div class="mb-3">
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" id="listeningProgressBar"
+                                     style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between mt-1">
+                                <small class="text-muted" id="progressText">0 / 0 cards</small>
+                                <small class="text-muted" id="statusText">Preparing...</small>
+                            </div>
+                        </div>
+
+                        <!-- Cache Status -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">
+                                    <i class="fas fa-database"></i>
+                                    <span id="cacheStatus">Cache: Checking...</span>
+                                </small>
+                                <small class="text-muted">
+                                    <span id="cacheHitRate">Hit rate: --</span>
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Controls -->
+                        <div class="text-center">
+                            <button id="pauseResumeBtn" class="btn btn-outline-primary">
+                                <i class="fas fa-pause"></i>
+                                <span>Pause</span>
                             </button>
-                            <button type="button" class="btn btn-outline-danger btn-sm" id="stop-listening-btn">
-                                <i class="bi bi-stop"></i> Stop
-                            </button>
+                        </div>
+
+                        <div class="text-center mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-infinity"></i>
+                                Playing infinitely - close to stop
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -128,18 +197,19 @@ document.addEventListener('DOMContentLoaded', function() {
             // Update modal title
             document.getElementById('listeningModalLabel').textContent = `🎵 Listening: ${tabName}`;
 
-            // Reset modal state
-            document.getElementById('listening-status').style.display = 'block';
-            document.getElementById('listening-progress').style.display = 'none';
+            // Reset modal state to setup view
+            document.getElementById('listeningSetup').style.display = 'block';
+            document.getElementById('listeningProgress').style.display = 'none';
 
             // Start listening using ListeningManager
             if (window.listeningManager) {
                 await window.listeningManager.startListening(tabName);
             } else {
                 console.error('❌ ListeningManager not available');
-                document.getElementById('listening-status').innerHTML = `
-                    <p class="text-danger">⚠️ Listening functionality not available</p>
-                    <p class="small text-muted">ListeningManager failed to initialize</p>
+                // Show error in setup view
+                document.getElementById('listeningSetupDescription').innerHTML = `
+                    <span class="text-danger">⚠️ Listening functionality not available</span><br>
+                    <small class="text-muted">ListeningManager failed to initialize</small>
                 `;
             }
         });
