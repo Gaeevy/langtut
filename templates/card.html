@@ -85,7 +85,7 @@
 <script src="{{ url_for('static', filename='js/tts.js') }}"></script>
 
 <script>
-    // Card context for potential TTS usage
+    // Card context for TTS usage
     window.cardContext = {
         spreadsheetId: {{ user_spreadsheet_id|tojson if user_spreadsheet_id else 'null' }},
         sheetGid: {{ sheet_gid|tojson if sheet_gid else 'null' }}
@@ -99,29 +99,18 @@
 
     // TTS prefetching functionality
     function prefetchCardTTS() {
-        console.log('🎯 CARD LOADED - Starting TTS prefetch...');
-        console.log('🎯 Card data:', window.cardData);
-        console.log('🎯 Context:', window.cardContext);
-
         // Check if TTS manager is available
         if (typeof window.ttsManager === 'undefined') {
-            console.log('🎯 TTS Manager not ready, retrying in 500ms...');
             setTimeout(prefetchCardTTS, 500);
             return;
         }
 
-        // Check if we have the data we need
+        // Check if we have data to prefetch
         if (!window.cardData.word && !window.cardData.example) {
-            console.log('🎯 No word or example to prefetch TTS for');
             return;
         }
 
-        console.log('🎯 Starting TTS prefetch for card...');
-        console.log('🎯 Before prefetch - Cache stats:');
-        window.ttsManager.getCacheStats();
-
         // Trigger TTS generation (cache only, no autoplay)
-        // Note: speakCard() will handle TTS availability internally
         window.ttsManager.speakCard(
             window.cardData.word,
             window.cardData.example,
@@ -130,15 +119,9 @@
             window.cardContext.spreadsheetId,
             window.cardContext.sheetGid
         ).then(result => {
-            if (result) {
-                console.log('🎯 TTS prefetch completed:', result);
-                console.log('🎯 After prefetch - Cache stats:');
-                window.ttsManager.getCacheStats();
-            } else {
-                console.log('🎯 TTS prefetch failed - service may not be ready yet');
-                // Retry once after a delay if TTS wasn't ready
+            if (!result) {
+                // Retry once if TTS wasn't ready
                 setTimeout(() => {
-                    console.log('🎯 Retrying TTS prefetch...');
                     window.ttsManager.speakCard(
                         window.cardData.word,
                         window.cardData.example,
@@ -146,25 +129,16 @@
                         false,
                         window.cardContext.spreadsheetId,
                         window.cardContext.sheetGid
-                    ).then(retryResult => {
-                        if (retryResult) {
-                            console.log('🎯 TTS prefetch retry succeeded:', retryResult);
-                            window.ttsManager.getCacheStats();
-                        } else {
-                            console.log('🎯 TTS prefetch retry failed - TTS may be disabled');
-                        }
-                    });
+                    );
                 }, 1000);
             }
-        }).catch(error => {
-            console.log('🎯 TTS prefetch failed:', error);
+        }).catch(() => {
+            // Silent fail - TTS prefetching is optional
         });
     }
 
-    // Set focus to the answer input field when the page loads
+    // Initialize when page loads
     document.addEventListener('DOMContentLoaded', function() {
-        console.log('🎯 Card page DOMContentLoaded');
-
         const answerInput = document.querySelector('input[name="user_answer"]');
         if (answerInput) {
             answerInput.focus();
@@ -189,23 +163,5 @@
             button.innerHTML = '<i class="bi bi-eye"></i> Show hint';
         }
     }
-
-    // Debug function to manually check cache
-    window.debugTTSCache = function() {
-        if (window.ttsManager) {
-            console.log('🎯 Manual cache check:');
-            window.ttsManager.getCacheStats();
-
-            // Test if our card data is cached
-            const wordCacheKey = `${window.cardData.word}_default`;
-            const exampleCacheKey = `${window.cardData.example}_default`;
-
-            console.log('🎯 Cache check results:');
-            console.log(`  Word "${window.cardData.word}" cached:`, window.ttsManager.audioCache.has(wordCacheKey));
-            console.log(`  Example "${window.cardData.example}" cached:`, window.ttsManager.audioCache.has(exampleCacheKey));
-        } else {
-            console.log('🎯 TTS Manager not available');
-        }
-    };
 </script>
 {% endblock %}
