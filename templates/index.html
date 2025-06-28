@@ -18,9 +18,15 @@
                         <span class="badge bg-warning">{{ tab.cards_to_review(True)|length }} cards to review</span>
                         {% endif %}
                     </p>
-                    <form action="{{ url_for('flashcard.start_learning', tab_name=tab.name) }}" method="post">
-                        <button type="submit" class="btn btn-primary btn-sm">Study</button>
-                    </form>
+                    <div class="d-flex gap-2 justify-content-center">
+                        <form action="{{ url_for('flashcard.start_learning', tab_name=tab.name) }}" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-primary btn-sm">Study</button>
+                        </form>
+                        <button type="button" class="btn btn-outline-primary btn-sm listen-btn"
+                                data-tab-name="{{ tab.name }}" data-card-count="{{ tab.card_count }}">
+                            <i class="bi bi-volume-up"></i> Listen
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -34,6 +40,43 @@
             </div>
         </div>
         {% endfor %}
+    </div>
+
+    <!-- Listening Progress Modal -->
+    <div class="modal fade" id="listeningModal" tabindex="-1" aria-labelledby="listeningModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="listeningModalLabel">🎵 Listening Mode</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div id="listening-status" class="mb-3">
+                        <p class="mb-1">Loading cards...</p>
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div id="listening-progress" style="display: none;">
+                        <div class="mb-2">
+                            <h6 id="current-card-info">Playing: casa (1/150)</h6>
+                        </div>
+                        <div class="progress mb-3" style="height: 10px;">
+                            <div id="listening-progress-bar" class="progress-bar" role="progressbar"
+                                 style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                        <div class="d-flex gap-2 justify-content-center">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="pause-listening-btn">
+                                <i class="bi bi-pause"></i> Pause
+                            </button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" id="stop-listening-btn">
+                                <i class="bi bi-stop"></i> Stop
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Spreadsheet Status -->
@@ -51,4 +94,56 @@
         </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Include TTS JavaScript -->
+<script src="{{ url_for('static', filename='js/tts.js') }}"></script>
+<!-- Include Listening Manager -->
+<script src="{{ url_for('static', filename='js/listening.js') }}"></script>
+
+<script>
+// Card context for TTS usage (needed by ListeningManager)
+window.cardContext = {
+    spreadsheetId: {{ user_spreadsheet_id|tojson if user_spreadsheet_id else 'null' }}
+};
+
+// Initialize listening functionality when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Get all listen buttons
+    const listenButtons = document.querySelectorAll('.listen-btn');
+
+    // Add click handlers to listen buttons
+    listenButtons.forEach(button => {
+        button.addEventListener('click', async function() {
+            const tabName = this.getAttribute('data-tab-name');
+            const cardCount = this.getAttribute('data-card-count');
+
+            console.log(`Starting listening mode for: ${tabName} (${cardCount} cards)`);
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('listeningModal'));
+            modal.show();
+
+            // Update modal title
+            document.getElementById('listeningModalLabel').textContent = `🎵 Listening: ${tabName}`;
+
+            // Reset modal state
+            document.getElementById('listening-status').style.display = 'block';
+            document.getElementById('listening-progress').style.display = 'none';
+
+            // Start listening using ListeningManager
+            if (window.listeningManager) {
+                await window.listeningManager.startListening(tabName);
+            } else {
+                console.error('❌ ListeningManager not available');
+                document.getElementById('listening-status').innerHTML = `
+                    <p class="text-danger">⚠️ Listening functionality not available</p>
+                    <p class="small text-muted">ListeningManager failed to initialize</p>
+                `;
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
