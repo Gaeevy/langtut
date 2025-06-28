@@ -9,6 +9,8 @@ from google_auth_oauthlib.flow import Flow
 
 from src.auth import credentials_to_dict
 from src.config import CLIENT_SECRETS_FILE, SCOPES
+from src.session_manager import SessionKeys as sk
+from src.session_manager import SessionManager as sm
 from src.user_manager import clear_user_session, login_user
 from src.utils import load_redirect_uris
 
@@ -68,8 +70,8 @@ def auth():
         )
 
         # Store the state and redirect URI for later verification
-        session['state'] = state
-        session['redirect_uri'] = redirect_uri
+        sm.set(sk.AUTH_STATE, state)
+        sm.set(sk.AUTH_REDIRECT_URI, redirect_uri)
 
         print(f'Authorization URL: {authorization_url}')
         return redirect(authorization_url)
@@ -90,7 +92,7 @@ def oauth2callback():
 
     # Ensure that the request is not a forgery and that the user sending
     # this connect request is the expected user
-    state = session.get('state')
+    state = sm.get(sk.AUTH_STATE)
 
     if not state or state != request.args.get('state'):
         return render_template('error.html', message='Invalid state parameter')
@@ -98,7 +100,7 @@ def oauth2callback():
     # Use the authorization server's response to fetch the OAuth 2.0 tokens
     try:
         # Use the same redirect URI that was used for the initial auth request
-        redirect_uri = session.get('redirect_uri')
+        redirect_uri = sm.get(sk.AUTH_REDIRECT_URI)
         if not redirect_uri:
             # Fallback if we don't have it in the session
             print('Warning: No redirect_uri in session, constructing one...')
@@ -135,7 +137,7 @@ def oauth2callback():
         # Store credentials in the session
         credentials = flow.credentials
         credentials_dict = credentials_to_dict(credentials)
-        session['credentials'] = credentials_dict
+        sm.set(sk.AUTH_CREDENTIALS, credentials_dict)
 
         # Login user and create/update user record
         try:

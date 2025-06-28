@@ -12,7 +12,9 @@ from flask import Blueprint, redirect, render_template, request, session, url_fo
 from src.config import MAX_CARDS_PER_SESSION
 from src.gsheet import read_all_card_sets, read_card_set, update_spreadsheet
 from src.models import Card
-from src.user_manager import get_user_spreadsheet_id
+from src.session_manager import SessionKeys as sk
+from src.session_manager import SessionManager as sm
+from src.user_manager import get_user_spreadsheet_id, is_authenticated
 from src.utils import format_timestamp, get_timestamp
 
 # Create logger
@@ -40,25 +42,25 @@ def index():
     logger.info(f'User agent: {request.headers.get("User-Agent", "Unknown")}')
 
     # Check if session is working
-    if 'test' not in session:
-        session['test'] = 'Session is working'
+    if not sm.has(sk.TEST_SESSION):
+        sm.set(sk.TEST_SESSION, 'Session is working')
 
-    # Check authentication status
-    is_authenticated = 'credentials' in session
+    # Check authentication status using SessionManager
+    user_is_authenticated = is_authenticated()
     user_spreadsheet_id = get_user_spreadsheet_id(session)
 
-    logger.info(f'Authentication status: {is_authenticated}')
+    logger.info(f'Authentication status: {user_is_authenticated}')
     logger.info(f'User spreadsheet ID: {user_spreadsheet_id}')
 
     # If not authenticated, show login screen
-    if not is_authenticated:
+    if not user_is_authenticated:
         logger.info('User not authenticated, showing login screen')
         return render_template('login.html')
 
     # If no spreadsheet set, show setup screen
     if not user_spreadsheet_id:
         logger.info('No spreadsheet configured, showing setup screen')
-        return render_template('setup.html', is_authenticated=is_authenticated)
+        return render_template('setup.html', is_authenticated=user_is_authenticated)
 
     # Normal app flow with user's spreadsheet
     try:
@@ -72,7 +74,7 @@ def index():
 
     return render_template(
         'index.html',
-        is_authenticated=is_authenticated,
+        is_authenticated=user_is_authenticated,
         tabs=card_sets,
         user_spreadsheet_id=user_spreadsheet_id,
     )
@@ -441,7 +443,7 @@ def show_results():
         first_attempt_count=first_attempt_count,
         answers=answers,
         original_count=original_count,
-        is_authenticated='credentials' in session,
+        is_authenticated=is_authenticated(),
         updated=False,  # Will be True when spreadsheet updates are working
     )
 
@@ -487,6 +489,6 @@ def end_session_early():
         original_count=original_count,
         ended_early=True,
         cards_remaining=original_count - total_answered,
-        is_authenticated='credentials' in session,
+        is_authenticated=is_authenticated(),
         updated=False,  # Will be True when spreadsheet updates are working
     )

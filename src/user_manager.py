@@ -1,14 +1,115 @@
+"""
+User management utilities for the Language Learning Flashcard App.
+
+Handles user authentication, session management, and database operations for users.
+"""
+
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
-from src.auth import dict_to_credentials
-from src.database import add_user_spreadsheet, get_or_create_user, get_user_active_spreadsheet
+from src.auth import get_credentials
+from src.database import User, add_user_spreadsheet, db, get_user_active_spreadsheet
+from src.session_manager import SessionKeys as sk
+from src.session_manager import SessionManager as sm
+
+
+def get_current_user() -> User | None:
+    """
+    Get the current authenticated user from the session.
+
+    Returns:
+        User object if authenticated, None otherwise
+    """
+    user_id = sm.get(sk.USER_ID)
+    if user_id:
+        return User.query.get(user_id)
+    return None
+
+
+def login_user(session_obj, credentials_dict):
+    """
+    Login user and create/update user record.
+
+    Args:
+        session_obj: Flask session object (for backward compatibility)
+        credentials_dict: OAuth credentials dictionary
+
+    Returns:
+        User object for the logged-in user
+    """
+    # Get user info from credentials using the existing function
+    user_info = get_google_user_info(credentials_dict)
+
+    if not user_info:
+        raise Exception('Failed to get user information from Google')
+
+    google_user_id = user_info['google_user_id']
+    email = user_info['email']
+
+    # Find or create user
+    user = User.query.filter_by(google_user_id=google_user_id).first()
+
+    if not user:
+        # Create new user
+        user = User(google_user_id=google_user_id, email=email)
+        db.session.add(user)
+        db.session.commit()
+        print(f'New user created: {email} (ID: {user.id})')
+    else:
+        # Update existing user email if it changed
+        if user.email != email:
+            user.email = email
+            db.session.commit()
+        print(f'User logged in: {email} (ID: {user.id})')
+
+    # Store user info in session using SessionManager
+    sm.set(sk.USER_ID, user.id)
+    sm.set(sk.USER_GOOGLE_ID, user.google_user_id)
+
+    return user
+
+
+def clear_user_session(session_obj):
+    """
+    Clear user authentication data from session.
+
+    Args:
+        session_obj: Flask session object (for backward compatibility)
+    """
+    # Clear auth namespace
+    sm.clear_namespace('auth')
+
+    # Clear user namespace
+    sm.clear_namespace('user')
+
+    # Clear learning namespace
+    sm.clear_namespace('learning')
+
+    print('User session cleared')
+
+
+def is_authenticated():
+    """
+    Check if the current user is authenticated.
+
+    Returns:
+        bool: True if user is authenticated with valid credentials
+    """
+    # Check if we have valid credentials
+    credentials = get_credentials()
+    if not credentials:
+        return False
+
+    # Check if we have user session data
+    user_id = sm.get(sk.USER_ID)
+    return user_id is not None
 
 
 def get_google_user_info(credentials_dict):
     """Extract user information from Google OAuth credentials"""
     try:
         # Convert dict back to credentials object
-        credentials = dict_to_credentials(credentials_dict)
+        credentials = Credentials(**credentials_dict)
 
         # Use the OAuth2 API to get user info (simpler and more reliable)
         service = build('oauth2', 'v2', credentials=credentials)
@@ -25,38 +126,9 @@ def get_google_user_info(credentials_dict):
         return None
 
 
-def get_current_user_from_session(session):
-    """Get current user from Flask session"""
-    if 'user_id' in session:
-        from src.database import User
-
-        return User.query.get(session['user_id'])
-    return None
-
-
-def login_user(session, credentials_dict):
-    """Login user and store in session"""
-    # Get user info from Google
-    user_info = get_google_user_info(credentials_dict)
-    if not user_info or not user_info['google_user_id']:
-        raise Exception('Could not extract user information from Google')
-
-    # Get or create user in database
-    user = get_or_create_user(
-        google_user_id=user_info['google_user_id'], email=user_info['email'], name=user_info['name']
-    )
-
-    # Store user ID in session
-    session['user_id'] = user.id
-    session['google_user_id'] = user.google_user_id
-
-    print(f'User logged in: {user.email} (ID: {user.id})')
-    return user
-
-
-def get_user_spreadsheet_id(session):
+def get_user_spreadsheet_id(session_obj):
     """Get the user's active spreadsheet ID from database"""
-    user = get_current_user_from_session(session)
+    user = get_current_user()
     if not user:
         return None
 
@@ -67,9 +139,9 @@ def get_user_spreadsheet_id(session):
     return None
 
 
-def set_user_spreadsheet(session, spreadsheet_id, spreadsheet_url=None, spreadsheet_name=None):
+def set_user_spreadsheet(session_obj, spreadsheet_id, spreadsheet_url=None, spreadsheet_name=None):
     """Set a spreadsheet as active for the current user"""
-    user = get_current_user_from_session(session)
+    user = get_current_user()
     if not user:
         raise Exception('User not logged in')
 
@@ -86,8 +158,9 @@ def set_user_spreadsheet(session, spreadsheet_id, spreadsheet_url=None, spreadsh
     return user_spreadsheet
 
 
-def clear_user_session(session):
-    """Clear user session data"""
-    keys_to_remove = ['user_id', 'google_user_id', 'credentials']
-    for key in keys_to_remove:
-        session.pop(key, None)
+def get_current_user_from_session(session_obj):
+    """Get current user from Flask session (using SessionManager)"""
+    user_id = sm.get(sk.USER_ID)
+    if user_id:
+        return User.query.get(user_id)
+    return None
