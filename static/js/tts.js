@@ -12,6 +12,7 @@ class TTSManager {
         this.isLoading = false;
         this.audioContext = null;
         this.userInteracted = false;
+        this.primedAudioForChromeIOS = null;
 
         // Initialize mobile audio handling
         this.initializeMobileAudio();
@@ -193,8 +194,18 @@ class TTSManager {
             // Stop current audio if playing
             this.stopCurrentAudio();
 
-            // Create audio element
-            const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+            // For Chrome iOS: Use primed Audio element if available
+            let audio;
+            if (this.primedAudioForChromeIOS) {
+                audio = this.primedAudioForChromeIOS;
+                // Don't reassign primedAudioForChromeIOS, keep reusing it
+            } else {
+                // Create new audio element for other browsers
+                audio = new Audio();
+            }
+
+            // Set the new audio source
+            audio.src = `data:audio/mp3;base64,${audioBase64}`;
             this.currentAudio = audio;
 
             // Add mobile-specific audio settings
@@ -206,7 +217,7 @@ class TTSManager {
                 this.currentAudio = null;
             });
             audio.addEventListener('error', (e) => {
-                console.error('🔊 Audio error:', e);
+                console.error('Audio error:', e);
             });
 
             // Wait for audio to be ready
@@ -238,14 +249,14 @@ class TTSManager {
 
             return true;
         } catch (error) {
-            console.error('🔊 Error playing audio:', error);
+            console.error('Error playing audio:', error);
 
             // Mobile-specific error handling
             if (error.name === 'NotAllowedError') {
-                console.error('🔊 Audio blocked by browser autoplay policy');
+                console.error('Audio blocked by browser autoplay policy');
                 alert('Audio is blocked by your browser. Please tap the audio button manually to enable sound.');
             } else if (error.name === 'NotSupportedError') {
-                console.error('🔊 Audio format not supported');
+                console.error('Audio format not supported');
                 alert('Audio format not supported on this device.');
             }
 
@@ -364,7 +375,6 @@ class TTSManager {
      */
     clearCache() {
         this.audioCache.clear();
-        console.log('TTS audio cache cleared');
     }
 
     /**
