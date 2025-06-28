@@ -211,7 +211,213 @@ src/routes_original_backup.py  # Backup of original monolithic routes
 - **GRACEFUL shutdowns** for data integrity
 - **BACKUP strategies** for user data
 
-### 10. Refactoring Priorities
+### 10. Session Management Rules 🆕 **IN PROGRESS**
+
+#### Session Architecture Analysis
+**Current State (Chaotic):**
+- **18 different session keys** scattered across 6 files
+- **Inconsistent patterns**: `session['key']` vs `session.get('key', default)`
+- **Large data storage**: Full card data (~5KB) stored in sessions
+- **No centralized management**: Session operations spread throughout codebase
+
+**Session Storage Confirmation:**
+- ✅ **Using filesystem sessions** (not client-side cookies)
+- ✅ **Current capacity**: ~500MB per session (confirmed via `flask_session/` directory)
+- ✅ **Flask-Session properly configured** in `src/__init__.py`
+- ✅ **No 4KB cookie limit issues** (filesystem storage handles large data)
+
+#### SessionManager Design Decisions
+
+**1. Architecture: Static Methods**
+```python
+# Pattern: Static methods (no instance needed)
+sm.get(sk.AUTH_STATE)
+sm.set(sk.AUTH_STATE, value)
+sm.remove(sk.AUTH_STATE)
+
+# NOT instance methods (rejected)
+# sm = SessionManager()
+# sm.get(sk.AUTH_STATE)
+```
+
+**2. Key Organization: Flat Enum with Prefix Namespacing**
+```python
+class SessionKeys(Enum):
+    # Auth namespace
+    AUTH_STATE = 'auth.state'
+    AUTH_REDIRECT_URI = 'auth.redirect_uri'
+    AUTH_CREDENTIALS = 'auth.credentials'
+
+    # User namespace
+    USER_ID = 'user.id'
+    USER_GOOGLE_ID = 'user.google_id'
+
+    # Learning namespace
+    LEARNING_CARDS = 'learning.cards'
+    LEARNING_CURRENT_INDEX = 'learning.current_index'
+    LEARNING_ANSWERS = 'learning.answers'
+    LEARNING_INCORRECT_CARDS = 'learning.incorrect_cards'
+    LEARNING_REVIEWING = 'learning.reviewing'
+    LEARNING_ACTIVE_TAB = 'learning.active_tab'
+    LEARNING_ORIGINAL_COUNT = 'learning.original_count'
+    LEARNING_SHEET_GID = 'learning.sheet_gid'
+    LEARNING_LAST_LEVEL_CHANGE = 'learning.last_level_change'
+```
+
+**3. Default Values: In Get Method**
+```python
+# Pattern: Defaults passed to get method
+sm.get(sk.LEARNING_CURRENT_INDEX, 0)
+sm.get(sk.LEARNING_REVIEWING, False)
+sm.get(sk.LEARNING_ANSWERS, [])
+
+# NOT in enum definition (rejected)
+```
+
+**4. Type Safety: Simple Get/Set (MVP)**
+```python
+# Pattern: Simple Any types for MVP
+def get(key: SessionKeys, default: Any = None) -> Any
+def set(key: SessionKeys, value: Any) -> None
+
+# NOT typed methods initially (future enhancement)
+```
+
+**5. Convenience Methods: Pure Get/Set Initially**
+```python
+# Pattern: Start with core operations only
+SessionManager.get(key, default)
+SessionManager.set(key, value)
+SessionManager.remove(key)
+
+# NOT lifecycle methods initially (future enhancement)
+# start_learning_session(), clear_auth_session(), etc.
+```
+
+#### Implementation Plan
+
+**File Structure:**
+```python
+# src/session_manager.py (NEW FILE)
+from enum import Enum
+from flask import session
+from typing import Any
+
+class SessionKeys(Enum):
+    # All 18+ session keys with prefix namespacing
+
+class SessionManager:
+    @staticmethod
+    def get(key: SessionKeys, default: Any = None) -> Any:
+        """Get session value with optional default."""
+        return session.get(key.value, default)
+
+    @staticmethod
+    def set(key: SessionKeys, value: Any) -> None:
+        """Set session value."""
+        session[key.value] = value
+
+    @staticmethod
+    def remove(key: SessionKeys) -> None:
+        """Remove session key."""
+        session.pop(key.value, None)
+```
+
+**Import Pattern:**
+```python
+# Standard import pattern for all files
+from src.session_manager import SessionManager as sm, SessionKeys as sk
+
+# Usage pattern
+sm.get(sk.USER_ID)
+sm.set(sk.AUTH_STATE, state)
+```
+
+#### Gradual Migration Strategy
+
+**Phase 1: Authentication Module (`routes/auth.py`) - LOW RISK**
+- **3 session keys** to migrate:
+  - `session['state']` → `SessionKeys.AUTH_STATE`
+  - `session['redirect_uri']` → `SessionKeys.AUTH_REDIRECT_URI`
+  - `session['credentials']` → `SessionKeys.AUTH_CREDENTIALS`
+- **Why first**: Smallest impact, isolated functionality, clear boundaries
+
+**Phase 2: User Management (`user_manager.py`) - LOW RISK**
+- **2 session keys** to migrate:
+  - `session['user_id']` → `SessionKeys.USER_ID`
+  - `session['google_user_id']` → `SessionKeys.USER_GOOGLE_ID`
+- **Why second**: Small scope, well-defined interface
+
+**Phase 3: Core Learning (`routes/flashcard.py`) - HIGH RISK**
+- **13+ session keys** to migrate:
+  - All `learning.*` namespace keys
+  - Most complex logic with session dependencies
+- **Why last**: Highest risk, most complex, core functionality
+
+#### Migration Rules
+
+**MUST follow patterns:**
+```python
+# ✅ Replace direct session access
+# OLD: session['user_id'] = user.id
+# NEW: sm.set(sk.USER_ID, user.id)
+
+# ✅ Replace session.get() calls
+# OLD: user_id = session.get('user_id')
+# NEW: user_id = sm.get(sk.USER_ID)
+
+# ✅ Replace session.pop() calls
+# OLD: session.pop('auth_state', None)
+# NEW: sm.remove(sk.AUTH_STATE)
+```
+
+**MUST NOT patterns:**
+```python
+# ❌ Do not use direct session access after migration
+# session['user_id'] = value  # FORBIDDEN
+
+# ❌ Do not mix old and new patterns in same file
+# Migrate entire file in one go
+
+# ❌ Do not create new session keys without adding to enum
+# All new keys must be in SessionKeys enum
+```
+
+#### Testing Strategy
+
+**Per-Phase Validation:**
+1. **Functional Testing**: All existing functionality works unchanged
+2. **Session Inspection**: Verify session keys use new prefixed format
+3. **Error Testing**: Ensure defensive patterns handle missing keys
+4. **Rollback Plan**: Each phase can be reverted independently
+
+**Pre-Migration Checklist:**
+- [ ] SessionManager class created and tested
+- [ ] All session keys mapped to enum values
+- [ ] Import pattern verified in test file
+- [ ] Backup of original file created
+
+**Post-Migration Validation:**
+- [ ] All tests pass
+- [ ] Manual testing of affected functionality
+- [ ] Session data inspection shows proper key format
+- [ ] No direct `session[]` access remaining in migrated files
+
+#### Success Metrics
+
+**Immediate Goals:**
+- ✅ **Centralized session access** through SessionManager
+- ✅ **Consistent patterns** across all files
+- ✅ **Type-safe session keys** via enum
+- ✅ **Refactoring-safe** session operations
+
+**Future Enhancements (Post-Migration):**
+- Add typed convenience methods for common operations
+- Implement session lifecycle management
+- Add session validation and cleanup
+- Consider session data optimization patterns
+
+### 11. Refactoring Priorities
 
 #### ✅ COMPLETED
 1. **✅ Split routes.py** - Successfully broken into 6 blueprints (1,090 → 6 focused files)
