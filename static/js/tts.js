@@ -37,7 +37,7 @@ class TTSManager {
                     this.userInteracted = true;
 
                     // Create and play a silent audio to unlock audio context
-                    const silentAudio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU4Ljk1AAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABmwQ+XAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABrTjOWAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+                    const silentAudio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU4Ljk1AAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABmwQ+XAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABrTjOWAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
                     silentAudio.play().catch(() => {
                         console.log('🔊 Silent audio play failed, but user interaction registered');
                     });
@@ -92,8 +92,20 @@ class TTSManager {
         // Check cache first
         const cacheKey = `${text.trim()}_${voiceName || 'default'}`;
         if (this.audioCache.has(cacheKey)) {
+            console.log('🎯 TTS CACHE HIT:', {
+                text: text.trim(),
+                cacheKey: cacheKey,
+                cacheSize: this.audioCache.size
+            });
             return this.playAudio(this.audioCache.get(cacheKey));
         }
+
+        console.log('🎯 TTS CACHE MISS:', {
+            text: text.trim(),
+            cacheKey: cacheKey,
+            cacheSize: this.audioCache.size,
+            existingKeys: Array.from(this.audioCache.keys())
+        });
 
         // Show loading state
         this.setLoadingState(true);
@@ -115,6 +127,12 @@ class TTSManager {
             if (data.success && data.audio_base64) {
                 // Cache the audio
                 this.audioCache.set(cacheKey, data.audio_base64);
+                console.log('🎯 TTS CACHED:', {
+                    text: text.trim(),
+                    cacheKey: cacheKey,
+                    newCacheSize: this.audioCache.size,
+                    audioLength: data.audio_base64.length
+                });
 
                 // Play the audio
                 return this.playAudio(data.audio_base64);
@@ -138,6 +156,15 @@ class TTSManager {
             console.warn('TTS service is not available');
             return false;
         }
+
+        console.log('🎯 TTS SPEAK-CARD CALLED:', {
+            word: word,
+            example: example,
+            autoplay: autoplay,
+            spreadsheetId: spreadsheetId,
+            sheetGid: sheetGid,
+            currentCacheSize: this.audioCache.size
+        });
 
         this.setLoadingState(true);
 
@@ -166,16 +193,38 @@ class TTSManager {
             const data = await response.json();
 
             if (data.success && data.audio) {
+                let wordCached = false;
+                let exampleCached = false;
+
                 // Cache the audio
                 if (data.audio.word) {
                     const wordCacheKey = `${word}_${voiceName || 'default'}`;
                     this.audioCache.set(wordCacheKey, data.audio.word.audio_base64);
+                    wordCached = true;
+                    console.log('🎯 TTS WORD CACHED:', {
+                        word: word,
+                        cacheKey: wordCacheKey,
+                        audioLength: data.audio.word.audio_base64.length
+                    });
                 }
 
                 if (data.audio.example) {
                     const exampleCacheKey = `${example}_${voiceName || 'default'}`;
                     this.audioCache.set(exampleCacheKey, data.audio.example.audio_base64);
+                    exampleCached = true;
+                    console.log('🎯 TTS EXAMPLE CACHED:', {
+                        example: example,
+                        cacheKey: exampleCacheKey,
+                        audioLength: data.audio.example.audio_base64.length
+                    });
                 }
+
+                console.log('🎯 TTS SPEAK-CARD COMPLETED:', {
+                    wordCached: wordCached,
+                    exampleCached: exampleCached,
+                    finalCacheSize: this.audioCache.size,
+                    autoplay: autoplay
+                });
 
                 // Play audio if autoplay is enabled
                 if (autoplay) {
@@ -403,13 +452,28 @@ class TTSManager {
     }
 
     /**
-     * Get cache statistics
+     * Get cache statistics for debugging
      */
     getCacheStats() {
-        return {
+        const stats = {
             size: this.audioCache.size,
-            keys: Array.from(this.audioCache.keys())
+            keys: Array.from(this.audioCache.keys()),
+            memoryUsage: this.estimateCacheMemoryUsage()
         };
+        console.log('🎯 TTS CACHE STATS:', stats);
+        return stats;
+    }
+
+    /**
+     * Estimate cache memory usage (rough calculation)
+     */
+    estimateCacheMemoryUsage() {
+        let totalSize = 0;
+        for (const [key, value] of this.audioCache) {
+            totalSize += key.length * 2; // rough estimate for string
+            totalSize += value.length * 0.75; // base64 is ~75% of original binary size
+        }
+        return `${Math.round(totalSize / 1024)} KB`;
     }
 }
 

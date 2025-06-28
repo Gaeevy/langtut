@@ -208,7 +208,7 @@ class TTSService:
         text_hash = self.get_cache_key(text, voice_name)
         return f'{spreadsheet_id}/{sheet_gid}/{text_hash}.mp3'
 
-    def get_cached_audio(
+    def get_audio_from_gcs(
         self, spreadsheet_id: str, sheet_gid: int, text: str, voice_name: str | None = None
     ) -> bytes | None:
         """
@@ -231,17 +231,17 @@ class TTSService:
             blob = self.bucket.blob(gcs_path)
 
             if blob.exists():
-                logger.info(f'🎯 Cache HIT: {gcs_path}')
+                logger.debug(f'🎯 Cache HIT: {gcs_path}')
                 return blob.download_as_bytes()
             else:
-                logger.info(f'🎯 Cache MISS: {gcs_path}')
+                logger.debug(f'🎯 Cache MISS: {gcs_path}')
                 return None
 
         except Exception as e:
             logger.warning(f'⚠️ Error checking GCS cache: {e}')
             return None
 
-    def cache_audio(
+    def cache_audio_to_gcs(
         self,
         spreadsheet_id: str,
         sheet_gid: int,
@@ -278,7 +278,7 @@ class TTSService:
             logger.warning(f'⚠️ Error caching audio to GCS: {e}')
             return False
 
-    def generate_speech_with_cache(
+    def text_to_speech(
         self,
         text: str,
         spreadsheet_id: str = None,
@@ -298,7 +298,7 @@ class TTSService:
             Base64 encoded audio content, or None if generation fails
         """
         if not self.is_available():
-            logger.info('TTS service is not available')
+            logger.warning('TTS service is not available')
             return None
 
         if not text or not text.strip():
@@ -307,7 +307,7 @@ class TTSService:
 
         # Try to get from cache first (if we have caching context)
         if spreadsheet_id and sheet_gid is not None:
-            cached_audio = self.get_cached_audio(spreadsheet_id, sheet_gid, text, voice_name)
+            cached_audio = self.get_audio_from_gcs(spreadsheet_id, sheet_gid, text, voice_name)
             if cached_audio:
                 return base64.b64encode(cached_audio).decode('utf-8')
 
@@ -318,7 +318,7 @@ class TTSService:
 
         # Cache the audio (if we have caching context)
         if spreadsheet_id and sheet_gid is not None:
-            self.cache_audio(spreadsheet_id, sheet_gid, text, audio_content, voice_name)
+            self.cache_audio_to_gcs(spreadsheet_id, sheet_gid, text, audio_content, voice_name)
 
         # Return base64 encoded audio
         return base64.b64encode(audio_content).decode('utf-8')
@@ -371,24 +371,6 @@ class TTSService:
 
 # Global TTS service instance
 tts_service = TTSService()
-
-
-def generate_portuguese_speech(
-    text: str, voice_name: str | None = None, spreadsheet_id: str = None, sheet_gid: int = None
-) -> str | None:
-    """
-    Convenience function to generate Portuguese speech as base64 with optional caching
-
-    Args:
-        text: Text to convert to speech
-        voice_name: Optional voice name override
-        spreadsheet_id: Optional spreadsheet ID for caching context
-        sheet_gid: Optional sheet GID for caching context
-
-    Returns:
-        Base64 encoded audio content, or None if generation fails
-    """
-    return tts_service.generate_speech_with_cache(text, spreadsheet_id, sheet_gid, voice_name)
 
 
 def is_tts_available() -> bool:
