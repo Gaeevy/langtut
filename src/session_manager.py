@@ -28,7 +28,7 @@ class SessionKeys(Enum):
     LEARNING_CURRENT_INDEX = 'learning.current_index'
     LEARNING_ANSWERS = 'learning.answers'
     LEARNING_INCORRECT_CARDS = 'learning.incorrect_cards'
-    LEARNING_REVIEWING = 'learning.reviewing'
+    LEARNING_REVIEWING_INCORRECT = 'learning.reviewing_incorrect'
     LEARNING_ACTIVE_TAB = 'learning.active_tab'
     LEARNING_ORIGINAL_COUNT = 'learning.original_count'
     LEARNING_SHEET_GID = 'learning.sheet_gid'
