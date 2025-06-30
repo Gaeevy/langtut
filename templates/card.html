@@ -97,11 +97,18 @@
         example: {{ card.example|tojson if card.example else 'null' }}
     };
 
-    // TTS prefetching functionality
-    function prefetchCardTTS() {
+    // Track prefetch attempts to prevent duplicates
+    let prefetchAttempted = false;
+
+    // Simplified TTS prefetching functionality
+    async function prefetchCardTTS() {
+        // Prevent duplicate prefetching
+        if (prefetchAttempted) {
+            return;
+        }
+
         // Check if TTS manager is available
         if (typeof window.ttsManager === 'undefined') {
-            setTimeout(prefetchCardTTS, 500);
             return;
         }
 
@@ -110,31 +117,23 @@
             return;
         }
 
-        // Trigger TTS generation (cache only, no autoplay)
-        window.ttsManager.speakCard(
-            window.cardData.word,
-            window.cardData.example,
-            null, // voice name
-            false, // autoplay = false (just cache)
-            window.cardContext.spreadsheetId,
-            window.cardContext.sheetGid
-        ).then(result => {
-            if (!result) {
-                // Retry once if TTS wasn't ready
-                setTimeout(() => {
-                    window.ttsManager.speakCard(
-                        window.cardData.word,
-                        window.cardData.example,
-                        null,
-                        false,
-                        window.cardContext.spreadsheetId,
-                        window.cardContext.sheetGid
-                    );
-                }, 1000);
-            }
-        }).catch(() => {
-            // Silent fail - TTS prefetching is optional
-        });
+        // Set flag to prevent duplicate attempts
+        prefetchAttempted = true;
+
+        try {
+            // Trigger TTS generation (cache only, no autoplay)
+            // TTSManager now handles timing internally with waitForTTSAvailable()
+            const result = await window.ttsManager.speakCard(
+                window.cardData.word,
+                window.cardData.example,
+                null, // voice name
+                false, // autoplay = false (just cache)
+                window.cardContext.spreadsheetId,
+                window.cardContext.sheetGid
+            );
+        } catch (error) {
+            console.error('💥 Prefetch error:', error);
+        }
     }
 
     // Initialize when page loads

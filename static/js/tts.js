@@ -1,230 +1,173 @@
 /**
- * Text-to-Speech functionality for European Portuguese
- * Handles audio generation and playback using Google Cloud TTS
+ * Minimalistic TTS Manager with persistent caching
  */
-
 class TTSManager {
     constructor() {
         this.isAvailable = false;
-        this.voices = [];
         this.audioCache = new Map();
         this.currentAudio = null;
-        this.isLoading = false;
-        this.audioContext = null;
-        this.userInteracted = false;
-        this.primedAudioForChromeIOS = null;
+        this.pendingRequests = new Map();
 
-        // Initialize mobile audio handling
-        this.initializeMobileAudio();
+        // Restore cache from sessionStorage
+        this.restoreCache();
 
-        // Initialize TTS status
-        this.checkTTSStatus();
+        // Check TTS availability and setup mobile audio
+        this.init();
     }
 
-    /**
-     * Initialize mobile audio handling
-     */
-    initializeMobileAudio() {
-        // Detect mobile
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-        if (isMobile) {
-            // Set up user interaction detection
-            const enableAudio = () => {
-                if (!this.userInteracted) {
-                    this.userInteracted = true;
-
-                    // Create and play a silent audio to unlock audio context
-                    const silentAudio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU4Ljk1AAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABmwQ+XAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABrTjOWAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
-                    silentAudio.play().catch(() => {
-                        // Silent fail - this is expected on many browsers
-                    });
-                }
-            };
-
-            // Listen for user interactions
-            ['touchstart', 'touchend', 'mousedown', 'keydown'].forEach(event => {
-                document.addEventListener(event, enableAudio, { once: true, passive: true });
-            });
-        }
-    }
-
-    /**
-     * Check if TTS service is available
-     */
-    async checkTTSStatus() {
+    async init() {
+        // Check TTS service
         try {
             const response = await fetch('/api/tts/status');
             const data = await response.json();
-
             this.isAvailable = data.available;
-            this.voices = data.voices || [];
-
-            return this.isAvailable;
         } catch (error) {
-            console.error('Error checking TTS status:', error);
-            this.isAvailable = false;
-            return false;
+            console.error('❌ TTS init failed:', error);
+        }
+
+        // Setup mobile audio unlock
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+            const unlock = () => {
+                const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU4Ljk1AAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABmwQ+XAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABrTjOWAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+                audio.play().catch(() => {});
+            };
+            ['touchstart', 'mousedown', 'keydown'].forEach(event =>
+                document.addEventListener(event, unlock, { once: true, passive: true })
+            );
         }
     }
 
-    /**
-     * Generate and play speech for given text
-     */
-    async speak(text, voiceName = null) {
-        if (!this.isAvailable) {
-            console.warn('TTS service is not available');
-            return false;
-        }
-
-        if (!text || !text.trim()) {
-            console.warn('No text provided for TTS');
-            return false;
-        }
-
-        // Check cache first
-        const cacheKey = `${text.trim()}_${voiceName || 'default'}`;
-        if (this.audioCache.has(cacheKey)) {
-            return this.playAudio(this.audioCache.get(cacheKey));
-        }
-
-        // Show loading state
-        this.setLoadingState(true);
-
+    restoreCache() {
         try {
-            const response = await fetch('/api/tts/speak', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    text: text.trim(),
-                    voice_name: voiceName
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.success && data.audio_base64) {
-                // Cache the audio
-                this.audioCache.set(cacheKey, data.audio_base64);
-
-                // Play the audio
-                return this.playAudio(data.audio_base64);
-            } else {
-                console.error('TTS generation failed:', data.error);
-                return false;
+            const cached = sessionStorage.getItem('tts_cache');
+            if (cached) {
+                this.audioCache = new Map(JSON.parse(cached));
+                console.log(`💾 Restored ${this.audioCache.size} cached items`);
             }
         } catch (error) {
-            console.error('Error generating speech:', error);
-            return false;
-        } finally {
-            this.setLoadingState(false);
+            console.warn('⚠️ Cache restore failed:', error);
         }
     }
 
-    /**
-     * Generate and play speech for card content (word and example)
-     */
-    async speakCard(word, example, voiceName = null, autoplay = false, spreadsheetId = null, sheetGid = null) {
-        if (!this.isAvailable) {
+    saveCache() {
+        try {
+            sessionStorage.setItem('tts_cache', JSON.stringify([...this.audioCache]));
+        } catch (error) {
+            console.warn('⚠️ Cache save failed:', error);
+        }
+    }
+
+    getCacheKey(text, voice = 'default') {
+        return `${text}_${voice}`;
+    }
+
+    async waitForService(maxWait = 5000) {
+        const start = Date.now();
+        while (!this.isAvailable && Date.now() - start < maxWait) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        return this.isAvailable;
+    }
+
+    async speakCard(word, example, voice = null, autoplay = false, spreadsheetId = null, sheetGid = null) {
+        // Wait for service if needed
+        if (!this.isAvailable && !await this.waitForService()) {
+            console.warn('⚠️ TTS service unavailable');
             return false;
         }
 
-        this.setLoadingState(true);
+        // Check cache
+        const wordKey = word ? this.getCacheKey(word, voice) : null;
+        const exampleKey = example ? this.getCacheKey(example, voice) : null;
 
+        const wordCached = !word || this.audioCache.has(wordKey);
+        const exampleCached = !example || this.audioCache.has(exampleKey);
+
+        if (wordCached && exampleCached) {
+            console.log(`🎯 Cache hit: "${word || ''}" + "${example || ''}"`);
+
+            if (autoplay) {
+                const audioData = {};
+                if (word) audioData.word = { audio_base64: this.audioCache.get(wordKey) };
+                if (example) audioData.example = { audio_base64: this.audioCache.get(exampleKey) };
+                await this.playCardAudio(audioData);
+            }
+            return true;
+        }
+
+        // Check for pending request
+        const pendingKey = `${word || ''}_${example || ''}_${voice || 'default'}`;
+        if (this.pendingRequests.has(pendingKey)) {
+            return this.pendingRequests.get(pendingKey);
+        }
+
+        console.log(`📡 Fetching: "${word || ''}" + "${example || ''}"`);
+
+        // Create API request
+        const requestPromise = this.fetchCardAudio(word, example, voice, autoplay, spreadsheetId, sheetGid);
+        this.pendingRequests.set(pendingKey, requestPromise);
+
+        requestPromise.finally(() => this.pendingRequests.delete(pendingKey));
+
+        return requestPromise;
+    }
+
+    async fetchCardAudio(word, example, voice, autoplay, spreadsheetId, sheetGid) {
         try {
-            const requestBody = {
-                word: word,
-                example: example,
-                voice_name: voiceName
-            };
-
-            // Add caching context if available
+            const body = { word, example, voice_name: voice };
             if (spreadsheetId && sheetGid !== null) {
-                requestBody.spreadsheet_id = spreadsheetId;
-                requestBody.sheet_gid = sheetGid;
+                body.spreadsheet_id = spreadsheetId;
+                body.sheet_gid = sheetGid;
             }
 
             const response = await fetch('/api/tts/speak-card', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(requestBody)
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
             });
 
             const data = await response.json();
 
             if (data.success && data.audio) {
-                // Cache the audio
+                // Cache audio
                 if (data.audio.word) {
-                    const wordCacheKey = `${word}_${voiceName || 'default'}`;
-                    this.audioCache.set(wordCacheKey, data.audio.word.audio_base64);
+                    this.audioCache.set(this.getCacheKey(word, voice), data.audio.word.audio_base64);
                 }
-
                 if (data.audio.example) {
-                    const exampleCacheKey = `${example}_${voiceName || 'default'}`;
-                    this.audioCache.set(exampleCacheKey, data.audio.example.audio_base64);
+                    this.audioCache.set(this.getCacheKey(example, voice), data.audio.example.audio_base64);
                 }
 
-                // Play audio if autoplay is enabled
+                this.saveCache();
+
+                // Play if requested
                 if (autoplay) {
                     await this.playCardAudio(data.audio);
                 }
 
                 return data.audio;
             } else {
-                console.error('TTS card generation failed:', data.error);
+                console.error('❌ TTS API failed:', data.error);
                 return false;
             }
         } catch (error) {
-            console.error('Error generating card speech:', error);
+            console.error('💥 TTS request error:', error);
             return false;
-        } finally {
-            this.setLoadingState(false);
         }
     }
 
-    /**
-     * Play audio from base64 data
-     */
     async playAudio(audioBase64) {
         try {
-            // Stop current audio if playing
             this.stopCurrentAudio();
 
-            // For Chrome iOS: Use primed Audio element if available
-            let audio;
-            if (this.primedAudioForChromeIOS) {
-                audio = this.primedAudioForChromeIOS;
-                // Don't reassign primedAudioForChromeIOS, keep reusing it
-            } else {
-                // Create new audio element for other browsers
-                audio = new Audio();
-            }
-
-            // Set the new audio source
-            audio.src = `data:audio/mp3;base64,${audioBase64}`;
+            const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
             this.currentAudio = audio;
 
-            // Add mobile-specific audio settings
-            audio.preload = 'auto';
-            audio.volume = 1.0;
+            audio.addEventListener('ended', () => this.currentAudio = null);
+            audio.addEventListener('error', (e) => console.error('💥 Audio error:', e));
 
-            // Essential audio events
-            audio.addEventListener('ended', () => {
-                this.currentAudio = null;
-            });
-            audio.addEventListener('error', (e) => {
-                console.error('Audio error:', e);
-            });
-
-            // Wait for audio to be ready
+            // Wait for ready and play
             await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    reject(new Error('Audio loading timeout'));
-                }, 10000); // 10 second timeout
+                const timeout = setTimeout(() => reject(new Error('Timeout')), 10000);
 
                 audio.addEventListener('canplaythrough', () => {
                     clearTimeout(timeout);
@@ -233,47 +176,31 @@ class TTSManager {
 
                 audio.addEventListener('error', () => {
                     clearTimeout(timeout);
-                    reject(new Error('Audio loading failed'));
+                    reject(new Error('Load failed'));
                 });
 
-                // Start loading
                 audio.load();
             });
 
-            // Try to play the audio
-            const playPromise = audio.play();
-
-            if (playPromise !== undefined) {
-                await playPromise;
-            }
-
+            await audio.play();
             return true;
         } catch (error) {
-            console.error('Error playing audio:', error);
+            console.error('💥 Playback error:', error);
 
-            // Mobile-specific error handling
             if (error.name === 'NotAllowedError') {
-                console.error('Audio blocked by browser autoplay policy');
-                alert('Audio is blocked by your browser. Please tap the audio button manually to enable sound.');
-            } else if (error.name === 'NotSupportedError') {
-                console.error('Audio format not supported');
-                alert('Audio format not supported on this device.');
+                alert('Audio blocked. Please tap the audio button manually.');
             }
-
             return false;
         }
     }
 
-    /**
-     * Play card audio with delay between word and example
-     */
     async playCardAudio(audioData, delay = 1000) {
         try {
             // Play word first
             if (audioData.word) {
                 await this.playAudio(audioData.word.audio_base64);
 
-                // Wait for word to finish + delay
+                // Wait for completion + delay
                 if (this.currentAudio) {
                     await new Promise(resolve => {
                         this.currentAudio.addEventListener('ended', () => {
@@ -290,14 +217,11 @@ class TTSManager {
 
             return true;
         } catch (error) {
-            console.error('Error playing card audio:', error);
+            console.error('💥 Card audio error:', error);
             return false;
         }
     }
 
-    /**
-     * Stop currently playing audio
-     */
     stopCurrentAudio() {
         if (this.currentAudio) {
             this.currentAudio.pause();
@@ -306,111 +230,35 @@ class TTSManager {
         }
     }
 
-    /**
-     * Set loading state for UI feedback
-     */
-    setLoadingState(loading) {
-        this.isLoading = loading;
-
-        // Update minimal audio buttons
-        const minimalButtons = document.querySelectorAll('.btn-audio-minimal');
-        minimalButtons.forEach(btn => {
-            if (loading) {
-                btn.disabled = true;
-                btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
-            } else {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-volume-up"></i>';
-            }
-        });
-
-        // Update legacy TTS buttons (for other pages)
-        const speakButtons = document.querySelectorAll('.tts-speak-btn:not(.btn-audio-minimal)');
-        speakButtons.forEach(btn => {
-            if (loading) {
-                btn.disabled = true;
-                btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Loading...';
-            } else {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-volume-up"></i> Listen';
-            }
-        });
+    // Legacy speak method for compatibility
+    async speak(text, voice = null) {
+        return this.speakCard(text, null, voice, true);
     }
 
-    /**
-     * Create a speak button for text
-     */
-    createSpeakButton(text, className = 'btn btn-outline-primary btn-sm tts-speak-btn') {
-        const button = document.createElement('button');
-        button.className = className;
-        button.innerHTML = '<i class="bi bi-volume-up"></i> Listen';
-        button.title = 'Listen to pronunciation';
-
-        button.addEventListener('click', async (e) => {
-            e.preventDefault();
-            await this.speak(text);
-        });
-
-        return button;
-    }
-
-    /**
-     * Add speak buttons to elements with data-tts attribute
-     */
-    initializeSpeakButtons() {
-        const elements = document.querySelectorAll('[data-tts]');
-        elements.forEach(element => {
-            const text = element.getAttribute('data-tts') || element.textContent;
-            if (text && text.trim()) {
-                const button = this.createSpeakButton(text.trim());
-
-                // Add button after the element
-                element.parentNode.insertBefore(button, element.nextSibling);
-            }
-        });
-    }
-
-    /**
-     * Clear audio cache
-     */
     clearCache() {
         this.audioCache.clear();
+        this.pendingRequests.clear();
+        sessionStorage.removeItem('tts_cache');
+        console.log('🗑️ Cache cleared');
     }
 
-    /**
-     * Get cache statistics for debugging
-     */
     getCacheStats() {
-        return {
-            size: this.audioCache.size,
-            memoryUsage: this.estimateCacheMemoryUsage()
-        };
-    }
-
-    /**
-     * Estimate cache memory usage (rough calculation)
-     */
-    estimateCacheMemoryUsage() {
-        let totalSize = 0;
+        const size = this.audioCache.size;
+        let memoryKB = 0;
         for (const [key, value] of this.audioCache) {
-            totalSize += key.length * 2; // rough estimate for string
-            totalSize += value.length * 0.75; // base64 is ~75% of original binary size
+            memoryKB += (key.length * 2 + value.length * 0.75) / 1024;
         }
-        return `${Math.round(totalSize / 1024)} KB`;
+
+        const stats = {
+            size,
+            memoryKB: Math.round(memoryKB),
+            pending: this.pendingRequests.size
+        };
+
+        console.log(`📊 Cache: ${stats.size} items (${stats.memoryKB}KB), ${stats.pending} pending`);
+        return stats;
     }
 }
 
-// Global TTS manager instance
+// Global instance
 window.ttsManager = new TTSManager();
-
-// Auto-initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    if (window.ttsManager.isAvailable) {
-        window.ttsManager.initializeSpeakButtons();
-    }
-});
-
-// Export for module use
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = TTSManager;
-}
