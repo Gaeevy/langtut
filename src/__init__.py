@@ -15,6 +15,7 @@ from src.config import (
     SESSION_TYPE,
     SESSION_USE_SIGNER,
 )
+from src.request_logger import setup_request_logging
 from src.routes import register_blueprints
 from src.utils import ensure_utf8_encoding
 
@@ -40,6 +41,9 @@ app.config['JSONIFY_MIMETYPE'] = JSONIFY_MIMETYPE
 
 # Initialize Flask-Session
 Session(app)
+
+# Set up request/response logging
+setup_request_logging(app)
 
 # Register blueprints
 register_blueprints(app)
