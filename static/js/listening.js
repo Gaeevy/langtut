@@ -51,8 +51,19 @@ class ListeningManager {
         // Modal close handler - stop playback when modal is closed
         const modal = document.getElementById('listeningModal');
         if (modal) {
+            // Remove any existing listeners first
+            modal.removeEventListener('hidden.bs.modal', this.stopPlayback);
+
+            // Add the stop playback handler
             modal.addEventListener('hidden.bs.modal', () => {
+                console.log('📝 Modal closed, stopping playback');
                 this.stopPlayback();
+            });
+
+            // Also handle modal show event to reset state
+            modal.addEventListener('show.bs.modal', () => {
+                console.log('📝 Modal opening, preparing clean state');
+                // Don't reset session here as startListening will handle it
             });
         }
     }
@@ -147,14 +158,26 @@ class ListeningManager {
      * Start listening session for a tab
      */
     async startListening(tabName) {
+        console.log(`🎵 Starting listening session for: ${tabName}`);
+
+        // First, completely reset any existing session
+        this.resetSession();
+
+        // Initialize new session state
         this.tabName = tabName;
         this.currentCardIndex = 0;
         this.isPlaying = false;
         this.isPaused = false;
+        this.loopCount = 1;
+        this.cards = [];
+        this.sheetGid = null;
+        this.totalCount = 0;
+        this.currentSession = tabName; // Track current session
 
         try {
-            // Show setup view first
+            // Reset UI to setup view
             this.showSetupView();
+            this.resetUIElements();
 
             // For mobile, show unlock prompt first
             if (this.isMobile && !this.audioUnlocked) {
@@ -169,6 +192,97 @@ class ListeningManager {
             console.error('Error starting listening mode:', error);
             this.updateStatus(`Error: ${error.message}`, false);
         }
+    }
+
+    /**
+     * Reset all session state and cleanup
+     */
+    resetSession() {
+        console.log('🧹 Resetting session state...');
+
+        // Stop any current playback immediately
+        this.isPlaying = false;
+        this.isPaused = false;
+
+        // Stop current audio and clear TTS state
+        if (window.ttsManager) {
+            window.ttsManager.stopCurrentAudio();
+            // Clear any pending requests from previous session
+            window.ttsManager.pendingRequests.clear();
+        }
+
+        // Reset all session variables
+        this.currentSession = null;
+        this.currentCardIndex = 0;
+        this.cards = [];
+        this.tabName = '';
+        this.sheetGid = null;
+        this.totalCount = 0;
+        this.loopCount = 1;
+
+        // Reset UI elements
+        this.resetUIElements();
+    }
+
+    /**
+     * Reset all UI elements to their initial state
+     */
+    resetUIElements() {
+        // Reset status
+        this.updateStatus('Ready to listen', false);
+
+        // Reset progress bar
+        const progressBar = document.getElementById('listeningProgressBar');
+        if (progressBar) {
+            progressBar.style.width = '0%';
+            progressBar.setAttribute('aria-valuenow', '0');
+        }
+
+        // Reset progress text
+        const progressText = document.getElementById('progressText');
+        if (progressText) {
+            progressText.textContent = '0 / 0 cards';
+        }
+
+        // Reset current card display
+        const currentWordEl = document.getElementById('currentWord');
+        const currentExampleEl = document.getElementById('currentExample');
+        if (currentWordEl) {
+            currentWordEl.textContent = 'Ready to start...';
+        }
+        if (currentExampleEl) {
+            currentExampleEl.textContent = 'Press start to begin listening session';
+        }
+
+        // Reset loop counter
+        const loopCounter = document.getElementById('loopCounter');
+        if (loopCounter) {
+            loopCounter.textContent = 'Loop 1';
+        }
+
+        // Reset pause/resume button
+        const pauseResumeBtn = document.getElementById('pauseResumeBtn');
+        if (pauseResumeBtn) {
+            pauseResumeBtn.innerHTML = '<i class="fas fa-pause"></i> <span>Pause</span>';
+            pauseResumeBtn.disabled = false;
+        }
+
+        // Reset unlock button state
+        const unlockBtn = document.getElementById('unlockAudioBtn');
+        if (unlockBtn) {
+            unlockBtn.innerHTML = '<i class="fas fa-volume-up"></i> Start Listening Session';
+            unlockBtn.disabled = false;
+        }
+
+        // Reset start button state
+        const startBtn = document.getElementById('startListeningBtn');
+        if (startBtn) {
+            startBtn.innerHTML = '<i class="fas fa-play"></i> Start Listening';
+            startBtn.disabled = false;
+        }
+
+        // Update cache status
+        this.updateCacheStatus();
     }
 
     /**
@@ -202,38 +316,48 @@ class ListeningManager {
             desktopStart.style.display = 'none';
         }
 
-        // Add click handler for unlock button
+        // Add click handler for unlock button - ensure clean state
         const unlockBtn = document.getElementById('unlockAudioBtn');
         if (unlockBtn) {
-            // Remove any existing listeners
+            // Remove any existing listeners and reset button
             unlockBtn.replaceWith(unlockBtn.cloneNode(true));
             const newUnlockBtn = document.getElementById('unlockAudioBtn');
+
+            // Reset button state
+            newUnlockBtn.innerHTML = '<i class="fas fa-volume-up"></i> Start Listening Session';
+            newUnlockBtn.disabled = false;
 
             newUnlockBtn.addEventListener('click', async () => {
                 // Show loading
                 newUnlockBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Unlocking...';
                 newUnlockBtn.disabled = true;
 
-                // Chrome iOS specific immediate unlock
-                if (this.isChromeIOS()) {
-                    const unlocked = await this.unlockAudioForChromeIOS();
+                try {
+                    // Chrome iOS specific immediate unlock
+                    if (this.isChromeIOS()) {
+                        const unlocked = await this.unlockAudioForChromeIOS();
 
-                    if (unlocked) {
-                        await this.continueAfterUnlock();
+                        if (unlocked) {
+                            await this.continueAfterUnlock();
+                        } else {
+                            newUnlockBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Chrome iOS - Try Safari';
+                            newUnlockBtn.disabled = false;
+                        }
                     } else {
-                        newUnlockBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Chrome iOS - Try Safari';
-                        newUnlockBtn.disabled = false;
-                    }
-                } else {
-                    // Standard unlock for Safari iOS and other browsers
-                    const unlocked = await this.unlockAudioContext();
+                        // Standard unlock for Safari iOS and other browsers
+                        const unlocked = await this.unlockAudioContext();
 
-                    if (unlocked) {
-                        await this.continueAfterUnlock();
-                    } else {
-                        newUnlockBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Unlock Failed - Try Refresh';
-                        newUnlockBtn.disabled = false;
+                        if (unlocked) {
+                            await this.continueAfterUnlock();
+                        } else {
+                            newUnlockBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Unlock Failed - Try Refresh';
+                            newUnlockBtn.disabled = false;
+                        }
                     }
+                } catch (error) {
+                    console.error('Error during unlock:', error);
+                    newUnlockBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error - Try Again';
+                    newUnlockBtn.disabled = false;
                 }
             }, { once: true });
         }
@@ -254,20 +378,30 @@ class ListeningManager {
             desktopStart.style.display = 'block';
         }
 
-        // Add click handler for start button
+        // Add click handler for start button - ensure clean state
         const startBtn = document.getElementById('startListeningBtn');
         if (startBtn) {
-            // Remove any existing listeners
+            // Remove any existing listeners and reset button
             startBtn.replaceWith(startBtn.cloneNode(true));
             const newStartBtn = document.getElementById('startListeningBtn');
+
+            // Reset button state
+            newStartBtn.innerHTML = '<i class="fas fa-play"></i> Start Listening';
+            newStartBtn.disabled = false;
 
             newStartBtn.addEventListener('click', async () => {
                 // Show loading
                 newStartBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading...';
                 newStartBtn.disabled = true;
 
-                // Continue with normal flow
-                await this.continueAfterUnlock();
+                try {
+                    // Continue with normal flow
+                    await this.continueAfterUnlock();
+                } catch (error) {
+                    console.error('Error during start:', error);
+                    newStartBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error - Try Again';
+                    newStartBtn.disabled = false;
+                }
             }, { once: true });
         }
     }
@@ -277,11 +411,17 @@ class ListeningManager {
      */
     async continueAfterUnlock() {
         try {
+            // Verify we're still in the right session (user might have switched tabs)
+            if (!this.tabName || !this.currentSession) {
+                throw new Error('Session was reset, please try again');
+            }
+
             // Switch to progress view and show loading
             this.showProgressView();
             this.updateStatus('Loading cards...', true);
 
             // Fetch cards from API
+            console.log(`📡 Fetching cards for: ${this.tabName}`);
             const response = await fetch(`/api/cards/${encodeURIComponent(this.tabName)}`);
             const data = await response.json();
 
@@ -289,12 +429,18 @@ class ListeningManager {
                 throw new Error(data.error || 'Failed to fetch cards');
             }
 
+            // Verify we're still in the same session
+            if (this.currentSession !== this.tabName) {
+                console.log('⚠️ Session changed during card loading, aborting');
+                return;
+            }
+
             this.cards = data.cards;
             this.tabName = data.tab_name;
             this.sheetGid = data.sheet_gid;
             this.totalCount = data.total_count;
 
-            console.log(`📚 Loaded ${this.totalCount} cards for listening`);
+            console.log(`📚 Loaded ${this.totalCount} cards for listening: ${this.tabName}`);
 
             if (this.totalCount === 0) {
                 throw new Error('No cards available for listening');
@@ -306,6 +452,14 @@ class ListeningManager {
         } catch (error) {
             console.error('Error continuing after unlock:', error);
             this.updateStatus(`Error: ${error.message}`, false);
+
+            // Reset to setup view on error
+            setTimeout(() => {
+                if (this.currentSession === this.tabName) {
+                    this.showSetupView();
+                    this.resetUIElements();
+                }
+            }, 3000);
         }
     }
 
@@ -313,6 +467,12 @@ class ListeningManager {
      * Begin sequential playback
      */
     async beginPlayback() {
+        // Verify session hasn't changed
+        if (!this.currentSession || this.currentSession !== this.tabName) {
+            console.log('⚠️ Session changed, aborting playback');
+            return;
+        }
+
         this.isPlaying = true;
         this.isPaused = false;
         this.currentCardIndex = 0;
@@ -320,10 +480,16 @@ class ListeningManager {
         // Switch to progress view
         this.showProgressView();
 
-        console.log(`🎬 Beginning playback of ${this.totalCount} cards`);
+        console.log(`🎬 Beginning playback of ${this.totalCount} cards for: ${this.tabName}`);
 
         // Pre-populate cache for smooth infinite loops
         await this.populateAudioCache();
+
+        // Verify session is still active after caching
+        if (!this.isPlaying || this.currentSession !== this.tabName) {
+            console.log('⚠️ Session changed during caching, stopping');
+            return;
+        }
 
         // Start playing cards
         await this.playNextCard();
@@ -342,6 +508,7 @@ class ListeningManager {
         this.updateStatus('Preparing audio cache...', true);
 
         const spreadsheetId = window.cardContext?.spreadsheetId || null;
+        const currentSession = this.currentSession; // Capture current session
         let cachedCount = 0;
         let totalItems = this.cards.length * 2; // word + example per card
 
@@ -350,9 +517,9 @@ class ListeningManager {
             for (let i = 0; i < this.cards.length; i++) {
                 const card = this.cards[i];
 
-                // Check if we should continue (user might have stopped)
-                if (!this.isPlaying) {
-                    console.log('🛑 Cache population stopped by user');
+                // Check if we should continue (user might have stopped or switched sessions)
+                if (!this.isPlaying || this.currentSession !== currentSession) {
+                    console.log(`🛑 Cache population stopped - session changed from ${currentSession} to ${this.currentSession}`);
                     return;
                 }
 
@@ -376,6 +543,12 @@ class ListeningManager {
                         this.sheetGid
                     );
 
+                    // Check again if session is still active after TTS call
+                    if (!this.isPlaying || this.currentSession !== currentSession) {
+                        console.log(`🛑 Cache population stopped during TTS call - session changed`);
+                        return;
+                    }
+
                     cachedCount += 2; // word + example
 
                     // Brief delay to prevent overwhelming the API
@@ -385,16 +558,26 @@ class ListeningManager {
                     cachedCount += 2;
                 }
 
-                // Update progress
-                const progress = Math.round((cachedCount / totalItems) * 100);
-                this.updateStatus(`Preparing audio cache... ${progress}%`, true);
+                // Update progress only if session is still active
+                if (this.currentSession === currentSession) {
+                    const progress = Math.round((cachedCount / totalItems) * 100);
+                    this.updateStatus(`Preparing audio cache... ${progress}%`, true);
+                }
             }
 
-            console.log(`✅ Audio cache populated: ${cachedCount} items cached`);
+            // Final check before completing
+            if (this.currentSession === currentSession) {
+                console.log(`✅ Audio cache populated: ${cachedCount} items cached for session: ${currentSession}`);
+            } else {
+                console.log(`⚠️ Cache population completed but session changed from ${currentSession} to ${this.currentSession}`);
+            }
 
         } catch (error) {
             console.error('Error populating audio cache:', error);
-            // Continue anyway - we'll fall back to on-demand generation
+            // Continue anyway if we're still in the same session - we'll fall back to on-demand generation
+            if (this.currentSession === currentSession) {
+                console.log('🔄 Continuing with on-demand audio generation');
+            }
         }
     }
 
@@ -402,8 +585,9 @@ class ListeningManager {
      * Play the next card in sequence
      */
     async playNextCard() {
-        // Check if we should continue playing
-        if (!this.isPlaying || this.isPaused) {
+        // Check if we should continue playing and session is still active
+        if (!this.isPlaying || this.isPaused || this.currentSession !== this.tabName) {
+            console.log('⚠️ Playback stopped or session changed');
             return;
         }
 
@@ -425,12 +609,18 @@ class ListeningManager {
             // Play the card audio using cached approach
             await this.playCardAudio(card);
 
+            // Verify session is still active after playing
+            if (!this.isPlaying || this.isPaused || this.currentSession !== this.tabName) {
+                console.log('⚠️ Session changed during card playback');
+                return;
+            }
+
             // Move to next card
             this.currentCardIndex++;
 
             // Brief pause between cards
             setTimeout(() => {
-                if (this.isPlaying && !this.isPaused) {
+                if (this.isPlaying && !this.isPaused && this.currentSession === this.tabName) {
                     this.playNextCard();
                 }
             }, 500);
@@ -443,7 +633,7 @@ class ListeningManager {
             this.updateStatus(`Error playing card, skipping...`);
 
             setTimeout(() => {
-                if (this.isPlaying && !this.isPaused) {
+                if (this.isPlaying && !this.isPaused && this.currentSession === this.tabName) {
                     this.playNextCard();
                 }
             }, 1000);
@@ -454,6 +644,12 @@ class ListeningManager {
      * Restart the card loop for infinite playback
      */
     restartLoop() {
+        // Verify session is still active
+        if (!this.isPlaying || this.currentSession !== this.tabName) {
+            console.log('⚠️ Loop restart cancelled - session changed or stopped');
+            return;
+        }
+
         // Reset to beginning
         this.currentCardIndex = 0;
 
@@ -472,10 +668,14 @@ class ListeningManager {
             loopCounter.textContent = `Loop ${this.loopCount}`;
         }
 
+        console.log(`🔄 Starting loop ${this.loopCount} for session: ${this.currentSession}`);
+
         // Continue playing if still active
-        if (this.isPlaying && !this.isPaused) {
+        if (this.isPlaying && !this.isPaused && this.currentSession === this.tabName) {
             setTimeout(() => {
-                this.playNextCard();
+                if (this.isPlaying && !this.isPaused && this.currentSession === this.tabName) {
+                    this.playNextCard();
+                }
             }, 1000); // Slightly longer pause between loops
         }
     }
@@ -616,18 +816,29 @@ class ListeningManager {
      * Stop playback completely (called when modal is closed)
      */
     stopPlayback() {
+        console.log('🛑 Stopping playback and cleaning up session');
+
         this.isPlaying = false;
         this.isPaused = false;
 
-        // Stop current audio
+        // Stop current audio and clear TTS state
         if (window.ttsManager) {
             window.ttsManager.stopCurrentAudio();
+            // Clear any pending requests
+            window.ttsManager.pendingRequests.clear();
         }
 
-        // Reset state
+        // Reset all session state
         this.currentSession = null;
         this.currentCardIndex = 0;
         this.cards = [];
+        this.tabName = '';
+        this.sheetGid = null;
+        this.totalCount = 0;
+        this.loopCount = 1;
+
+        // Reset UI elements
+        this.resetUIElements();
 
         // Keep audio unlocked for potential future sessions
         // Don't reset audioUnlocked flag
@@ -746,35 +957,59 @@ class ListeningManager {
      */
     getSessionInfo() {
         return {
+            currentSession: this.currentSession,
             tabName: this.tabName,
             totalCards: this.totalCount,
             currentIndex: this.currentCardIndex,
             isPlaying: this.isPlaying,
-            isPaused: this.isPaused
+            isPaused: this.isPaused,
+            loopCount: this.loopCount,
+            audioUnlocked: this.audioUnlocked,
+            cardsLoaded: this.cards.length > 0
         };
     }
 
     /**
-     * Get cache statistics for debugging
+     * Get cache info for debugging
      */
     getCacheInfo() {
         if (!window.ttsManager) {
-            return { available: false };
+            return { available: false, reason: 'TTS Manager not available' };
         }
 
         const stats = window.ttsManager.getCacheStats();
         return {
             available: true,
             cacheSize: stats.size,
-            memoryUsage: stats.memoryUsage,
-            cardsExpected: this.totalCount * 2, // word + example per card
-            cacheHitRate: this.totalCount > 0 ? Math.round((stats.size / (this.totalCount * 2)) * 100) : 0
+            cacheMemoryKB: stats.memoryKB,
+            pendingRequests: stats.pending,
+            cacheHitRate: stats.size > 0 ? Math.round((stats.size / (stats.size + stats.pending)) * 100) : 0
         };
+    }
+
+    /**
+     * Debug method to log current state
+     */
+    logCurrentState() {
+        const sessionInfo = this.getSessionInfo();
+        const cacheInfo = this.getCacheInfo();
+
+        console.log('🔍 Listening Manager State:');
+        console.log('  Session:', sessionInfo);
+        console.log('  Cache:', cacheInfo);
+
+        return { session: sessionInfo, cache: cacheInfo };
     }
 }
 
-// Global listening manager instance
+// Global listening manager instance with enhanced logging
+console.log('🎵 Initializing Listening Manager...');
 window.listeningManager = new ListeningManager();
+
+// Debug helper
+window.debugListening = () => {
+    return window.listeningManager.logCurrentState();
+};
 
 // Export for module use
 if (typeof module !== 'undefined' && module.exports) {
