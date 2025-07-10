@@ -3,10 +3,14 @@
  */
 class TTSManager {
     constructor() {
-        this.isAvailable = false;
+        this.isAvailable = true;
         this.audioCache = new Map();
         this.currentAudio = null;
         this.pendingRequests = new Map();
+
+        // Mobile audio management - restored for listening mode
+        this.userInteracted = false;
+        this.primedAudioForChromeIOS = null;
 
         // Restore cache from sessionStorage
         this.restoreCache();
@@ -28,6 +32,7 @@ class TTSManager {
         // Setup mobile audio unlock
         if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
             const unlock = () => {
+                this.userInteracted = true;
                 const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU4Ljk1AAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABmwQ+XAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABrTjOWAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
                 audio.play().catch(() => {});
             };
@@ -159,7 +164,17 @@ class TTSManager {
         try {
             this.stopCurrentAudio();
 
-            const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+            // For Chrome iOS: Use primed Audio element if available (restored functionality)
+            let audio;
+            if (this.primedAudioForChromeIOS) {
+                audio = this.primedAudioForChromeIOS;
+                // Reuse the primed element but update its source
+                audio.src = `data:audio/mp3;base64,${audioBase64}`;
+            } else {
+                // Create new audio element for other browsers
+                audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+            }
+
             this.currentAudio = audio;
 
             audio.addEventListener('ended', () => this.currentAudio = null);
@@ -179,7 +194,16 @@ class TTSManager {
                     reject(new Error('Load failed'));
                 });
 
-                audio.load();
+                // Only call load() if not using primed audio (it's already loaded)
+                if (!this.primedAudioForChromeIOS) {
+                    audio.load();
+                } else {
+                    // For primed audio, it should be ready immediately
+                    setTimeout(() => {
+                        clearTimeout(timeout);
+                        resolve();
+                    }, 100);
+                }
             });
 
             await audio.play();
@@ -230,9 +254,68 @@ class TTSManager {
         }
     }
 
-    // Legacy speak method for compatibility
+    // Enhanced speak method for individual text (restored for listening mode)
     async speak(text, voice = null) {
-        return this.speakCard(text, null, voice, true);
+        if (!text || !text.trim()) {
+            console.warn('No text provided for TTS');
+            return false;
+        }
+
+        const trimmedText = text.trim();
+        const cacheKey = this.getCacheKey(trimmedText, voice);
+
+        // Check cache first
+        if (this.audioCache.has(cacheKey)) {
+            console.log(`🎯 Individual text cache hit: "${trimmedText}"`);
+            return this.playAudio(this.audioCache.get(cacheKey));
+        }
+
+        // Check for pending request
+        if (this.pendingRequests.has(cacheKey)) {
+            return this.pendingRequests.get(cacheKey);
+        }
+
+        console.log(`📡 Fetching individual text: "${trimmedText}"`);
+
+        // Create API request for individual text
+        const requestPromise = this.fetchIndividualText(trimmedText, voice);
+        this.pendingRequests.set(cacheKey, requestPromise);
+
+        requestPromise.finally(() => this.pendingRequests.delete(cacheKey));
+
+        return requestPromise;
+    }
+
+    async fetchIndividualText(text, voice) {
+        try {
+            const response = await fetch('/api/tts/speak', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: text,
+                    voice_name: voice
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.audio_base64) {
+                // Cache the audio
+                const cacheKey = this.getCacheKey(text, voice);
+                this.audioCache.set(cacheKey, data.audio_base64);
+                this.saveCache();
+
+                // Play the audio
+                await this.playAudio(data.audio_base64);
+                return true;
+            } else {
+                console.error('❌ Individual text TTS failed:', data.error);
+                return false;
+            }
+        } catch (error) {
+            console.error('💥 Individual text TTS request error:', error);
+            return false;
+        }
     }
 
     clearCache() {
