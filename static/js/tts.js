@@ -33,7 +33,7 @@ class TTSManager {
         if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
             const unlock = () => {
                 this.userInteracted = true;
-                const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU4Ljk1AAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABmwQ+XAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABrTjOWAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+                const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU4Ljk1AAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABmwQ+XAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABrTjOWAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
                 audio.play().catch(() => {});
             };
             ['touchstart', 'mousedown', 'keydown'].forEach(event =>
@@ -91,13 +91,16 @@ class TTSManager {
         if (wordCached && exampleCached) {
             console.log(`🎯 Cache hit: "${word || ''}" + "${example || ''}"`);
 
+            // Always return audio data structure, whether from cache or API
+            const audioData = {};
+            if (word) audioData.word = { audio_base64: this.audioCache.get(wordKey) };
+            if (example) audioData.example = { audio_base64: this.audioCache.get(exampleKey) };
+
             if (autoplay) {
-                const audioData = {};
-                if (word) audioData.word = { audio_base64: this.audioCache.get(wordKey) };
-                if (example) audioData.example = { audio_base64: this.audioCache.get(exampleKey) };
                 await this.playCardAudio(audioData);
             }
-            return true;
+
+            return audioData; // Return actual audio data, not true
         }
 
         // Check for pending request
@@ -162,29 +165,46 @@ class TTSManager {
 
     async playAudio(audioBase64) {
         try {
+            // Only stop current audio, not ALL audio (too aggressive)
             this.stopCurrentAudio();
+
+            // Log base64 preview for debugging
+            const base64Preview = audioBase64.substring(0, 10);
+            console.log(`🔊 Starting audio playback... [${base64Preview}...]`);
 
             // For Chrome iOS: Use primed Audio element if available (restored functionality)
             let audio;
             if (this.primedAudioForChromeIOS) {
+                console.log('📱 Using primed Chrome iOS audio element');
                 audio = this.primedAudioForChromeIOS;
+
+                // Make sure primed audio is stopped before reusing
+                if (!audio.paused) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }
+
+                // Remove any existing event listeners to prevent conflicts
+                audio.onended = null;
+                audio.onerror = null;
+                audio.oncanplaythrough = null;
+
                 // Reuse the primed element but update its source
                 audio.src = `data:audio/mp3;base64,${audioBase64}`;
             } else {
+                console.log('🖥️ Creating new audio element');
                 // Create new audio element for other browsers
                 audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
             }
 
             this.currentAudio = audio;
 
-            audio.addEventListener('ended', () => this.currentAudio = null);
-            audio.addEventListener('error', (e) => console.error('💥 Audio error:', e));
-
-            // Wait for ready and play
+            // Wait for audio to be ready
             await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => reject(new Error('Timeout')), 10000);
+                const timeout = setTimeout(() => reject(new Error('Audio load timeout')), 10000);
 
                 audio.addEventListener('canplaythrough', () => {
+                    console.log(`📻 Audio ready to play [${base64Preview}...]`);
                     clearTimeout(timeout);
                     resolve();
                 }, { once: true });
@@ -206,8 +226,50 @@ class TTSManager {
                 }
             });
 
+            console.log(`▶️ Playing audio... [${base64Preview}...]`);
             await audio.play();
-            return true;
+            console.log(`🎵 Audio play() started, waiting for completion... [${base64Preview}...]`);
+
+            // CRITICAL FIX: Wait for audio to actually finish playing
+            return new Promise((resolve, reject) => {
+                let finished = false;
+
+                const finishAudio = () => {
+                    if (!finished) {
+                        finished = true;
+                        console.log(`✅ Audio playback completed [${base64Preview}...]`);
+                        // Only clear current audio if this is still the active one
+                        if (this.currentAudio === audio) {
+                            this.currentAudio = null;
+                        }
+                        resolve(true);
+                    }
+                };
+
+                // Listen for natural completion
+                audio.addEventListener('ended', finishAudio, { once: true });
+
+                // Handle errors
+                audio.addEventListener('error', (e) => {
+                    console.error(`💥 Audio error during playback [${base64Preview}...]:`, e);
+                    if (!finished) {
+                        finished = true;
+                        if (this.currentAudio === audio) {
+                            this.currentAudio = null;
+                        }
+                        reject(new Error('Audio playback failed'));
+                    }
+                }, { once: true });
+
+                // Fallback timeout (in case audio doesn't fire ended event)
+                setTimeout(() => {
+                    if (!finished) {
+                        console.log(`⏰ Audio timeout, assuming completed [${base64Preview}...]`);
+                        finishAudio();
+                    }
+                }, 15000); // 15 second timeout for long audio
+            });
+
         } catch (error) {
             console.error('💥 Playback error:', error);
 
@@ -248,10 +310,74 @@ class TTSManager {
 
     stopCurrentAudio() {
         if (this.currentAudio) {
-            this.currentAudio.pause();
-            this.currentAudio.currentTime = 0;
-            this.currentAudio = null;
+            console.log('⏹️ Stopping current audio');
+            try {
+                this.currentAudio.pause();
+                this.currentAudio.currentTime = 0;
+                // Clear event listeners to prevent ghost callbacks
+                this.currentAudio.onended = null;
+                this.currentAudio.onerror = null;
+                this.currentAudio = null;
+            } catch (error) {
+                console.warn('⚠️ Error stopping current audio:', error);
+            }
         }
+    }
+
+    /**
+     * Stop ALL possible audio sources - comprehensive cleanup
+     */
+    stopAllAudio() {
+        console.log('🔇 Stopping ALL audio sources (comprehensive cleanup)...');
+
+        // Stop current audio
+        this.stopCurrentAudio();
+
+        // Stop primed audio element if it exists
+        if (this.primedAudioForChromeIOS) {
+            try {
+                console.log('🔇 Stopping primed Chrome iOS audio');
+                this.primedAudioForChromeIOS.pause();
+                this.primedAudioForChromeIOS.currentTime = 0;
+                // Clear event listeners but don't destroy the element (keep it primed)
+                this.primedAudioForChromeIOS.onended = null;
+                this.primedAudioForChromeIOS.onerror = null;
+                this.primedAudioForChromeIOS.oncanplaythrough = null;
+            } catch (error) {
+                console.warn('⚠️ Error stopping primed audio:', error);
+            }
+        }
+
+        // Stop any other audio elements that might be playing
+        try {
+            const allAudioElements = document.querySelectorAll('audio');
+            allAudioElements.forEach(audio => {
+                if (!audio.paused) {
+                    console.log('🔇 Stopping orphaned audio element');
+                    audio.pause();
+                    audio.currentTime = 0;
+                }
+            });
+        } catch (error) {
+            console.warn('⚠️ Error stopping orphaned audio elements:', error);
+        }
+    }
+
+    /**
+     * Reset audio system completely (for session switches)
+     */
+    resetAudioSystem() {
+        console.log('🔄 Resetting audio system for session switch...');
+
+        // Stop all audio
+        this.stopAllAudio();
+
+        // Clear all pending requests
+        console.log('🧹 Clearing pending requests');
+        this.pendingRequests.clear();
+
+        // Don't clear the cache or primed audio - those can be reused
+        // Just ensure clean audio state
     }
 
     // Enhanced speak method for individual text (restored for listening mode)
