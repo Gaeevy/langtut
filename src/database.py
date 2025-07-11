@@ -56,6 +56,7 @@ class UserSpreadsheet(db.Model):
     is_active = Column(Boolean, default=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_used = Column(DateTime, default=datetime.utcnow)
+    properties = Column(Text)  # JSON string storage (Phase 1: simple text field)
 
     # Relationship to user
     user = relationship('User', back_populates='spreadsheets')
@@ -78,6 +79,7 @@ class UserSpreadsheet(db.Model):
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_used': self.last_used.isoformat() if self.last_used else None,
+            'properties': self.properties,  # Phase 1: simple field access
         }
 
 
@@ -114,6 +116,31 @@ def ensure_tables():
         # Tables don't exist, create them
         db.create_all()
         _tables_created = True
+
+    # Run migrations after ensuring tables exist
+    migrate_database()
+
+
+def migrate_database():
+    """Add properties column to user_spreadsheets table (Phase 1)"""
+    try:
+        inspector = db.inspect(db.engine)
+        columns = [column['name'] for column in inspector.get_columns('user_spreadsheets')]
+
+        if 'properties' not in columns:
+            with db.engine.connect() as connection:
+                connection.execute(
+                    db.text('ALTER TABLE user_spreadsheets ADD COLUMN properties TEXT')
+                )
+                connection.commit()
+            print("✅ Migration: Added 'properties' column to UserSpreadsheet table")
+        else:
+            print("✅ Migration: 'properties' column already exists")
+
+    except Exception as e:
+        print(f'⚠️  Migration warning: {e}')
+        # Don't raise the exception - let the app continue
+        # This handles cases where the table doesn't exist yet
 
 
 def get_or_create_user(google_user_id, email=None, name=None):

@@ -238,3 +238,106 @@ def volume_check() -> dict[str, Any]:
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+
+@admin_bp.route('/table-info')
+def table_info() -> dict[str, Any]:
+    """Get UserSpreadsheet table schema information (Phase 1 verification)"""
+    try:
+        inspector = db.inspect(db.engine)
+        columns = inspector.get_columns('user_spreadsheets')
+
+        return jsonify(
+            {
+                'success': True,
+                'table': 'user_spreadsheets',
+                'columns': [
+                    {
+                        'name': col['name'],
+                        'type': str(col['type']),
+                        'nullable': col['nullable'],
+                        'default': col['default'],
+                    }
+                    for col in columns
+                ],
+                'column_count': len(columns),
+                'properties_column_exists': any(col['name'] == 'properties' for col in columns),
+            }
+        )
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@admin_bp.route('/railway-debug')
+def railway_debug() -> dict[str, Any]:
+    """Debug endpoint for Railway database access."""
+    try:
+        import os
+        from pathlib import Path
+
+        debug_info = {
+            'environment': {
+                'RAILWAY_ENVIRONMENT': os.getenv('RAILWAY_ENVIRONMENT'),
+                'DATABASE_PATH': os.getenv('DATABASE_PATH'),
+                'RAILWAY_SERVICE_NAME': os.getenv('RAILWAY_SERVICE_NAME'),
+                'current_directory': str(Path.cwd()),
+            },
+            'database_file': {
+                'expected_path': '/app/data/app.db',
+                'local_path': 'data/app.db',
+                'exists_expected': Path('/app/data/app.db').exists(),
+                'exists_local': Path('data/app.db').exists(),
+            },
+            'directory_contents': {},
+            'database_status': {},
+        }
+
+        # Check directory contents
+        for path_name, path_str in [('app_data', '/app/data'), ('local_data', 'data')]:
+            path_obj = Path(path_str)
+            if path_obj.exists():
+                try:
+                    debug_info['directory_contents'][path_name] = [
+                        {
+                            'name': item.name,
+                            'is_file': item.is_file(),
+                            'size': item.stat().st_size if item.is_file() else None,
+                        }
+                        for item in path_obj.iterdir()
+                    ]
+                except Exception as e:
+                    debug_info['directory_contents'][path_name] = f'Error: {e}'
+            else:
+                debug_info['directory_contents'][path_name] = 'Directory does not exist'
+
+        # Check database connectivity
+        try:
+            user_count = User.query.count()
+            spreadsheet_count = UserSpreadsheet.query.count()
+
+            # Get sample property data
+            sample_spreadsheet = UserSpreadsheet.query.first()
+            sample_property = None
+            if sample_spreadsheet:
+                sample_property = sample_spreadsheet.properties
+
+            debug_info['database_status'] = {
+                'connected': True,
+                'users': user_count,
+                'spreadsheets': spreadsheet_count,
+                'sample_property_data': sample_property,
+            }
+        except Exception as e:
+            debug_info['database_status'] = {'connected': False, 'error': str(e)}
+
+        return jsonify(
+            {
+                'success': True,
+                'debug_info': debug_info,
+                'note': 'This endpoint helps debug Railway database access',
+            }
+        )
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
