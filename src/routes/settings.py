@@ -9,7 +9,7 @@ from flask import Blueprint, jsonify, redirect, render_template, request, sessio
 from src.gsheet import extract_spreadsheet_id, read_all_card_sets, validate_spreadsheet_access
 from src.session_manager import SessionKeys as sk
 from src.session_manager import SessionManager as sm
-from src.user_manager import get_current_user_from_session, set_user_spreadsheet
+from src.user_manager import get_current_user, set_user_spreadsheet
 
 # Create blueprint
 settings_bp = Blueprint('settings', __name__)
@@ -22,9 +22,14 @@ def settings():
     if not sm.has(sk.AUTH_CREDENTIALS):
         return redirect(url_for('auth.auth'))
 
-    # Get current user and their spreadsheet
-    user = get_current_user_from_session(session)
-    current_spreadsheet_id = user.spreadsheet_id if user else None
+    # Get current user and their active spreadsheet
+    user = get_current_user()
+    current_spreadsheet_id = None
+
+    if user:
+        active_spreadsheet = user.get_active_spreadsheet()
+        if active_spreadsheet:
+            current_spreadsheet_id = active_spreadsheet.spreadsheet_id
 
     return render_template(
         'settings.html', user=user, current_spreadsheet_id=current_spreadsheet_id

@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Spreadsheet Settings{% endblock %}
+{% block title %}Settings{% endblock %}
 
 {% block content %}
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-md-8">
-            <h2 class="mb-4">📊 Spreadsheet Settings</h2>
+            <h2 class="mb-4">⚙️ Settings</h2>
 
             <!-- Flash messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -20,16 +20,71 @@
                 {% endif %}
             {% endwith %}
 
+            <!-- Language Settings -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🌐 Language Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="original-language" class="form-label">Learning From:</label>
+                            <select class="form-select" id="original-language">
+                                <option value="ru">Russian (Русский)</option>
+                                <option value="en">English</option>
+                                <option value="es">Spanish (Español)</option>
+                                <option value="fr">French (Français)</option>
+                                <option value="de">German (Deutsch)</option>
+                                <option value="it">Italian (Italiano)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="target-language" class="form-label">Learning To:</label>
+                            <select class="form-select" id="target-language">
+                                <option value="pt">Portuguese (Português)</option>
+                                <option value="en">English</option>
+                                <option value="es">Spanish (Español)</option>
+                                <option value="fr">French (Français)</option>
+                                <option value="de">German (Deutsch)</option>
+                                <option value="it">Italian (Italiano)</option>
+                                <option value="ru">Russian (Русский)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="hint-language" class="form-label">Interface Language:</label>
+                            <select class="form-select" id="hint-language">
+                                <option value="en">English</option>
+                                <option value="pt">Portuguese (Português)</option>
+                                <option value="es">Spanish (Español)</option>
+                                <option value="fr">French (Français)</option>
+                                <option value="de">German (Deutsch)</option>
+                                <option value="it">Italian (Italiano)</option>
+                                <option value="ru">Russian (Русский)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button class="btn btn-primary" onclick="saveLanguageSettings()">
+                            💾 Save Language Settings
+                        </button>
+                        <button class="btn btn-outline-secondary ms-2" onclick="loadLanguageSettings()">
+                            🔄 Reset to Current
+                        </button>
+                    </div>
+                    <div id="language-results" class="mt-3" style="display: none;"></div>
+                </div>
+            </div>
+
             <!-- Current Status -->
             <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0">📋 Current Spreadsheet</h5>
                 </div>
                 <div class="card-body">
-                    {% if user_spreadsheet_id %}
+                    {% if current_spreadsheet_id %}
                         <div class="alert alert-success">
                             <strong>Using Your Spreadsheet</strong><br>
-                            Spreadsheet ID: <code>{{ user_spreadsheet_id }}</code>
+                            Spreadsheet ID: <code>{{ current_spreadsheet_id }}</code>
                         </div>
                         <form method="POST" action="{{ url_for('settings.reset_spreadsheet') }}" class="d-inline" onsubmit="resetSpreadsheet()">
                             <input type="hidden" name="confirm" value="true">
@@ -51,7 +106,7 @@
                 <label for="spreadsheet_id" class="form-label">Enter Spreadsheet ID:</label>
                 <div class="input-group">
                     <input type="text" class="form-control" id="spreadsheet_id"
-                           value="{{ user_spreadsheet_id or '' }}"
+                           value="{{ current_spreadsheet_id or '' }}"
                            placeholder="Enter Google Sheets ID or URL">
                     <button class="btn btn-outline-secondary" type="button" onclick="validateSpreadsheet()">
                         Test Connection
@@ -103,84 +158,293 @@
 </div>
 
 <script>
-document.getElementById('validate-btn').addEventListener('click', function() {
-    const url = document.getElementById('spreadsheet_url').value.trim();
-    const resultsDiv = document.getElementById('validation-results');
-    const confirmForm = document.getElementById('confirm-form');
-    const btn = this;
+// Language settings functionality
+function loadLanguageSettings() {
+    fetch('/api/language-settings')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const settings = data.language_settings;
+                document.getElementById('original-language').value = settings.original;
+                document.getElementById('target-language').value = settings.target;
+                document.getElementById('hint-language').value = settings.hint;
 
-    if (!url) {
-        resultsDiv.innerHTML = '<div class="alert alert-danger">Please enter a spreadsheet URL or ID.</div>';
+                // Show metadata information if available
+                let message = 'Language settings loaded successfully.';
+                if (data.metadata && data.metadata.model_version === 'enhanced') {
+                    message += ` (Using enhanced model validation)`;
+                    if (!data.metadata.is_valid_configuration) {
+                        message += ` Warning: Configuration has duplicate languages.`;
+                    }
+                }
+
+                showLanguageResult(message, 'success');
+            } else {
+                showLanguageResult('Failed to load language settings: ' + data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            showLanguageResult('Error loading language settings: ' + error.message, 'danger');
+        });
+}
+
+function saveLanguageSettings() {
+    const originalLang = document.getElementById('original-language').value;
+    const targetLang = document.getElementById('target-language').value;
+    const hintLang = document.getElementById('hint-language').value;
+
+    const languageSettings = {
+        original: originalLang,
+        target: targetLang,
+        hint: hintLang
+    };
+
+    // First validate the settings before saving
+    validateLanguageSettings(languageSettings)
+        .then(validationResult => {
+            if (!validationResult.valid) {
+                // Show validation errors
+                let errorMessage = 'Validation failed:<br>';
+                validationResult.validation_errors.forEach(error => {
+                    errorMessage += `• ${error.field}: ${error.message}<br>`;
+                });
+                showLanguageResult(errorMessage, 'danger');
+                return;
+            }
+
+            // Show warnings if any
+            if (validationResult.warnings && validationResult.warnings.length > 0) {
+                let warningMessage = 'Warning:<br>';
+                validationResult.warnings.forEach(warning => {
+                    warningMessage += `• ${warning}<br>`;
+                });
+                showLanguageResult(warningMessage, 'warning');
+            }
+
+            // Proceed with saving
+            fetch('/api/language-settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    language_settings: languageSettings
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    let message = 'Language settings saved successfully!';
+                    if (data.metadata && data.metadata.previous_settings) {
+                        const prev = data.metadata.previous_settings;
+                        message += `<br><small>Previous: ${prev.original} → ${prev.target} (${prev.hint})</small>`;
+                    }
+                    showLanguageResult(message, 'success');
+                } else {
+                    // Handle enhanced error responses
+                    let errorMessage = 'Failed to save language settings: ' + data.error;
+
+                    if (data.validation_errors && data.validation_errors.length > 0) {
+                        errorMessage += '<br>Validation errors:<br>';
+                        data.validation_errors.forEach(error => {
+                            errorMessage += `• ${error.field}: ${error.message}<br>`;
+                        });
+                    }
+
+                    if (data.suggestion) {
+                        errorMessage += '<br>Suggestion: ' + data.suggestion;
+                    }
+
+                    showLanguageResult(errorMessage, 'danger');
+                }
+            })
+            .catch(error => {
+                showLanguageResult('Error saving language settings: ' + error.message, 'danger');
+            });
+        })
+        .catch(error => {
+            showLanguageResult('Error validating language settings: ' + error.message, 'danger');
+        });
+}
+
+function validateLanguageSettings(languageSettings) {
+    return fetch('/api/language-settings/validate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            language_settings: languageSettings
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            return {
+                valid: data.valid,
+                validation_errors: data.validation_errors || [],
+                warnings: data.warnings || []
+            };
+        } else {
+            throw new Error(data.error || 'Validation failed');
+        }
+    });
+}
+
+function showLanguageResult(message, type) {
+    const resultsDiv = document.getElementById('language-results');
+    resultsDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+    resultsDiv.style.display = 'block';
+
+    // Hide after 8 seconds (longer for more detailed messages)
+    setTimeout(() => {
+        resultsDiv.style.display = 'none';
+    }, 8000);
+}
+
+// Load language settings when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadLanguageSettings();
+});
+
+// Spreadsheet validation functionality (existing code)
+function validateSpreadsheet() {
+    const spreadsheetId = document.getElementById('spreadsheet_id').value.trim();
+    const resultsDiv = document.getElementById('results');
+    const previewDiv = document.getElementById('content-preview');
+
+    if (!spreadsheetId) {
+        resultsDiv.innerHTML = '<div class="alert alert-danger">Please enter a spreadsheet ID or URL.</div>';
         resultsDiv.style.display = 'block';
         return;
     }
 
     // Show loading
-    btn.disabled = true;
-    btn.innerHTML = '⏳ Validating...';
-    resultsDiv.innerHTML = '<div class="alert alert-info">Checking spreadsheet access and format...</div>';
+    resultsDiv.innerHTML = '<div class="alert alert-info">⏳ Validating spreadsheet...</div>';
     resultsDiv.style.display = 'block';
-    confirmForm.style.display = 'none';
+    previewDiv.style.display = 'none';
 
-    // Make AJAX request
     fetch('/validate-spreadsheet', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            spreadsheet_url: url
+            spreadsheet_url: spreadsheetId
         })
     })
     .then(response => response.json())
     .then(data => {
-        btn.disabled = false;
-        btn.innerHTML = '🔍 Validate Spreadsheet';
-
         if (data.success) {
-            resultsDiv.innerHTML = `
+            // Show preview
+            let cardSetsInfo = '';
+            if (data.card_sets && data.card_sets.length > 0) {
+                cardSetsInfo = '<h6>Card Sets Found:</h6><ul>';
+                data.card_sets.forEach(cs => {
+                    cardSetsInfo += `<li><strong>${cs.name}</strong> (${cs.card_count} cards)</li>`;
+                });
+                cardSetsInfo += '</ul>';
+            }
+
+            document.getElementById('spreadsheet-info').innerHTML = `
                 <div class="alert alert-success">
-                    <strong>✅ ${data.message}</strong><br>
+                    <strong>✅ Spreadsheet Validated Successfully!</strong><br>
                     <strong>Spreadsheet ID:</strong> <code>${data.spreadsheet_id}</code><br>
-                    <strong>Worksheets found:</strong> ${data.worksheets.join(', ')}
+                    ${cardSetsInfo}
                 </div>
             `;
 
-            // Show confirmation form
-            document.getElementById('confirmed_url').value = url;
-            confirmForm.style.display = 'block';
+            document.getElementById('confirm-spreadsheet-id').value = data.spreadsheet_id;
 
-            // Store the validated spreadsheet ID for localStorage
-            window.validatedSpreadsheetId = data.spreadsheet_id;
+            resultsDiv.style.display = 'none';
+            previewDiv.style.display = 'block';
+
         } else {
-            resultsDiv.innerHTML = `
-                <div class="alert alert-danger">
-                    <strong>❌ Validation Failed</strong><br>
-                    ${data.error}
-                </div>
-            `;
+            resultsDiv.innerHTML = `<div class="alert alert-danger"><strong>❌ Validation Failed:</strong> ${data.error}</div>`;
         }
     })
     .catch(error => {
-        btn.disabled = false;
-        btn.innerHTML = '🔍 Validate Spreadsheet';
-        resultsDiv.innerHTML = `
-            <div class="alert alert-danger">
-                <strong>❌ Error</strong><br>
-                Failed to validate spreadsheet: ${error.message}
-            </div>
-        `;
+        resultsDiv.innerHTML = `<div class="alert alert-danger"><strong>❌ Error:</strong> ${error.message}</div>`;
     });
-});
+}
 
-// Handle form submission - no localStorage needed anymore
-document.getElementById('confirm-form').addEventListener('submit', function(e) {
-    // Form will be handled by the server
-});
+function confirmSpreadsheet() {
+    const spreadsheetId = document.getElementById('confirm-spreadsheet-id').value;
+    const button = document.querySelector('#content-preview .btn-success');
+    const cancelButton = document.querySelector('#content-preview .btn-secondary');
 
-// Handle reset button - no localStorage needed anymore
+    // Show loading state
+    button.disabled = true;
+    cancelButton.disabled = true;
+    button.innerHTML = '⏳ Setting up...';
+
+    fetch('/set-spreadsheet', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            spreadsheet_id: spreadsheetId,
+            confirm: true
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            button.innerHTML = '✅ Success!';
+            button.className = 'btn btn-success';
+
+            // Reload page after short delay
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            // Show error
+            button.innerHTML = '❌ Error';
+            button.className = 'btn btn-danger';
+
+            // Show error message
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'alert alert-danger mt-2';
+            errorDiv.innerHTML = `<strong>Error:</strong> ${data.error}`;
+            document.querySelector('#content-preview .card-body').appendChild(errorDiv);
+
+            // Reset buttons after delay
+            setTimeout(() => {
+                button.disabled = false;
+                cancelButton.disabled = false;
+                button.innerHTML = '✓ Use This Spreadsheet';
+                button.className = 'btn btn-success';
+            }, 3000);
+        }
+    })
+    .catch(error => {
+        // Show error
+        button.innerHTML = '❌ Error';
+        button.className = 'btn btn-danger';
+
+        // Show error message
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'alert alert-danger mt-2';
+        errorDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+        document.querySelector('#content-preview .card-body').appendChild(errorDiv);
+
+        // Reset buttons after delay
+        setTimeout(() => {
+            button.disabled = false;
+            cancelButton.disabled = false;
+            button.innerHTML = '✓ Use This Spreadsheet';
+            button.className = 'btn btn-success';
+        }, 3000);
+    });
+}
+
+function hidePreview() {
+    document.getElementById('content-preview').style.display = 'none';
+}
+
 function resetSpreadsheet() {
-    // Form will be handled by the server
     return true;
 }
 </script>
