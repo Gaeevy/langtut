@@ -369,7 +369,75 @@ function validateSpreadsheet() {
 }
 
 function confirmSpreadsheet() {
-    document.getElementById('confirm-form').submit();
+    const spreadsheetId = document.getElementById('confirm-spreadsheet-id').value;
+    const button = document.querySelector('#content-preview .btn-success');
+    const cancelButton = document.querySelector('#content-preview .btn-secondary');
+
+    // Show loading state
+    button.disabled = true;
+    cancelButton.disabled = true;
+    button.innerHTML = '⏳ Setting up...';
+
+    fetch('/set-spreadsheet', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            spreadsheet_id: spreadsheetId,
+            confirm: true
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            button.innerHTML = '✅ Success!';
+            button.className = 'btn btn-success';
+
+            // Reload page after short delay
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            // Show error
+            button.innerHTML = '❌ Error';
+            button.className = 'btn btn-danger';
+
+            // Show error message
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'alert alert-danger mt-2';
+            errorDiv.innerHTML = `<strong>Error:</strong> ${data.error}`;
+            document.querySelector('#content-preview .card-body').appendChild(errorDiv);
+
+            // Reset buttons after delay
+            setTimeout(() => {
+                button.disabled = false;
+                cancelButton.disabled = false;
+                button.innerHTML = '✓ Use This Spreadsheet';
+                button.className = 'btn btn-success';
+            }, 3000);
+        }
+    })
+    .catch(error => {
+        // Show error
+        button.innerHTML = '❌ Error';
+        button.className = 'btn btn-danger';
+
+        // Show error message
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'alert alert-danger mt-2';
+        errorDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+        document.querySelector('#content-preview .card-body').appendChild(errorDiv);
+
+        // Reset buttons after delay
+        setTimeout(() => {
+            button.disabled = false;
+            cancelButton.disabled = false;
+            button.innerHTML = '✓ Use This Spreadsheet';
+            button.className = 'btn btn-success';
+        }, 3000);
+    });
 }
 
 function hidePreview() {
