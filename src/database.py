@@ -56,7 +56,7 @@ class UserSpreadsheet(db.Model):
     is_active = Column(Boolean, default=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_used = Column(DateTime, default=datetime.utcnow)
-    properties = Column(Text)  # JSON string storage (Phase 1: simple text field)
+    properties = Column(Text)  # JSON string storage
 
     # Relationship to user
     user = relationship('User', back_populates='spreadsheets')
@@ -69,6 +69,36 @@ class UserSpreadsheet(db.Model):
     def __repr__(self):
         return f'<UserSpreadsheet {self.spreadsheet_id} for user {self.user_id}>'
 
+    def get_properties(self):
+        """Get UserSpreadsheetProperty object from JSON string."""
+        from src.models import UserSpreadsheetProperty
+
+        return UserSpreadsheetProperty.from_db_string(self.properties)
+
+    def set_properties(self, properties):
+        """Set properties from UserSpreadsheetProperty object."""
+        from src.models import UserSpreadsheetProperty
+
+        if isinstance(properties, UserSpreadsheetProperty):
+            self.properties = properties.to_db_string()
+        elif isinstance(properties, dict):
+            # Create UserSpreadsheetProperty from dict
+            prop_obj = UserSpreadsheetProperty(**properties)
+            self.properties = prop_obj.to_db_string()
+        else:
+            raise ValueError('Properties must be UserSpreadsheetProperty object or dict')
+
+    def get_language_settings(self) -> dict:
+        """Get language settings from properties."""
+        props = self.get_properties()
+        return props.get_language_dict()
+
+    def set_language_settings(self, language_settings: dict):
+        """Set language settings in properties."""
+        props = self.get_properties()
+        props.set_language_dict(language_settings)
+        self.set_properties(props)
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -79,7 +109,8 @@ class UserSpreadsheet(db.Model):
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_used': self.last_used.isoformat() if self.last_used else None,
-            'properties': self.properties,  # Phase 1: simple field access
+            'properties': self.properties,
+            'language_settings': self.get_language_settings(),  # Add language settings to dict
         }
 
 
@@ -193,12 +224,18 @@ def add_user_spreadsheet(
             {'is_active': False}
         )
 
+    # Create new spreadsheet with default properties
+    from src.models import UserSpreadsheetProperty
+
+    default_properties = UserSpreadsheetProperty.get_default()
+
     new_spreadsheet = UserSpreadsheet(
         user_id=user_id,
         spreadsheet_id=spreadsheet_id,
         spreadsheet_url=spreadsheet_url,
         spreadsheet_name=spreadsheet_name,
         is_active=make_active,
+        properties=default_properties.to_db_string(),  # Initialize with default properties
     )
 
     db.session.add(new_spreadsheet)

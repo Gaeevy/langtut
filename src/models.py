@@ -5,11 +5,12 @@ This module contains Pydantic models for representing data structures
 in the application, such as language cards and tab collections.
 """
 
+import json
 import random
 from datetime import datetime, timedelta
 from enum import Enum
 
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, Field, computed_field
 
 NEVER_SHOWN = datetime(1970, 1, 1)  # Unix epoch start date
 
@@ -133,3 +134,99 @@ class CardSet(BaseModel):
         cards = sorted_cards[:limit] if limit else sorted_cards
         random.shuffle(cards)
         return cards
+
+
+class SpreadsheetLanguages(BaseModel):
+    """
+    Language settings for spreadsheet learning configuration.
+
+    Attributes:
+        original: Language code being learned FROM (e.g., 'ru' for Russian)
+        target: Language code being learned TO (e.g., 'pt' for Portuguese)
+        hint: Language code for interface/hints (e.g., 'en' for English)
+    """
+
+    original: str = Field(
+        default='ru', description='Language being learned from', min_length=2, max_length=5
+    )
+    target: str = Field(
+        default='pt', description='Language being learned to', min_length=2, max_length=5
+    )
+    hint: str = Field(
+        default='en', description='Interface/hint language', min_length=2, max_length=5
+    )
+
+    @classmethod
+    def get_default(cls) -> 'SpreadsheetLanguages':
+        """Get default language settings."""
+        return cls()
+
+    def to_dict(self) -> dict[str, str]:
+        """Convert to dictionary for backward compatibility."""
+        return {'original': self.original, 'target': self.target, 'hint': self.hint}
+
+    @classmethod
+    def from_dict(cls, data: dict[str, str]) -> 'SpreadsheetLanguages':
+        """Create from dictionary for backward compatibility."""
+        return cls(
+            original=data.get('original', 'ru'),
+            target=data.get('target', 'pt'),
+            hint=data.get('hint', 'en'),
+        )
+
+    def is_valid_configuration(self) -> bool:
+        """Check if the language configuration is valid (no duplicates, proper codes)."""
+        # Check that all languages are different (optional validation)
+        languages = [self.original, self.target, self.hint]
+        return len(set(languages)) == len(languages)  # No duplicates
+
+    def update_from_dict(self, updates: dict[str, str]) -> 'SpreadsheetLanguages':
+        """Create a new instance with updated values from dictionary."""
+        current_dict = self.to_dict()
+        current_dict.update(updates)
+        return self.from_dict(current_dict)
+
+
+class UserSpreadsheetProperty(BaseModel):
+    """
+    Properties for UserSpreadsheet configuration.
+
+    Stores language settings and other user-specific spreadsheet configurations.
+    """
+
+    language: SpreadsheetLanguages = Field(default_factory=SpreadsheetLanguages.get_default)
+
+    def to_db_string(self) -> str:
+        """Convert properties to JSON string for database storage."""
+        return json.dumps(self.model_dump())
+
+    @classmethod
+    def from_db_string(cls, value: str | None) -> 'UserSpreadsheetProperty':
+        """Create UserSpreadsheetProperty from database JSON string."""
+        if not value:
+            return cls()  # Return default values
+
+        try:
+            data = json.loads(value)
+
+            # Handle backward compatibility - if language is a dict, convert it
+            if 'language' in data and isinstance(data['language'], dict):
+                data['language'] = SpreadsheetLanguages.from_dict(data['language'])
+
+            return cls(**data)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            # If JSON parsing fails, return default values
+            return cls()
+
+    @classmethod
+    def get_default(cls) -> 'UserSpreadsheetProperty':
+        """Get default properties."""
+        return cls()
+
+    def get_language_dict(self) -> dict[str, str]:
+        """Get language settings as dictionary for backward compatibility."""
+        return self.language.to_dict()
+
+    def set_language_dict(self, language_dict: dict[str, str]) -> None:
+        """Set language settings from dictionary for backward compatibility."""
+        self.language = SpreadsheetLanguages.from_dict(language_dict)
