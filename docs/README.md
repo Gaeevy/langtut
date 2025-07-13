@@ -24,16 +24,6 @@ Comprehensive guide to the listening mode feature - sequential audio playback wi
 - Infinite loop playback with card reshuffling
 - Session management and error handling
 
-### [User Properties System](./user-properties.md)
-Documentation of the user properties system for language settings and configuration.
-
-**Topics covered:**
-- Database schema and Pydantic models
-- Language configuration (original, target, hint)
-- API endpoints for settings management
-- Database migration and backward compatibility
-- UI integration and validation
-
 ### [TTS (Text-to-Speech) System](./tts-system.md)
 Complete documentation of the Portuguese TTS system with Google Cloud integration.
 
