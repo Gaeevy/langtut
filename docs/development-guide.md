@@ -267,20 +267,6 @@ SKIP=ruff git commit
 
 ## Database Management
 
-### Migrations
-The application includes automatic database migrations:
-```python
-def migrate_database():
-    """Add new columns if they don't exist."""
-    inspector = db.inspect(db.engine)
-    columns = [col['name'] for col in inspector.get_columns('table_name')]
-
-    if 'new_column' not in columns:
-        with db.engine.connect() as connection:
-            connection.execute(db.text("ALTER TABLE table_name ADD COLUMN new_column TEXT"))
-            connection.commit()
-```
-
 ### Database Console
 ```bash
 # Access database directly
@@ -452,11 +438,11 @@ except Exception as e:
 7. Write tests
 
 ### Database Schema Changes
-1. Add migration function
-2. Update SQLAlchemy models
-3. Test migration locally
-4. Deploy to production
-5. Verify migration success
+1. Update SQLAlchemy models in `src/database.py`
+2. Test schema changes locally
+3. Deploy to production
+4. Verify schema is correct
+5. Update documentation if needed
 
 ## Troubleshooting
 
