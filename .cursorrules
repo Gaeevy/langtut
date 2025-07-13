@@ -41,6 +41,7 @@ src/                           # Main application module
 ```
 templates/                    # Jinja2 HTML templates
 static/                      # Frontend assets (CSS, JS, PWA files)
+docs/                        # Comprehensive documentation
 ```
 
 ### Configuration & Dependencies
@@ -54,13 +55,23 @@ settings.toml              # Main configuration (non-sensitive)
 
 ## Development Rules
 
-### 1. File Organization Rules
+### 1. Development Environment Rules
+- **ALWAYS use Poetry** - Never use direct `python` commands
+  - ✅ `poetry run python -c "from src.config import config; print(config.DEBUG)"`
+  - ✅ `poetry run pytest`
+  - ✅ `poetry run gunicorn --bind 0.0.0.0:8080 --reload app:app`
+  - ❌ `python app.py`
+  - ❌ `python -m pytest`
+- **POETRY for all development tasks** - Testing, running, debugging
+- **VIRTUAL ENVIRONMENT** - Poetry manages dependencies and isolation automatically
+
+### 2. File Organization Rules
 - **NEVER add code to monolithic files** - Use blueprint pattern
 - **FEATURE-BASED blueprints**: Each blueprint handles one functional area
 - **BLUEPRINT registration** - Centralized in `routes/__init__.py`
 - **KEEP services focused** - One responsibility per service file
 
-### 2. Code Quality Rules
+### 3. Code Quality Rules
 - **TYPE HINTS required** - Add type hints to all functions
 - **PYDANTIC models** for all data validation
 - **ERROR HANDLING** - Comprehensive try/catch blocks with logging
@@ -68,7 +79,7 @@ settings.toml              # Main configuration (non-sensitive)
 - **NO direct database calls** in routes - use service layer
 - **LOGGING** required for all external API calls
 
-### 3. Session Management Rules
+### 4. Session Management Rules
 - **USE SessionManager** - Never access `session[]` directly
 - **IMPORT PATTERN**: `from src.session_manager import SessionManager as sm, SessionKeys as sk`
 - **USAGE PATTERNS**:
@@ -83,25 +94,25 @@ settings.toml              # Main configuration (non-sensitive)
   - `learning.*` - Cards, progress, answers, review state
   - `test.*` - Development/debugging
 
-### 4. Data Persistence Rules
+### 5. Data Persistence Rules
 - **DUAL-STORE ARCHITECTURE**:
   - **Google Sheets**: Content management (cards, vocabulary, learning material)
   - **SQLite**: Application data (users, sessions, authentication state)
 - **NEVER raw SQL** - Use SQLAlchemy ORM for application data
 - **USE Google Sheets API** for content data with proper error handling
 
-### 5. Configuration Rules
+### 6. Configuration Rules
 - **NEVER hardcode credentials** - Use settings.toml/.secrets.toml
 - **ENVIRONMENT variables** take precedence over file config
 - **VALIDATE configuration** on app startup
 
-### 6. Security Rules
+### 7. Security Rules
 - **VALIDATE all inputs** - Use Pydantic validation
 - **SANITIZE outputs** to prevent XSS
 - **RATE LIMITING** on API endpoints
 - **AUDIT logs** for sensitive operations
 
-### 7. Git Commit Rules
+### 8. Git Commit Rules
 - **CONCISE commit messages** - Maximum 200 characters total
 - **FORMAT**: `type: brief description (max 150 chars)`
 - **TYPES**: feat, fix, refactor, docs, style, test, chore
@@ -144,41 +155,44 @@ return redirect(url_for('flashcard.index'))
 return redirect(url_for('auth.auth'))
 ```
 
-## Current Route Organization
+## Route Organization
 
-### Authentication Routes (`auth.py`)
-- `/auth` - Initiate OAuth flow
-- `/oauth2callback` - OAuth callback handler
-- `/clear` - Clear credentials
+The application uses 6 main blueprints for route organization:
 
-### Core Flashcard Routes (`flashcard.py`)
-- `/` - Homepage/flashcard selection
-- `/start/<tab_name>` - Start learning session
-- `/card` - Display current flashcard
-- `/answer` - Process user's answer
-- `/feedback/<correct>` - Show answer feedback
-- `/next` - Move to next card
-- `/results` - Session results
-- `/end-session` - End session early
+- **Authentication** (`auth.py`) - OAuth flow, callbacks, credential management
+- **Core Flashcard** (`flashcard.py`) - Learning sessions, card display, feedback
+- **Settings** (`settings.py`) - User preferences, spreadsheet configuration
+- **API** (`api.py`) - TTS endpoints, card management, language settings
+- **Admin** (`admin.py`) - Database administration, user management
+- **Test** (`test.py`) - Development testing and debugging
 
-### Settings Routes (`settings.py`)
-- `/settings` - User settings interface
-- `/validate-spreadsheet` - Validate Google Sheets access
-- `/set-spreadsheet` - Set user's active spreadsheet
-- `/reset-spreadsheet` - Reset to default spreadsheet
+*For detailed route mappings, see [docs/architecture.md](docs/architecture.md)*
 
-### API Routes (`api.py`)
-- `/api/tts` - Text-to-Speech API
-- `/api/cards` - Card management API
-- `/api/stats` - Statistics API
+## Development Workflow
 
-### Admin Routes (`admin.py`)
-- `/admin` - Admin interface
-- `/admin/cards` - Card management
-- `/admin/users` - User management
+### Running the Application
+```bash
+# Start development server (recommended)
+poetry run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
 
-### Testing Routes (`test.py`)
-- `/test` - Testing interface
+# Run tests
+poetry run pytest
+
+# Run pre-commit hooks
+poetry run pre-commit run --all-files
+```
+
+### Testing and Debugging
+```bash
+# Test specific functionality
+poetry run python -c "from src.tts_service import tts_service; print(tts_service.generate_audio('test'))"
+
+# Check configuration
+poetry run python -c "from src.config import config; print(config.DEBUG)"
+
+# Test database connection
+poetry run python -c "from src.database import db; print(db.engine.execute('SELECT 1').fetchone())"
+```
 
 ## Pre-commit Configuration
 The project uses automated code quality checks via pre-commit hooks:
@@ -186,3 +200,11 @@ The project uses automated code quality checks via pre-commit hooks:
 - **File checks**: Trailing whitespace, JSON/YAML/TOML validation
 - **Security**: Bandit security scanning, private key detection
 - **Poetry export**: Auto-sync pyproject.toml → requirements.txt
+
+## Documentation
+Comprehensive documentation is available in the `docs/` directory:
+- **Architecture & Configuration** - System design and setup
+- **Feature Documentation** - Listening mode, TTS, user properties
+- **Development Guide** - Setup, testing, deployment procedures
+
+*Always refer to current documentation for detailed implementation guidelines.*
