@@ -13,7 +13,7 @@ from gspread.spreadsheet import Spreadsheet
 from gspread.worksheet import Worksheet
 
 from src.auth import get_credentials
-from src.config import SPREADSHEET_ID
+from src.config import config
 from src.models import NEVER_SHOWN, Card, CardSet, Levels
 from src.utils import format_timestamp, parse_timestamp
 
@@ -128,7 +128,7 @@ def get_spreadsheet(spreadsheet_id: str = None) -> Spreadsheet | None:
         return None
 
     # Use provided ID or fall back to default
-    sheet_id = spreadsheet_id or SPREADSHEET_ID
+    sheet_id = spreadsheet_id or config.SPREADSHEET_ID
 
     try:
         gc = gspread.authorize(creds)

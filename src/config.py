@@ -1,13 +1,20 @@
+"""
+Unified configuration management for Language Learning Flashcard App.
+
+Single source of truth for all configuration with environment-aware settings
+and dual credential handling (local files vs production environment variables).
+"""
+
 import json
 import logging
 import os
 import sys
 import tempfile
+from pathlib import Path
 
 from dynaconf import Dynaconf
 
 
-# Configure logging
 def setup_logging():
     """Configure logging for both local development and Railway deployment."""
     # Create logger
@@ -39,101 +46,158 @@ def setup_logging():
     return logger
 
 
+def get_environment() -> str:
+    """
+    Environment detection using Railway's automatic variables.
+
+    Returns:
+        str: 'testing', 'production', or 'local'
+    """
+    # Testing environment
+    if (
+        os.getenv('PYTEST_CURRENT_TEST') is not None
+        or os.getenv('ENVIRONMENT') == 'testing'
+        or 'pytest' in sys.modules
+    ):
+        return 'testing'
+
+    # Production environment - Railway sets RAILWAY_ENVIRONMENT automatically
+    if os.getenv('RAILWAY_ENVIRONMENT') == 'production':
+        return 'production'
+
+    # Default to local development
+    return 'local'
+
+
+def get_credentials_file(
+    settings_obj, setting_key: str, env_var_key: str, default_file: str
+) -> str | None:
+    """
+    Get credentials file path with dual handling:
+    - Local: Use file from settings
+    - Production: Create temp file from environment variable
+
+    Args:
+        settings_obj: Dynaconf settings object
+        setting_key: Key in settings.toml for local file path
+        env_var_key: Environment variable key for production JSON
+        default_file: Default file name if setting not found
+
+    Returns:
+        str: Path to credentials file, or None if not available
+    """
+    # Check for environment variable (production)
+    env_var_content = settings_obj.get(env_var_key, None)
+
+    if env_var_content:
+        # Production: Create temporary file from env var
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
+                if isinstance(env_var_content, str):
+                    credentials_data = json.loads(env_var_content)
+                else:
+                    credentials_data = env_var_content
+
+                json.dump(credentials_data, temp_file)
+                return temp_file.name
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.error(f'Error parsing {env_var_key}: {e}')
+            return None
+    else:
+        # Local: Use file from settings
+        file_path = settings_obj.get(setting_key, default_file)
+        if Path(file_path).exists():
+            return file_path
+        logger.warning(f'Credentials file not found: {file_path}')
+        return None
+
+
 # Initialize logging
 logger = setup_logging()
+
+# Load configuration based on environment
+environment = get_environment()
+logger.info(f'Detected environment: {environment}')
 
 settings = Dynaconf(
     envvar_prefix='LANGTUT',
     settings_files=['settings.toml', '.secrets.toml'],
     environments=True,
+    env=environment,
     load_dotenv=True,
 )
 
-# Google Sheets API settings
-SPREADSHEET_ID = settings.get('SPREADSHEET_ID', '15_PsHfMb440wtUgZ0d1aJmu5YIXoo9JKytlJINxOV8Q')
+
+class Config:
+    """
+    Unified configuration object.
+
+    Single source of truth for all application settings with environment-aware
+    configuration and dual credential handling.
+    """
+
+    # Environment
+    ENVIRONMENT = environment
+    DEBUG = settings.get('debug', False)
+
+    # Core app
+    SECRET_KEY = settings.get('SECRET_KEY', None)
+    MAX_CARDS_PER_SESSION = settings.get('max_cards_per_session', 10)
+    SPREADSHEET_ID = settings.get('spreadsheet_id')
+
+    # Database
+    DATABASE_PATH = settings.get('database_path')
+    SQLALCHEMY_TRACK_MODIFICATIONS = settings.get('sqlalchemy_track_modifications', False)
+
+    # Flask Session
+    SESSION_TYPE = settings.get('session_type', 'filesystem')
+    SESSION_PERMANENT = settings.get('session_permanent', False)
+    SESSION_USE_SIGNER = settings.get('session_use_signer', True)
+    SESSION_COOKIE_SECURE = settings.get('session_cookie_secure', False)
+    SESSION_COOKIE_HTTPONLY = settings.get('session_cookie_httponly', True)
+    SESSION_COOKIE_SAMESITE = settings.get('session_cookie_samesite', 'Lax')
+
+    # Flask JSON
+    JSON_AS_ASCII = settings.get('json_as_ascii', False)
+    JSONIFY_MIMETYPE = settings.get('jsonify_mimetype', 'application/json; charset=utf-8')
+
+    # Google OAuth - Dual credential handling
+    CLIENT_SECRETS_FILE = get_credentials_file(
+        settings, 'client_secrets_file', 'CLIENT_SECRETS_JSON', 'client_secret.json'
+    )
+    SCOPES = settings.get('scopes', [])
+    API_SERVICE_NAME = settings.get('api_service_name', 'sheets')
+    API_VERSION = settings.get('api_version', 'v4')
+
+    # Google TTS - Dual credential handling
+    TTS_ENABLED = settings.get('tts_enabled', True)
+    TTS_LANGUAGE_CODE = settings.get('tts_language_code', 'pt-PT')
+    TTS_VOICE_NAME = settings.get('tts_voice_name', 'pt-PT-Standard-A')
+    TTS_AUDIO_ENCODING = settings.get('tts_audio_encoding', 'MP3')
+    GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE = get_credentials_file(
+        settings,
+        'google_cloud_service_account_file',
+        'GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON',
+        'google-cloud-service-account.json',
+    )
+    GCS_AUDIO_BUCKET = settings.get('gcs_audio_bucket', 'langtut-tts')
+
+    # Testing mocks
+    TESTING_MOCK_OAUTH = (
+        settings.get('mock.oauth_enabled', False) if environment == 'testing' else False
+    )
+    TESTING_MOCK_SHEETS = (
+        settings.get('mock.sheets_enabled', False) if environment == 'testing' else False
+    )
 
 
-# Google OAuth2 settings - handle both file and environment variable
-def get_client_secrets_file():
-    """Get the client secrets file path, creating from env var if needed"""
-    # Check if we have client secrets as environment variable (production)
-    client_secrets_json = settings.get('CLIENT_SECRETS_JSON', None)
+# Export single config object
+config = Config()
 
-    if client_secrets_json:
-        # Create a temporary file with the client secrets
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
-            if isinstance(client_secrets_json, str):
-                # Parse JSON string if it's a string
-                client_secrets_data = json.loads(client_secrets_json)
-            else:
-                client_secrets_data = client_secrets_json
-
-            json.dump(client_secrets_data, temp_file)
-            return temp_file.name
-    else:
-        # Use local file (development)
-        return settings.get('CLIENT_SECRETS_FILE', 'client_secret.json')
-
-
-CLIENT_SECRETS_FILE = get_client_secrets_file()
-SCOPES = settings.get(
-    'SCOPES',
-    [
-        'https://www.googleapis.com/auth/spreadsheets',
-        'https://www.googleapis.com/auth/userinfo.email',
-        'https://www.googleapis.com/auth/userinfo.profile',
-    ],
-)
-API_SERVICE_NAME = settings.get('API_SERVICE_NAME', 'sheets')
-API_VERSION = settings.get('API_VERSION', 'v4')
-
-
-# Google Cloud Text-to-Speech settings
-def get_google_cloud_credentials():
-    """Get Google Cloud service account credentials"""
-    # Check for service account key as environment variable (production)
-    service_account_json = settings.get('GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON', None)
-
-    if service_account_json:
-        # Create a temporary file with the service account key
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
-            if isinstance(service_account_json, str):
-                # Parse JSON string if it's a string
-                service_account_data = json.loads(service_account_json)
-            else:
-                service_account_data = service_account_json
-
-            json.dump(service_account_data, temp_file)
-            return temp_file.name
-    else:
-        # Use local file (development)
-        local_file = settings.get(
-            'GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE', 'google-cloud-service-account.json'
-        )
-        if os.path.exists(local_file):
-            return local_file
-        return None
-
-
-GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE = get_google_cloud_credentials()
-TTS_ENABLED = settings.get('TTS_ENABLED', True)  # Enable/disable TTS functionality
-TTS_LANGUAGE_CODE = settings.get('TTS_LANGUAGE_CODE', 'pt-PT')  # European Portuguese
-TTS_VOICE_NAME = settings.get('TTS_VOICE_NAME', 'pt-PT-Standard-A')  # Female voice
-TTS_AUDIO_ENCODING = settings.get('TTS_AUDIO_ENCODING', 'MP3')  # Audio format
-
-# Application settings
-MAX_CARDS_PER_SESSION = settings.get(
-    'MAX_CARDS_PER_SESSION', 10
-)  # Maximum number of cards per learning session
-
-# Flask settings
-SECRET_KEY = settings.get('SECRET_KEY', None)  # Will use random key if not set
-FLASK_DEBUG = settings.get('DEBUG', False)
-SESSION_TYPE = settings.get('SESSION_TYPE', 'filesystem')
-SESSION_PERMANENT = settings.get('SESSION_PERMANENT', False)
-SESSION_USE_SIGNER = settings.get('SESSION_USE_SIGNER', True)
-SESSION_COOKIE_SECURE = settings.get('SESSION_COOKIE_SECURE', False)  # Set to True in production
-SESSION_COOKIE_HTTPONLY = settings.get('SESSION_COOKIE_HTTPONLY', True)
-SESSION_COOKIE_SAMESITE = settings.get('SESSION_COOKIE_SAMESITE', 'Lax')
-JSON_AS_ASCII = settings.get('JSON_AS_ASCII', False)
-JSONIFY_MIMETYPE = settings.get('JSONIFY_MIMETYPE', 'application/json; charset=utf-8')
+# Log configuration status
+logger.info(f'Configuration loaded for {environment} environment')
+logger.info(f'Debug mode: {config.DEBUG}')
+logger.info(f'Database path: {config.DATABASE_PATH}')
+logger.info(f'TTS enabled: {config.TTS_ENABLED}')
+logger.info(f'OAuth credentials available: {config.CLIENT_SECRETS_FILE is not None}')
+logger.info(f'TTS credentials available: {config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE is not None}')

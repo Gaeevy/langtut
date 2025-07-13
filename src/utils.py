@@ -7,7 +7,7 @@ This module provides general purpose utilities for the application.
 import json
 from datetime import datetime
 
-from src.config import CLIENT_SECRETS_FILE
+from src.config import config
 
 
 def load_redirect_uris():
@@ -15,16 +15,13 @@ def load_redirect_uris():
     Load registered redirect URIs from client_secret.json file.
 
     Returns:
-        List of registered redirect URIs or empty list if not found
+        list: List of registered redirect URIs
     """
     try:
-        with open(CLIENT_SECRETS_FILE) as f:
-            client_secret_data = json.load(f)
-            uris = client_secret_data.get('web', {}).get('redirect_uris', [])
-            print(f'Registered redirect URIs: {uris}')
-            return uris
-    except Exception as e:
-        print(f'Error loading redirect URIs from client_secret.json: {e}')
+        with open(config.CLIENT_SECRETS_FILE) as f:
+            client_secrets = json.load(f)
+            return client_secrets['web']['redirect_uris']
+    except (FileNotFoundError, KeyError, json.JSONDecodeError):
         return []
 
 

@@ -9,7 +9,7 @@ from typing import Any
 
 from flask import Blueprint, jsonify, render_template
 
-from src.config import SPREADSHEET_ID
+from src.config import config
 from src.database import UserSpreadsheet, db
 from src.gsheet import read_all_card_sets
 from src.tts_service import TTSService
@@ -24,11 +24,14 @@ tts_service = TTSService()
 
 @test_bp.route('/test')
 def test() -> dict[str, Any]:
-    """Test basic functionality and return system status."""
+    """Test endpoint for checking application functionality."""
     try:
+        # Test reading card sets
+        card_sets = read_all_card_sets(config.SPREADSHEET_ID)
+
         # Test Google Sheets access
         try:
-            card_sets = read_all_card_sets(SPREADSHEET_ID)
+            card_sets = read_all_card_sets(config.SPREADSHEET_ID)
             sheets_status = {
                 'working': True,
                 'card_sets_count': len(card_sets),
@@ -49,16 +52,36 @@ def test() -> dict[str, Any]:
         except Exception as e:
             tts_status = {'configured': False, 'synthesis_test': False, 'error': str(e)}
 
-        return jsonify(
-            {
-                'success': True,
-                'timestamp': str(datetime.now()),
-                'services': {'google_sheets': sheets_status, 'text_to_speech': tts_status},
-            }
-        )
+        # Count total cards
+        total_cards = sum(len(cs.cards) for cs in card_sets)
+
+        # Create test data
+        test_data = {
+            'status': 'success',
+            'sheets_status': sheets_status,
+            'tts_status': tts_status,
+            'timestamp': datetime.now().isoformat(),
+            'card_sets': len(card_sets),
+            'total_cards': total_cards,
+            'spreadsheet_id': config.SPREADSHEET_ID,
+            'environment': 'test',
+            'health_check': True,
+        }
+
+        # Return test data
+        return jsonify(test_data)
 
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        # Error handling
+        return jsonify(
+            {
+                'status': 'error',
+                'error': str(e),
+                'timestamp': datetime.now().isoformat(),
+                'environment': 'test',
+                'health_check': False,
+            }
+        )
 
 
 @test_bp.route('/test-tts')
