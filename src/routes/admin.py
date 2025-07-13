@@ -242,7 +242,7 @@ def volume_check() -> dict[str, Any]:
 
 @admin_bp.route('/table-info')
 def table_info() -> dict[str, Any]:
-    """Get UserSpreadsheet table schema information (Phase 1 verification)"""
+    """Get UserSpreadsheet table schema information."""
     try:
         inspector = db.inspect(db.engine)
         columns = inspector.get_columns('user_spreadsheets')
