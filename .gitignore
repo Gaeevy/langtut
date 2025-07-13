@@ -2,7 +2,7 @@
 flask_session/
 
 # static_files
-static_files/
+misc/static_files/
 
 # Python bytecode
 __pycache__/

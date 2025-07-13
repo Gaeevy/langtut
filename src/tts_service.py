@@ -13,14 +13,7 @@ import os
 from google.cloud import storage, texttospeech
 from google.oauth2 import service_account
 
-from src.config import (
-    GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE,
-    TTS_AUDIO_ENCODING,
-    TTS_ENABLED,
-    TTS_LANGUAGE_CODE,
-    TTS_VOICE_NAME,
-    settings,
-)
+from src.config import config, settings
 
 # Create logger
 logger = logging.getLogger(__name__)
@@ -33,7 +26,7 @@ class TTSService:
         self.tts_client = None
         self.storage_client = None
         self.bucket = None
-        self.enabled = TTS_ENABLED
+        self.enabled = config.TTS_ENABLED
         self._initialize_clients()
 
     def _initialize_clients(self):
@@ -42,21 +35,23 @@ class TTSService:
             logger.info('TTS is disabled in configuration')
             return
 
-        logger.info(f'Checking for service account file: {GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE}')
         logger.info(
-            f'File exists: {GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE and os.path.exists(GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE) if GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE else False}'
+            f'Checking for service account file: {config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE}'
+        )
+        logger.info(
+            f'File exists: {config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE and os.path.exists(config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE) if config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE else False}'
         )
 
         try:
-            if GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE and os.path.exists(
-                GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE
+            if config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE and os.path.exists(
+                config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE
             ):
                 # Use service account file
                 logger.info(
-                    f'Loading service account from file: {GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE}'
+                    f'Loading service account from file: {config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE}'
                 )
                 credentials = service_account.Credentials.from_service_account_file(
-                    GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE
+                    config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE
                 )
                 self.tts_client = texttospeech.TextToSpeechClient(credentials=credentials)
                 self.storage_client = storage.Client(credentials=credentials)
@@ -140,12 +135,12 @@ class TTSService:
 
             # Build the voice request
             voice = texttospeech.VoiceSelectionParams(
-                language_code=TTS_LANGUAGE_CODE, name=voice_name or TTS_VOICE_NAME
+                language_code=config.TTS_LANGUAGE_CODE, name=voice_name or config.TTS_VOICE_NAME
             )
 
             # Select the type of audio file you want returned
             audio_config = texttospeech.AudioConfig(
-                audio_encoding=getattr(texttospeech.AudioEncoding, TTS_AUDIO_ENCODING)
+                audio_encoding=getattr(texttospeech.AudioEncoding, config.TTS_AUDIO_ENCODING)
             )
 
             # Perform the text-to-speech request
@@ -186,8 +181,8 @@ class TTSService:
         Returns:
             Cache key string (MD5 hash)
         """
-        voice = voice_name or TTS_VOICE_NAME
-        cache_string = f'{text.strip()}_{voice}_{TTS_LANGUAGE_CODE}'
+        voice = voice_name or config.TTS_VOICE_NAME
+        cache_string = f'{text.strip()}_{voice}_{config.TTS_LANGUAGE_CODE}'
         return hashlib.md5(cache_string.encode('utf-8'), usedforsecurity=False).hexdigest()
 
     def get_gcs_path(
@@ -361,10 +356,10 @@ class TTSService:
         return {
             'source': getattr(self, 'credential_source', 'unknown'),
             'available': self.is_available(),
-            'service_account_file_path': GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE,
-            'service_account_file_exists': GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE
-            and os.path.exists(GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE)
-            if GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE
+            'service_account_file_path': config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE,
+            'service_account_file_exists': config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE
+            and os.path.exists(config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE)
+            if config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE
             else False,
         }
 

@@ -9,7 +9,7 @@ import logging
 
 from flask import Blueprint, redirect, render_template, request, session, url_for
 
-from src.config import MAX_CARDS_PER_SESSION
+from src.config import config
 from src.gsheet import read_all_card_sets, read_card_set, update_spreadsheet
 from src.models import Card
 from src.session_manager import SessionKeys as sk
@@ -143,10 +143,12 @@ def start_learning(tab_name: str):
     try:
         # Read cards from the specified tab
         card_set = read_card_set(worksheet_name=tab_name, spreadsheet_id=user_spreadsheet_id)
-        cards = card_set.get_cards_to_review(limit=MAX_CARDS_PER_SESSION, ignore_unshown=False)
+        cards = card_set.get_cards_to_review(
+            limit=config.MAX_CARDS_PER_SESSION, ignore_unshown=False
+        )
 
         logger.info(f'Loaded {len(cards)} cards from tab "{tab_name}" for review')
-        logger.info(f'Max cards per session: {MAX_CARDS_PER_SESSION}')
+        logger.info(f'Max cards per session: {config.MAX_CARDS_PER_SESSION}')
 
         # Log card details
         for i, card in enumerate(cards[:3]):  # Log first 3 cards
