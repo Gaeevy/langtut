@@ -191,17 +191,142 @@ def start_learning(tab_name: str):
     return redirect(url_for('flashcard.show_card'))
 
 
-@flashcard_bp.route('/card')
-def show_card():
-    """Display the current flashcard."""
-    logger.info('=== SHOW CARD ROUTE ===')
+@flashcard_bp.route('/review/<tab_name>')
+def start_review(tab_name: str):
+    """Start a review session with ALL cards from the specified tab."""
+    logger.info('=== START REVIEW ROUTE ===')
+    logger.info(f'Tab name: {tab_name}')
+    logger.info(f'Request method: {request.method}')
+    logger.info(f'Remote addr: {request.remote_addr}')
 
-    if not sm.has(sk.LEARNING_CARDS) or not sm.has(sk.LEARNING_CURRENT_INDEX):
-        logger.warning('Cards or current_index not in session, redirecting to index')
+    # Get user's active spreadsheet
+    user_spreadsheet_id = get_user_spreadsheet_id(session)
+    logger.info(f'User spreadsheet ID: {user_spreadsheet_id}')
+
+    try:
+        # Read ALL cards from the specified tab (no filtering)
+        card_set = read_card_set(worksheet_name=tab_name, spreadsheet_id=user_spreadsheet_id)
+        cards = card_set.cards  # Get all cards, not just cards_to_review
+
+        logger.info(f'Loaded {len(cards)} cards from tab "{tab_name}" for review')
+
+        # Log card details
+        for i, card in enumerate(cards[:3]):  # Log first 3 cards
+            logger.info(
+                f'  Card {i + 1}: {card.word} -> {card.translation} (Level {card.level.value})'
+            )
+        if len(cards) > 3:
+            logger.info(f'  ... and {len(cards) - 3} more cards')
+
+        # Store cards in session (converted to dict for JSON serialization)
+        cards_data = []
+        for card in cards:
+            card_dict = card.model_dump()
+            card_dict['last_shown'] = format_timestamp(card.last_shown)
+            cards_data.append(card_dict)
+
+        sm.set(sk.REVIEW_CARDS, cards_data)
+        sm.set(sk.REVIEW_CURRENT_INDEX, 0)
+        sm.set(sk.REVIEW_ACTIVE_TAB, tab_name)
+        sm.set(sk.REVIEW_SHEET_GID, card_set.gid)
+
+        logger.info(f'Review session initialized: {len(cards)} cards, starting at index 0')
+        logger.info(f'Active review tab set to: {tab_name}')
+
+    except Exception as e:
+        logger.error(f'Error starting review session for tab "{tab_name}": {e}')
         return redirect(url_for('flashcard.index'))
 
-    cards = sm.get(sk.LEARNING_CARDS)
-    index = sm.get(sk.LEARNING_CURRENT_INDEX)
+    # Redirect to the first card in review mode
+    return redirect(url_for('flashcard.show_card', mode='review'))
+
+
+@flashcard_bp.route('/review/nav/<direction>')
+def navigate_review(direction: str):
+    """Navigate between cards in review mode with wraparound."""
+    logger.info(f'=== REVIEW NAVIGATION: {direction} ===')
+
+    if not sm.has(sk.REVIEW_CARDS) or not sm.has(sk.REVIEW_CURRENT_INDEX):
+        logger.warning('Review cards or current_index not in session, redirecting to index')
+        return redirect(url_for('flashcard.index'))
+
+    cards = sm.get(sk.REVIEW_CARDS)
+    current_index = sm.get(sk.REVIEW_CURRENT_INDEX)
+    total_cards = len(cards)
+
+    if direction == 'next':
+        new_index = (current_index + 1) % total_cards  # Wraparound to 0 after last card
+    elif direction == 'prev':
+        new_index = (current_index - 1) % total_cards  # Wraparound to last card before first
+    else:
+        logger.error(f'Invalid navigation direction: {direction}')
+        return redirect(url_for('flashcard.show_card', mode='review'))
+
+    sm.set(sk.REVIEW_CURRENT_INDEX, new_index)
+    logger.info(f'Review navigation: {current_index} -> {new_index} ({direction})')
+
+    return redirect(url_for('flashcard.show_card', mode='review'))
+
+
+@flashcard_bp.route('/card')
+@flashcard_bp.route('/card/<mode>')
+def show_card(mode='study'):
+    """Display the current flashcard."""
+    logger.info('=== SHOW CARD ROUTE ===')
+    logger.info(f'Mode: {mode}')
+
+    # Determine session keys based on mode
+    if mode == 'review':
+        cards_key = sk.REVIEW_CARDS
+        index_key = sk.REVIEW_CURRENT_INDEX
+        tab_key = sk.REVIEW_ACTIVE_TAB
+        gid_key = sk.REVIEW_SHEET_GID
+    else:  # study mode
+        cards_key = sk.LEARNING_CARDS
+        index_key = sk.LEARNING_CURRENT_INDEX
+        tab_key = sk.LEARNING_ACTIVE_TAB
+        gid_key = sk.LEARNING_SHEET_GID
+
+    if not sm.has(cards_key) or not sm.has(index_key):
+        logger.warning(
+            f'Cards or current_index not in session for {mode} mode, redirecting to index'
+        )
+        return redirect(url_for('flashcard.index'))
+
+    cards = sm.get(cards_key)
+    index = sm.get(index_key)
+
+    # Review mode: simple navigation without complex logic
+    if mode == 'review':
+        if index >= len(cards):
+            logger.warning(f'Review index {index} out of bounds, resetting to 0')
+            sm.set(index_key, 0)
+            index = 0
+
+        current_card = cards[index]
+        current_card['is_review'] = False  # Not the same as study review mode
+
+        logger.info(
+            f'Showing review card {index + 1}/{len(cards)}: {current_card["word"]} -> {current_card["translation"]}'
+        )
+
+        user_spreadsheet_id = get_user_spreadsheet_id(session)
+        active_tab = sm.get(tab_key, 'Sheet1')
+        sheet_gid = sm.get(gid_key)
+
+        return render_template(
+            'card.html',
+            card=current_card,
+            index=index,
+            total=len(cards),
+            reviewing=False,  # This is review mode, not study review
+            mode=mode,
+            user_spreadsheet_id=user_spreadsheet_id,
+            active_tab=active_tab,
+            sheet_gid=sheet_gid,
+        )
+
+    # Study mode: existing logic
     reviewing = sm.get(sk.LEARNING_REVIEWING_INCORRECT, False)
 
     logger.info(f'Current index: {index}, Total cards: {len(cards)}, Reviewing: {reviewing}')
@@ -258,6 +383,7 @@ def show_card():
         index=index,
         total=len(sm.get(sk.LEARNING_INCORRECT_CARDS)) if reviewing else len(cards),
         reviewing=reviewing,
+        mode=mode,
         user_spreadsheet_id=user_spreadsheet_id,
         active_tab=active_tab,
         sheet_gid=sheet_gid,
@@ -391,11 +517,52 @@ def process_answer():
 @flashcard_bp.route('/feedback/<correct>')
 def show_feedback(correct: str):
     """Show feedback after answering a card."""
-    if not sm.has(sk.LEARNING_CARDS) or not sm.has(sk.LEARNING_CURRENT_INDEX):
+    return show_feedback_with_mode(correct, 'study')
+
+
+@flashcard_bp.route('/feedback/<correct>/<mode>')
+def show_feedback_with_mode(correct: str, mode: str = 'study'):
+    """Show feedback after answering a card or flip view in review mode."""
+
+    # Determine session keys based on mode
+    if mode == 'review':
+        cards_key = sk.REVIEW_CARDS
+        index_key = sk.REVIEW_CURRENT_INDEX
+        tab_key = sk.REVIEW_ACTIVE_TAB
+        gid_key = sk.REVIEW_SHEET_GID
+    else:  # study mode
+        cards_key = sk.LEARNING_CARDS
+        index_key = sk.LEARNING_CURRENT_INDEX
+        tab_key = sk.LEARNING_ACTIVE_TAB
+        gid_key = sk.LEARNING_SHEET_GID
+
+    if not sm.has(cards_key) or not sm.has(index_key):
         return redirect(url_for('flashcard.index'))
 
-    cards = sm.get(sk.LEARNING_CARDS)
-    index = sm.get(sk.LEARNING_CURRENT_INDEX)
+    cards = sm.get(cards_key)
+    index = sm.get(index_key)
+
+    # Review mode: simple card display
+    if mode == 'review':
+        current_card = cards[index]
+
+        return render_template(
+            'feedback.html',
+            card=current_card,
+            index=index,
+            total=len(cards),
+            correct=True,  # Not relevant for review mode
+            user_answer='',  # Not relevant for review mode
+            reviewing=False,
+            card_index=index,
+            level_change=None,
+            mode=mode,
+            user_spreadsheet_id=get_user_spreadsheet_id(session),
+            active_tab=sm.get(tab_key, 'Sheet1'),
+            sheet_gid=sm.get(gid_key),
+        )
+
+    # Study mode: existing logic
     reviewing = sm.get(sk.LEARNING_REVIEWING_INCORRECT, False)
 
     # Get the current card
@@ -421,6 +588,7 @@ def show_feedback(correct: str):
         reviewing=reviewing,
         card_index=index,
         level_change=level_change,
+        mode=mode,
         user_spreadsheet_id=get_user_spreadsheet_id(session),
         active_tab=sm.get(sk.LEARNING_ACTIVE_TAB, 'Sheet1'),
         # Use cached sheet GID instead of making API call
