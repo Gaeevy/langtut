@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Flashcard{% endblock %}
+{% block title %}{% if mode == 'review' %}Review{% else %}Flashcard{% endif %}{% endblock %}
 
 {% block content %}
 <div class="text-center mb-4">
@@ -10,33 +10,52 @@
     </div>
     {% endif %}
 
+    <!-- Progress bar - shown for both study and review modes -->
     <div class="progress-container">
         <div class="progress" style="height: 10px;">
-            <div class="progress-bar {% if reviewing %}bg-warning{% endif %}" role="progressbar"
+            <div class="progress-bar {% if reviewing %}pastel-progress-warning{% elif mode == 'review' %}pastel-progress-review{% else %}pastel-progress-study{% endif %}" role="progressbar"
                  style="width: {{ (index / total * 100)|round }}%;"
                  aria-valuenow="{{ index }}" aria-valuemin="0" aria-valuemax="{{ total }}"></div>
         </div>
         <div class="d-flex justify-content-between mt-1">
-            <small>Card {{ index + 1 }} of {{ total }}{% if reviewing %} (Review){% endif %}</small>
+            <small>Card {{ index + 1 }} of {{ total }}{% if reviewing %} (Review){% elif mode == 'review' %} (Browse){% endif %}</small>
             <small>{{ (index / total * 100)|round }}% complete</small>
         </div>
     </div>
 </div>
 
-<div class="language-card mb-4">
+<!-- Navigation arrows for review mode -->
+{% if mode == 'review' %}
+<div class="review-navigation mb-3">
+    <div class="d-flex justify-content-between align-items-center">
+        <a href="{{ url_for('flashcard.navigate_review', direction='prev') }}" class="btn btn-secondary btn-sm nav-arrow-btn">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <div class="text-center">
+            <small class="text-muted">Click card to flip</small>
+        </div>
+        <a href="{{ url_for('flashcard.navigate_review', direction='next') }}" class="btn btn-secondary btn-sm nav-arrow-btn">
+            <i class="bi bi-arrow-right"></i>
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<div class="language-card mb-4" {% if mode == 'review' %}onclick="flipCard()" style="cursor: pointer;"{% endif %}>
     <div class="row">
         <div class="col-md-12 text-center">
-            <p class="card-word">{{ card.translation }}</p>
+            <!-- Main translation (English) - larger and more prominent -->
+            <h3 class="card-translation-main text-dark fw-semibold mb-3">{{ card.translation }}</h3>
 
-            <!-- Always show example translation -->
+            <!-- Example translation - medium size, italicized -->
             {% if card.example_translation %}
-            <p class="card-example-translation text-muted mb-3" style="font-style: italic;">{{ card.example_translation }}</p>
+            <p class="card-example-translation text-secondary fst-italic mb-3" style="font-size: 1.2rem; line-height: 1.3;">{{ card.example_translation }}</p>
             {% endif %}
 
             <!-- Toggle for English equivalent only -->
             {% if card.equivalent %}
             <div class="equivalent-toggle mb-3">
-                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleEquivalent()">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="toggleEquivalent()">
                     <i class="bi bi-eye" id="toggle-icon"></i> Show hint
                 </button>
                 <div id="equivalent-content" style="display: none;" class="mt-2">
@@ -62,6 +81,8 @@
     </div>
 </div>
 
+<!-- Answer form - only for study mode -->
+{% if mode != 'review' %}
 <form action="{{ url_for('flashcard.process_answer') }}" method="post">
     <div class="mb-3">
         <input type="text" name="user_answer" class="form-control form-control-lg"
@@ -78,11 +99,228 @@
         End Session Early
     </a>
 </div>
+{% else %}
+<!-- Review mode - back to index -->
+<div class="text-center mt-3">
+    <a href="{{ url_for('flashcard.index') }}" class="btn btn-secondary btn-sm">
+        <i class="bi bi-house"></i> Back to Home
+    </a>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <!-- Include TTS JavaScript FIRST -->
 <script src="{{ url_for('static', filename='js/tts.js') }}"></script>
+
+<style>
+/* Review card font hierarchy and styling */
+.card-translation-main {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.card-word-main {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #2c3e50;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.card-example {
+    font-size: 1.1rem;
+    line-height: 1.5;
+    color: #495057;
+    font-style: italic;
+}
+
+.card-example-translation {
+    font-size: 0.95rem;
+    opacity: 0.75;
+    font-style: italic;
+}
+
+.language-card {
+    transition: all 0.2s ease;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background: linear-gradient(135deg,
+        rgba(255,255,255,0.95) 0%,
+        rgba(248,250,252,0.95) 50%,
+        rgba(243,246,251,0.95) 100%);
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.language-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+/* Navigation button improvements */
+.review-navigation .btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.review-navigation .btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* Custom progress bar colors */
+.pastel-progress-study {
+    background-color: #7c4dff !important;
+    background-image: linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent) !important;
+}
+
+.pastel-progress-warning {
+    background-color: #ffb74d !important;
+    background-image: linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent) !important;
+}
+
+.pastel-progress-review {
+    background-color: #81c784 !important;
+    background-image: linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent) !important;
+}
+
+/* Enhanced progress container */
+.progress {
+    border-radius: 8px;
+    background-color: rgba(0,0,0,0.05) !important;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Form styling to complement lighter buttons */
+.form-control-lg {
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.1);
+    background-color: rgba(255,255,255,0.9);
+    transition: all 0.2s ease;
+}
+
+.form-control-lg:focus {
+    border-color: rgba(79, 172, 254, 0.5);
+    box-shadow: 0 0 0 0.2rem rgba(79, 172, 254, 0.1);
+    background-color: rgba(255,255,255,1);
+}
+
+/* REFINED BUTTON SYSTEM - Much lighter and subtle */
+
+/* Base button improvements */
+.btn {
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Primary buttons - bit more color and stronger border */
+.btn-primary {
+    background-color: rgba(79, 172, 254, 0.12) !important;
+    border-color: rgba(79, 172, 254, 0.4) !important;
+    color: #1976d2 !important;
+    border-width: 1.5px !important;
+}
+
+.btn-primary:hover, .btn-primary:focus {
+    background-color: rgba(79, 172, 254, 0.2) !important;
+    border-color: rgba(79, 172, 254, 0.6) !important;
+    color: #1565c0 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(79, 172, 254, 0.2);
+}
+
+/* Secondary buttons - stronger border */
+.btn-secondary, .btn-outline-secondary {
+    background-color: rgba(108, 117, 125, 0.05) !important;
+    border-color: rgba(108, 117, 125, 0.3) !important;
+    color: #6c757d !important;
+    border-width: 1.5px !important;
+}
+
+.btn-secondary:hover, .btn-outline-secondary:hover {
+    background-color: rgba(108, 117, 125, 0.1) !important;
+    border-color: rgba(108, 117, 125, 0.4) !important;
+    color: #495057 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(108, 117, 125, 0.15);
+}
+
+/* Success buttons - stronger border for Easy rating */
+.btn-success, .btn-outline-success {
+    background-color: rgba(72, 187, 120, 0.06) !important;
+    border-color: rgba(72, 187, 120, 0.35) !important;
+    color: #388e3c !important;
+    border-width: 1.5px !important;
+}
+
+.btn-success:hover, .btn-outline-success:hover {
+    background-color: rgba(72, 187, 120, 0.12) !important;
+    border-color: rgba(72, 187, 120, 0.5) !important;
+    color: #2e7d32 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(72, 187, 120, 0.2);
+}
+
+/* Warning buttons - stronger border for Difficult rating */
+.btn-warning, .btn-outline-warning {
+    background-color: rgba(255, 183, 77, 0.06) !important;
+    border-color: rgba(255, 183, 77, 0.35) !important;
+    color: #f57c00 !important;
+    border-width: 1.5px !important;
+}
+
+.btn-warning:hover, .btn-outline-warning:hover {
+    background-color: rgba(255, 183, 77, 0.12) !important;
+    border-color: rgba(255, 183, 77, 0.5) !important;
+    color: #ef6c00 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(255, 183, 77, 0.2);
+}
+
+/* TTS/Sound buttons - stronger border */
+.tts-speak-btn, #speak-card-btn, button[title*="pronunciation"] {
+    background-color: rgba(108, 117, 125, 0.03) !important;
+    border-color: rgba(108, 117, 125, 0.25) !important;
+    color: #8495a7 !important;
+    border-width: 1.5px !important;
+    box-shadow: none !important;
+}
+
+.tts-speak-btn:hover, #speak-card-btn:hover, button[title*="pronunciation"]:hover {
+    background-color: rgba(108, 117, 125, 0.08) !important;
+    border-color: rgba(108, 117, 125, 0.35) !important;
+    color: #6c757d !important;
+    transform: translateY(-1px);
+    box-shadow: 0 1px 4px rgba(108, 117, 125, 0.1) !important;
+}
+
+/* Button icons */
+.btn i {
+    margin-right: 0.4rem;
+}
+
+.btn i:only-child {
+    margin-right: 0;
+}
+
+/* Link buttons */
+a.btn {
+    text-decoration: none !important;
+}
+
+a.btn:hover {
+    text-decoration: none !important;
+}
+</style>
 
 <script>
     // Card context for TTS usage
@@ -97,8 +335,38 @@
         example: {{ card.example|tojson if card.example else 'null' }}
     };
 
+    // Mode for JavaScript functionality
+    window.cardMode = {{ mode|tojson if mode else '"study"' }};
+
     // Track prefetch attempts to prevent duplicates
     let prefetchAttempted = false;
+
+    // Card flipping functionality for review mode
+    function flipCard() {
+        if (window.cardMode === 'review') {
+            window.location.href = '{{ url_for("flashcard.show_feedback_with_mode", correct="yes", mode=mode) }}';
+        }
+    }
+
+    // Keyboard navigation for review mode
+    document.addEventListener('keydown', function(event) {
+        if (window.cardMode === 'review') {
+            switch(event.key) {
+                case 'ArrowLeft':
+                    event.preventDefault();
+                    window.location.href = '{{ url_for("flashcard.navigate_review", direction="prev") }}';
+                    break;
+                case 'ArrowRight':
+                    event.preventDefault();
+                    window.location.href = '{{ url_for("flashcard.navigate_review", direction="next") }}';
+                    break;
+                case ' ':
+                    event.preventDefault();
+                    flipCard();
+                    break;
+            }
+        }
+    });
 
     // Simplified TTS prefetching functionality
     async function prefetchCardTTS() {
@@ -138,9 +406,12 @@
 
     // Initialize when page loads
     document.addEventListener('DOMContentLoaded', function() {
-        const answerInput = document.querySelector('input[name="user_answer"]');
-        if (answerInput) {
-            answerInput.focus();
+        // Focus answer input for study mode
+        if (window.cardMode === 'study') {
+            const answerInput = document.querySelector('input[name="user_answer"]');
+            if (answerInput) {
+                answerInput.focus();
+            }
         }
 
         // Start TTS prefetching

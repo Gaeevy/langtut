@@ -34,6 +34,12 @@ class SessionKeys(Enum):
     LEARNING_SHEET_GID = 'learning.sheet_gid'
     LEARNING_LAST_LEVEL_CHANGE = 'learning.last_level_change'
 
+    # Review namespace - Review mode session state
+    REVIEW_CARDS = 'review.cards'
+    REVIEW_CURRENT_INDEX = 'review.current_index'
+    REVIEW_ACTIVE_TAB = 'review.active_tab'
+    REVIEW_SHEET_GID = 'review.sheet_gid'
+
     # Test namespace - Development and debugging
     TEST_SESSION = 'test.session'
 
