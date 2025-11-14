@@ -380,6 +380,7 @@ a.btn:hover {
         }
 
         // Auto-play TTS for word and example (both study and review modes)
+        // Phase 1: Check if audio is unlocked before auto-playing
         if (window.ttsManager) {
             // Get card context
             const spreadsheetId = cardData.spreadsheetId;
@@ -387,21 +388,35 @@ a.btn:hover {
             const word = cardData.word;
             const example = cardData.example;
 
-            // Auto-play the word and example with a delay
-            setTimeout(() => {
-                window.ttsManager.speakCard(word, example, null, true, spreadsheetId, sheetGid);
-            }, 500);
+            // Check if audio has been unlocked
+            if (window.ttsManager.isUnlocked()) {
+                console.log('✅ Audio unlocked - auto-playing card audio');
+                // Auto-play the word and example with a delay
+                setTimeout(() => {
+                    window.ttsManager.speakCard(word, example, null, true, spreadsheetId, sheetGid);
+                }, 300);
+            } else {
+                console.log('⚠️ Audio not unlocked - skipping auto-play (user can click button)');
+                // Audio not unlocked - user will need to click the audio button manually
+                // This prevents the "Audio blocked" error
+            }
         }
 
         // Setup TTS click handlers
         const speakButton = document.getElementById('speak-card-btn');
         if (speakButton) {
-            speakButton.addEventListener('click', function() {
+            speakButton.addEventListener('click', async function() {
                 if (window.ttsManager) {
                     const word = cardData.word;
                     const example = cardData.example;
                     const spreadsheetId = cardData.spreadsheetId;
                     const sheetGid = cardData.sheetGid;
+
+                    // Unlock audio if needed (user gesture from button click)
+                    if (!window.ttsManager.isUnlocked()) {
+                        console.log('🔓 Unlocking audio from button click...');
+                        await window.ttsManager.unlockAudio();
+                    }
 
                     window.ttsManager.speakCard(word, example, null, true, spreadsheetId, sheetGid);
                 }
