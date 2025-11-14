@@ -71,10 +71,10 @@ repos:
 
 # Global settings
 default_language_version:
-  python: python3.11
+  python: python3
 
 # Performance: run hooks in parallel when possible
-default_stages: [commit]
+default_stages: [pre-commit]
 
 # Fail fast - stop on first failure
 fail_fast: false

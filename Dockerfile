@@ -48,16 +48,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
 # Expose the application port
 EXPOSE 8080
 
-# Run gunicorn with production-optimized settings
-CMD gunicorn \
-    --bind 0.0.0.0:${PORT} \
-    --workers 2 \
-    --timeout 120 \
-    --keep-alive 2 \
-    --max-requests 1000 \
-    --max-requests-jitter 100 \
-    --access-logfile - \
-    --error-logfile - \
-    --log-level info \
-    app:app
-
+# Run gunicorn with production-optimized settings for Railway Hobby plan
+# Use shell form to properly expand $PORT environment variable
+# Single worker to stay within 512MB RAM limit
+CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 1 --timeout 120 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile - --log-level info app:app
