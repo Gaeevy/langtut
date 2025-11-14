@@ -52,4 +52,3 @@ EXPOSE 8080
 # Use shell form to properly expand $PORT environment variable
 # Single worker to stay within 512MB RAM limit
 CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 1 --timeout 120 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile - --log-level info app:app
-
