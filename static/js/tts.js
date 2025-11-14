@@ -1,5 +1,6 @@
 /**
  * Minimalistic TTS Manager with persistent caching
+ * Phase 1: Unified Mobile Unlock Architecture
  */
 class TTSManager {
     constructor() {
@@ -8,37 +9,211 @@ class TTSManager {
         this.currentAudio = null;
         this.pendingRequests = new Map();
 
-        // Mobile audio management - restored for listening mode
-        this.userInteracted = false;
+        // Mobile audio management - unified approach
+        this.audioUnlocked = false;  // Changed from userInteracted
         this.primedAudioForChromeIOS = null;
+        this.browserType = this.detectBrowser();  // Detect browser once
+
+        console.log(`🎵 TTSManager initialized for: ${this.browserType}`);
+
+        // Desktop browsers don't need unlock - set synchronously!
+        if (this.browserType === 'desktop') {
+            this.audioUnlocked = true;
+            console.log('🖥️ Desktop browser - audio unlocked by default');
+        }
+
+        // Check if already unlocked in this session (synchronously)
+        try {
+            const storedUnlock = sessionStorage.getItem('tts_audio_unlocked');
+            if (storedUnlock === 'true') {
+                this.audioUnlocked = true;
+                console.log('💾 Audio unlock state restored from session');
+            }
+        } catch (error) {
+            console.warn('⚠️ Could not access sessionStorage:', error);
+        }
 
         // Restore cache from sessionStorage
         this.restoreCache();
 
-        // Check TTS availability and setup mobile audio
+        // Check TTS availability (async, but not blocking)
         this.init();
     }
 
+    /**
+     * Detect browser type for audio unlock strategy
+     * @returns {string} Browser type identifier
+     */
+    detectBrowser() {
+        const ua = navigator.userAgent;
+
+        // Chrome iOS (most restrictive - needs special Touch Strategy)
+        if (/CriOS/i.test(ua) && /iPhone|iPad|iPod/i.test(ua)) {
+            return 'chrome-ios';
+        }
+
+        // Safari iOS
+        if (/Safari/i.test(ua) && !/CriOS/i.test(ua) && /iPhone|iPad|iPod/i.test(ua)) {
+            return 'safari-ios';
+        }
+
+        // Android browsers
+        if (/Android/i.test(ua)) {
+            return /Chrome/i.test(ua) ? 'android-chrome' : 'android-other';
+        }
+
+        // Desktop browsers (no unlock needed)
+        return 'desktop';
+    }
+
     async init() {
-        // Check TTS service
+        // Check TTS service availability
         try {
             const response = await fetch('/api/tts/status');
             const data = await response.json();
             this.isAvailable = data.available;
+            console.log(`📡 TTS service available: ${this.isAvailable}`);
         } catch (error) {
             console.error('❌ TTS init failed:', error);
         }
+    }
 
-        // Setup mobile audio unlock
-        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-            const unlock = () => {
-                this.userInteracted = true;
-                const audio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU4Ljk1AAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABmwQ+XAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABHiAABrTjOWAAAGmAAAAIAAANON4AABLTEFNRTMuMTAwA6q5tamtmS0odHRwOi8vd3d3LmNkZXgub3JnL3N0YXRpYy9sYW1lL2xhbWUuaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
-                audio.play().catch(() => {});
-            };
-            ['touchstart', 'mousedown', 'keydown'].forEach(event =>
-                document.addEventListener(event, unlock, { once: true, passive: true })
-            );
+    /**
+     * Check if audio has been unlocked for playback
+     * @returns {boolean} True if audio can be played
+     */
+    isUnlocked() {
+        return this.audioUnlocked;
+    }
+
+    /**
+     * Unlock audio for mobile browsers
+     * MUST be called during a user gesture (click, touch, etc.)
+     * @returns {Promise<boolean>} True if unlock successful
+     */
+    async unlockAudio() {
+        if (this.audioUnlocked) {
+            console.log('✅ Audio already unlocked');
+            return true;
+        }
+
+        console.log(`🔓 Attempting to unlock audio for: ${this.browserType}`);
+
+        try {
+            let success = false;
+
+            switch (this.browserType) {
+                case 'chrome-ios':
+                    success = await this.unlockChromeIOS();
+                    break;
+
+                case 'safari-ios':
+                case 'android-chrome':
+                case 'android-other':
+                    success = await this.unlockMobile();
+                    break;
+
+                case 'desktop':
+                    success = true;  // Already unlocked
+                    break;
+
+                default:
+                    // Fallback to mobile unlock
+                    success = await this.unlockMobile();
+                    break;
+            }
+
+            if (success) {
+                this.audioUnlocked = true;
+                // Persist unlock state in session
+                try {
+                    sessionStorage.setItem('tts_audio_unlocked', 'true');
+                } catch (error) {
+                    console.warn('⚠️ Could not save unlock state:', error);
+                }
+                console.log('✅ Audio unlocked successfully');
+            }
+
+            return success;
+
+        } catch (error) {
+            console.error('💥 Audio unlock failed:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Chrome iOS-specific "Touch Strategy" unlock
+     * Creates and loads an Audio element during user interaction
+     * @returns {Promise<boolean>} True if unlock successful
+     */
+    async unlockChromeIOS() {
+        console.log('📱 Using Chrome iOS Touch Strategy');
+
+        try {
+            // Create Audio element during user interaction (don't play yet)
+            // This "touches" the audio subsystem and unlocks it for Chrome iOS
+            const touchedAudio = new Audio();
+            touchedAudio.volume = 1.0;
+            touchedAudio.preload = 'auto';
+
+            // Set a minimal WAV audio source
+            touchedAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+
+            // Just loading the audio during user interaction unlocks it for Chrome iOS
+            touchedAudio.load();
+
+            // Store for reuse throughout the session
+            this.primedAudioForChromeIOS = touchedAudio;
+
+            console.log('✅ Chrome iOS audio element primed and ready');
+            return true;
+
+        } catch (error) {
+            console.error('💥 Chrome iOS unlock failed:', error);
+            // Don't fail completely - might still work
+            return true;
+        }
+    }
+
+    /**
+     * Standard mobile unlock using AudioContext
+     * Works for Safari iOS, Android Chrome, and other mobile browsers
+     * @returns {Promise<boolean>} True if unlock successful
+     */
+    async unlockMobile() {
+        console.log('📱 Using standard mobile AudioContext unlock');
+
+        try {
+            // Create audio context if needed
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) {
+                console.warn('⚠️ AudioContext not supported');
+                return true;  // Proceed anyway
+            }
+
+            const audioContext = new AudioContextClass();
+
+            // Resume audio context (required for iOS)
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+                console.log('🔊 AudioContext resumed');
+            }
+
+            // Create and play silent audio to unlock
+            const silentBuffer = audioContext.createBuffer(1, 1, 22050);
+            const source = audioContext.createBufferSource();
+            source.buffer = silentBuffer;
+            source.connect(audioContext.destination);
+            source.start();
+
+            console.log('✅ Mobile audio unlocked via AudioContext');
+            return true;
+
+        } catch (error) {
+            console.error('💥 Mobile unlock failed:', error);
+            // Don't fail completely - might still work
+            return true;
         }
     }
 
@@ -165,6 +340,15 @@ class TTSManager {
 
     async playAudio(audioBase64) {
         try {
+            // Check if audio is unlocked before attempting playback
+            if (!this.audioUnlocked) {
+                console.warn('⚠️ Audio not unlocked - playback may be blocked');
+                // Throw NotAllowedError-like error to trigger fallback handling
+                const error = new Error('Audio playback not allowed - user interaction required');
+                error.name = 'NotAllowedError';
+                throw error;
+            }
+
             // Only stop current audio, not ALL audio (too aggressive)
             this.stopCurrentAudio();
 
@@ -172,7 +356,7 @@ class TTSManager {
             const base64Preview = audioBase64.substring(0, 10);
             console.log(`🔊 Starting audio playback... [${base64Preview}...]`);
 
-            // For Chrome iOS: Use primed Audio element if available (restored functionality)
+            // For Chrome iOS: Use primed Audio element if available
             let audio;
             if (this.primedAudioForChromeIOS) {
                 console.log('📱 Using primed Chrome iOS audio element');
@@ -218,7 +402,7 @@ class TTSManager {
                 if (!this.primedAudioForChromeIOS) {
                     audio.load();
                 } else {
-                    // For primed audio, it should be ready immediately
+                    // For primed audio, trigger load event quickly
                     setTimeout(() => {
                         clearTimeout(timeout);
                         resolve();
@@ -274,8 +458,12 @@ class TTSManager {
             console.error('💥 Playback error:', error);
 
             if (error.name === 'NotAllowedError') {
-                alert('Audio blocked. Please tap the audio button manually.');
+                console.warn('🚫 Audio blocked by browser - user interaction required');
+                // Don't show alert - let the UI handle it gracefully
+                // The calling code should check isUnlocked() before calling playAudio()
             }
+
+            // Return false to indicate playback failed
             return false;
         }
     }

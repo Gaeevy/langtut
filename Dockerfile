@@ -1,53 +1,36 @@
-# syntax=docker/dockerfile:1
-# Multi-stage Dockerfile for Railway deployment
-# Uses uv for fast, reliable dependency management
+# Multi-stage Dockerfile for Railway deployment with uv
+FROM python:3.11-slim AS builder
 
-# Stage 1: Build dependencies
-FROM python:3.11.10-slim AS builder
-
-# Install uv - the fast Python package installer
+# Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Set working directory
 WORKDIR /app
 
-# Copy dependency specification files
+# Install dependencies
 COPY pyproject.toml uv.lock ./
-
-# Install dependencies into /app/.venv
-# --frozen: Use exact versions from uv.lock (no resolution)
-# --no-dev: Skip development dependencies
 RUN uv sync --frozen --no-dev
 
-# Stage 2: Production runtime
-FROM python:3.11.10-slim
+# Production stage
+FROM python:3.11-slim
 
-# Install runtime system dependencies
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set working directory
 WORKDIR /app
 
-# Copy virtual environment from builder stage
-COPY --from=builder /app/.venv /app/.venv
+# Copy virtual environment from builder
+COPY --from=builder /app/.venv .venv
 
 # Copy application code
 COPY . .
 
-# Create data directory for database volume mount
+# Create data directory for volume mount
 RUN mkdir -p /app/data
 
-# Set environment variables
+# Set Python path and disable buffering
 ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONUNBUFFERED=1
 
-# Expose the application port (Railway will set PORT dynamically)
-EXPOSE 8080
-
-# Run gunicorn with production-optimized settings for Railway Hobby plan
-# Use exec form with sh -c for proper PORT variable expansion
-# Single worker to stay within 512MB RAM limit
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 1 --timeout 120 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile - --log-level info app:app"]
+# Start application
+CMD gunicorn app:app \
+    --bind 0.0.0.0:${PORT:-8080} \
+    --workers 1 \
+    --access-logfile - \
+    --error-logfile -
