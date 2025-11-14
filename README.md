@@ -16,7 +16,7 @@ A Flask web application that integrates with Google Sheets to provide ANKI-style
 - **Mobile Optimization:** Chrome iOS autoplay solutions and audio unlock strategies
 - **Smart Caching:** Google Cloud Storage caching for improved performance
 
-### User Experience
+### User Experi
 - **Responsive Design:** Mobile-first interface with Bootstrap
 - **Progressive Web App (PWA):** Offline capabilities and mobile installation
 - **Language Settings:** Configurable original, target, and hint languages
