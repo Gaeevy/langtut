@@ -1,40 +1,45 @@
-[tool.poetry]
+[project]
 name = "langtut"
 version = "0.1.0"
-description = ""
-authors = ["Vlad Goenko <vladislav@offerfit.ai>"]
-readme = "README.md"
-package-mode = false
+description = "Language Learning Flashcard App with Portuguese TTS"
+authors = [{name = "Vlad Goenko", email = "vladislav@offerfit.ai"}]
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "flask>=3.1.0",
+    "google-auth>=2.38.0",
+    "google-auth-oauthlib>=1.2.1",
+    "google-auth-httplib2>=0.2.0",
+    "google-api-python-client>=2.166.0",
+    "google-cloud-texttospeech>=2.21.0",
+    "pydantic>=2.11.3",
+    "flask-cors>=5.0.1",
+    "gspread>=6.2.0",
+    "oauth2client>=4.1.3",
+    "dynaconf>=3.2.10",
+    "openai>=1.77.0",
+    "python-dotenv>=1.1.0",
+    "pandas>=2.2.3",
+    "sqlalchemy>=2.0.0",
+    "flask-sqlalchemy>=3.1.0",
+    "flask-session>=0.8.0",
+    "gunicorn>=23.0.0",
+    "google-cloud-storage>=3.1.1",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-flask = "^3.1.0"
-google-auth = "^2.38.0"
-google-auth-oauthlib = "^1.2.1"
-google-auth-httplib2 = "^0.2.0"
-google-api-python-client = "^2.166.0"
-google-cloud-texttospeech = "^2.21.0"
-pydantic = "^2.11.3"
-flask-cors = "^5.0.1"
-gspread = "^6.2.0"
-oauth2client = "^4.1.3"
-dynaconf = "^3.2.10"
-openai = "^1.77.0"
-python-dotenv = "^1.1.0"
-pandas = "^2.2.3"
-sqlalchemy = "^2.0.0"
-flask-sqlalchemy = "^3.1.0"
-flask-session = "^0.8.0"
-gunicorn = "^23.0.0"
-google-cloud-storage = "^3.1.1"
-
-[tool.poetry.group.dev.dependencies]
-ruff = "^0.6.0"
-pre-commit = "^3.8.0"
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6.0",
+    "pre-commit>=3.8.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
 
 # Ruff configuration
 [tool.ruff]

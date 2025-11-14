@@ -1,9 +1,8 @@
 [build]
-builder = "nixpacks"
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-healthcheckPath = "/test"
-healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 
 # Note: Environment variables are now managed through Railway dashboard

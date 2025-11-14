@@ -8,7 +8,7 @@ This is a Flask-based Language Learning Flashcard App with the following charact
 - **Data Source**: Google Sheets integration for vocabulary management
 - **Architecture**: Modular Flask app with Blueprint-based routing
 - **Features**: Statistics tracking, PWA support, OAuth authentication
-- **Deployment**: Railway/Heroku compatible with Poetry + requirements.txt
+- **Deployment**: Railway with Docker + uv for fast, reproducible builds
 - **Code Quality**: Pre-commit hooks with ruff linting/formatting
 
 ## Current Project Structure
@@ -46,8 +46,10 @@ docs/                        # Comprehensive documentation
 
 ### Configuration & Dependencies
 ```
-pyproject.toml              # Poetry configuration with dependencies
-requirements.txt            # Railway deployment requirements
+pyproject.toml              # Project dependencies (PEP 621 format)
+uv.lock                     # Locked dependency versions for reproducibility
+Dockerfile                  # Docker configuration for Railway deployment
+.dockerignore              # Docker build exclusions
 settings.toml              # Main configuration (non-sensitive)
 .secrets.toml              # Sensitive configuration (not in git)
 .pre-commit-config.yaml    # Code quality automation
@@ -56,14 +58,14 @@ settings.toml              # Main configuration (non-sensitive)
 ## Development Rules
 
 ### 1. Development Environment Rules
-- **ALWAYS use Poetry** - Never use direct `python` commands
-  - ✅ `poetry run python -c "from src.config import config; print(config.DEBUG)"`
-  - ✅ `poetry run pytest`
-  - ✅ `poetry run gunicorn --bind 0.0.0.0:8080 --reload app:app`
+- **ALWAYS use uv** - Never use direct `python` commands
+  - ✅ `uv run python -c "from src.config import config; print(config.DEBUG)"`
+  - ✅ `uv run pytest`
+  - ✅ `uv run gunicorn --bind 0.0.0.0:8080 --reload app:app`
   - ❌ `python app.py`
   - ❌ `python -m pytest`
-- **POETRY for all development tasks** - Testing, running, debugging
-- **VIRTUAL ENVIRONMENT** - Poetry manages dependencies and isolation automatically
+- **UV for all development tasks** - Testing, running, debugging (10-100x faster than poetry)
+- **VIRTUAL ENVIRONMENT** - uv manages dependencies and isolation automatically
 
 ### 2. File Organization Rules
 - **NEVER add code to monolithic files** - Use blueprint pattern
@@ -173,25 +175,29 @@ The application uses 6 main blueprints for route organization:
 ### Running the Application
 ```bash
 # Start development server (recommended)
-poetry run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
+uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
 
 # Run tests
-poetry run pytest
+uv run pytest
 
 # Run pre-commit hooks
-poetry run pre-commit run --all-files
+uv run pre-commit run --all-files
 ```
 
 ### Testing and Debugging
 ```bash
 # Test specific functionality
-poetry run python -c "from src.tts_service import tts_service; print(tts_service.generate_audio('test'))"
+uv run python -c "from src.tts_service import tts_service; print(tts_service.generate_audio('test'))"
 
 # Check configuration
-poetry run python -c "from src.config import config; print(config.DEBUG)"
+uv run python -c "from src.config import config; print(config.DEBUG)"
 
 # Test database connection
-poetry run python -c "from src.database import db; print(db.engine.execute('SELECT 1').fetchone())"
+uv run python -c "from src.database import db; print(db.engine.execute('SELECT 1').fetchone())"
+
+# Check uv environment
+uv pip list  # List installed packages
+uv tree      # Show dependency tree
 ```
 
 ## Pre-commit Configuration
@@ -199,7 +205,6 @@ The project uses automated code quality checks via pre-commit hooks:
 - **Ruff**: Fast Python linting and formatting
 - **File checks**: Trailing whitespace, JSON/YAML/TOML validation
 - **Security**: Bandit security scanning, private key detection
-- **Poetry export**: Auto-sync pyproject.toml → requirements.txt
 
 ## Documentation
 Comprehensive documentation is available in the `docs/` directory:

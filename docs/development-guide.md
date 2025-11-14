@@ -4,7 +4,7 @@
 
 ### Prerequisites
 - Python 3.11 or higher
-- Poetry for dependency management
+- uv for fast dependency management ([Install uv](https://docs.astral.sh/uv/))
 - Google Cloud service account (for TTS)
 - Google OAuth credentials (for Sheets access)
 
@@ -14,15 +14,15 @@
 git clone <repository-url>
 cd langtut
 
-# Install dependencies
-poetry install
+# Install dependencies (automatically creates virtual environment)
+uv sync
 
 # Set up configuration
 cp .secrets.toml.example .secrets.toml
 # Edit .secrets.toml with your credentials
 
 # Start development server
-poetry run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
+uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
 ```
 
 ### Project Structure
@@ -51,7 +51,10 @@ langtut/
 │   └── manifest.json        # PWA manifest
 ├── docs/                    # Documentation
 ├── tests/                   # Test files
-└── requirements.txt         # Railway deployment requirements
+├── Dockerfile               # Docker configuration for Railway
+├── .dockerignore           # Docker build exclusions
+├── pyproject.toml          # Project dependencies and config
+└── uv.lock                 # Locked dependency versions
 ```
 
 ## Configuration
@@ -144,16 +147,16 @@ def endpoint_function() -> Dict[str, Any]:
 ### Running Tests
 ```bash
 # Run all tests
-poetry run pytest
+uv run pytest
 
 # Run with coverage
-poetry run pytest --cov=src
+uv run pytest --cov=src
 
 # Run specific test file
-poetry run pytest tests/test_specific.py
+uv run pytest tests/test_specific.py
 
 # Run with debugging
-poetry run pytest -v -s
+uv run pytest -v -s
 ```
 
 ### Test Structure
@@ -244,17 +247,16 @@ except Exception as e:
 ### Setup
 ```bash
 # Install pre-commit hooks
-poetry run pre-commit install
+uv run pre-commit install
 
 # Run hooks manually
-poetry run pre-commit run --all-files
+uv run pre-commit run --all-files
 ```
 
 ### Hooks Configuration
 - **Ruff:** Fast Python linting and formatting
 - **Bandit:** Security vulnerability scanning
 - **File checks:** Trailing whitespace, JSON validation
-- **Poetry export:** Auto-sync pyproject.toml → requirements.txt
 
 ### Bypassing Hooks (Emergency)
 ```bash
@@ -336,9 +338,10 @@ def protected_endpoint():
 
 ## Deployment
 
-### Railway Deployment
+### Railway Deployment with Docker
+The application uses Docker for deployment with multi-stage builds:
 ```bash
-# Deploy to Railway
+# Deploy to Railway (uses Dockerfile automatically)
 railway up
 
 # View logs
@@ -346,6 +349,18 @@ railway logs
 
 # Set environment variables
 railway variables set LANGTUT_SECRET_KEY=your-secret-key
+```
+
+### Local Docker Testing
+```bash
+# Build Docker image
+docker build -t langtut:test .
+
+# Run container locally
+docker run -p 8080:8080 \
+  -v $(pwd)/data:/app/data \
+  -e LANGTUT_ENVIRONMENT=local \
+  langtut:test
 ```
 
 ### Environment Variables
@@ -358,7 +373,7 @@ LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON
 
 ### Health Checks
 The application includes health check endpoints:
-- `/` - Main application health
+- `/test` - Main application health check (used by Docker and Railway)
 - `/admin` - Admin interface availability
 - `/api/health` - API health status
 
@@ -465,13 +480,17 @@ except Exception as e:
 ### Debug Commands
 ```bash
 # Check configuration
-poetry run python -c "from src.config import config; print(config.DEBUG)"
+uv run python -c "from src.config import config; print(config.DEBUG)"
 
 # Test database connection
-poetry run python -c "from src.database import db; print(db.engine.execute('SELECT 1').fetchone())"
+uv run python -c "from src.database import db; print(db.engine.execute('SELECT 1').fetchone())"
 
 # Test TTS service
-poetry run python -c "from src.tts_service import tts_service; print(tts_service.generate_audio('test'))"
+uv run python -c "from src.tts_service import tts_service; print(tts_service.generate_audio('test'))"
+
+# Check uv environment
+uv pip list  # List installed packages
+uv tree      # Show dependency tree
 ```
 
 ## Contributing
