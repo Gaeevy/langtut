@@ -37,7 +37,7 @@ For comprehensive information about the application, see our detailed documentat
 
 ### Prerequisites
 - Python 3.11 or higher
-- Poetry for dependency management
+- uv for fast dependency management ([Install uv](https://docs.astral.sh/uv/))
 - Google Cloud service account (for TTS)
 - Google OAuth credentials (for Sheets access)
 
@@ -47,15 +47,15 @@ For comprehensive information about the application, see our detailed documentat
 git clone <repository-url>
 cd langtut
 
-# Install dependencies
-poetry install
+# Install dependencies (uv will automatically create a virtual environment)
+uv sync
 
 # Set up configuration
 cp .secrets.toml.example .secrets.toml
 # Edit .secrets.toml with your credentials
 
 # Start development server
-poetry run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
+uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
 ```
 
 ### Configuration
@@ -91,7 +91,8 @@ Data Storage
 - **Data Validation:** Pydantic models
 - **Audio:** Google Cloud Text-to-Speech
 - **Authentication:** Google OAuth 2.0
-- **Deployment:** Railway with Poetry
+- **Deployment:** Railway with Docker + uv
+- **Dependency Management:** uv (fast Python package installer)
 
 ## 📱 Mobile Support
 
@@ -126,17 +127,35 @@ For detailed development instructions, see [Development Guide](./docs/developmen
 ## 🚀 Deployment
 
 ### Railway Deployment
-The application is optimized for Railway deployment with:
-- Automatic environment detection
-- Environment variable configuration
-- Gunicorn WSGI server
-- Health check endpoints
+The application is optimized for Railway deployment with Docker:
+- **Multi-stage Docker build** with uv for fast, reproducible builds
+- **Automatic environment detection**
+- **Environment variable configuration**
+- **Gunicorn WSGI server** with production settings
+- **Health check endpoints**
+- **Volume mount** for SQLite database persistence at `/app/data`
 
 ### Required Environment Variables
 ```bash
 LANGTUT_SECRET_KEY='your-secret-key-here'
 LANGTUT_CLIENT_SECRETS_JSON='{"web":{"client_id":"...","client_secret":"..."}}'
 LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"..."}'
+```
+
+### Docker Deployment
+The application uses a multi-stage Dockerfile for optimized production builds:
+- **Stage 1 (builder):** Install dependencies with uv
+- **Stage 2 (runtime):** Minimal production image with Python 3.11.10-slim
+
+```bash
+# Build Docker image locally
+docker build -t langtut:latest .
+
+# Run container
+docker run -p 8080:8080 \
+  -v $(pwd)/data:/app/data \
+  -e LANGTUT_SECRET_KEY='your-key' \
+  langtut:latest
 ```
 
 ## 📊 Current Status

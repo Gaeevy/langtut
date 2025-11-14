@@ -69,16 +69,6 @@ repos:
               misc/.*
           )$
 
-  # Custom local hooks
-  - repo: local
-    hooks:
-      - id: poetry-export
-        name: export poetry dependencies to requirements.txt
-        entry: poetry export --format=requirements.txt --output=requirements.txt --without-hashes
-        language: system
-        files: pyproject.toml
-        pass_filenames: false
-
 # Global settings
 default_language_version:
   python: python3.11
