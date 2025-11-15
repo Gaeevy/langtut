@@ -48,8 +48,7 @@ def validate_spreadsheet_access(spreadsheet_id: str) -> tuple[bool, str, list[st
     Validate that the user has access to the spreadsheet and it has the correct format
     Returns: (is_valid, error_message, worksheet_names)
     """
-    logger.info('=== VALIDATING SPREADSHEET ACCESS ===')
-    logger.info(f'Spreadsheet ID: {spreadsheet_id}')
+    logger.info(f'Validating spreadsheet access: {spreadsheet_id}')
 
     creds = get_credentials()
     if not creds:
@@ -235,10 +234,9 @@ def read_cards_from_worksheet(worksheet) -> list[Card]:
 
 def update_spreadsheet(worksheet_name, cards, spreadsheet_id: str = None):
     """Update data in Google Sheets in bulk for a specific sheet"""
-    logger.info('=== UPDATING SPREADSHEET ===')
-    logger.info(f'Worksheet: {worksheet_name}')
-    logger.info(f'Spreadsheet ID: {spreadsheet_id}')
-    logger.info(f'Number of cards to update: {len(cards)}')
+    logger.info(
+        f'Updating spreadsheet: {worksheet_name} ({len(cards)} cards, ID: {spreadsheet_id})'
+    )
 
     # Log card details being updated
     for i, card in enumerate(cards):

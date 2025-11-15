@@ -38,10 +38,23 @@ def should_log_request() -> bool:
     Determine if we should log this request.
 
     Returns:
-        True if request should be logged, False for static assets
+        True if request should be logged, False for static assets and polling endpoints
     """
-    # Return True if we should log, False for static assets and favicon
-    return not (request.path.startswith('/static/') or request.path == '/favicon.ico')
+    # Define paths to exclude from logging
+    excluded_paths = [
+        '/static/',  # Static assets
+        '/favicon.ico',  # Favicon requests
+        '/api/tts/status',  # TTS status polling
+        '/sw.js',  # Service worker
+        '/manifest.json',  # PWA manifest
+    ]
+
+    # Check if request path matches any excluded pattern
+    for excluded_path in excluded_paths:
+        if request.path.startswith(excluded_path) or request.path == excluded_path:
+            return False
+
+    return True
 
 
 def safe_get_request_body() -> Any:

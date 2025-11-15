@@ -28,9 +28,14 @@ RUN mkdir -p /app/data
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1
 
-# Start application
+# Start application with optimized settings for production
 CMD gunicorn app:app \
     --bind 0.0.0.0:${PORT:-8080} \
-    --workers 1 \
+    --workers 2 \
+    --timeout 120 \
+    --keep-alive 2 \
+    --max-requests 1000 \
+    --max-requests-jitter 100 \
     --access-logfile - \
-    --error-logfile -
+    --error-logfile - \
+    --log-level warning
