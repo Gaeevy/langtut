@@ -84,9 +84,7 @@ def batch_update_session_cards():
 @flashcard_bp.route('/')
 def index():
     """Homepage - shows login or flashcard selection."""
-    logger.info('=== INDEX ROUTE ===')
-    logger.info(f'Request method: {request.method}')
-    logger.info(f'Remote addr: {request.remote_addr}')
+    logger.debug('Loading index page')
     logger.info(f'User agent: {request.headers.get("User-Agent", "Unknown")}')
 
     # Check if session is working
@@ -131,9 +129,7 @@ def index():
 @flashcard_bp.route('/start/<tab_name>', methods=['POST'])
 def start_learning(tab_name: str):
     """Start a learning session with cards from the specified tab."""
-    logger.info('=== START LEARNING ROUTE ===')
-    logger.info(f'Tab name: {tab_name}')
-    logger.info(f'Request method: {request.method}')
+    logger.info(f'Starting learning session: {tab_name}')
     logger.info(f'Remote addr: {request.remote_addr}')
 
     # Get user's active spreadsheet
@@ -194,9 +190,7 @@ def start_learning(tab_name: str):
 @flashcard_bp.route('/review/<tab_name>')
 def start_review(tab_name: str):
     """Start a review session with ALL cards from the specified tab."""
-    logger.info('=== START REVIEW ROUTE ===')
-    logger.info(f'Tab name: {tab_name}')
-    logger.info(f'Request method: {request.method}')
+    logger.info(f'Starting review session: {tab_name}')
     logger.info(f'Remote addr: {request.remote_addr}')
 
     # Get user's active spreadsheet
@@ -272,8 +266,7 @@ def navigate_review(direction: str):
 @flashcard_bp.route('/card/<mode>')
 def show_card(mode='study'):
     """Display the current flashcard."""
-    logger.info('=== SHOW CARD ROUTE ===')
-    logger.info(f'Mode: {mode}')
+    logger.debug(f'Showing card - mode: {mode}')
 
     # Determine session keys based on mode
     if mode == 'review':
@@ -393,7 +386,7 @@ def show_card(mode='study'):
 @flashcard_bp.route('/answer', methods=['POST'])
 def process_answer():
     """Process the user's answer to a flashcard."""
-    logger.info('=== PROCESS ANSWER ROUTE ===')
+    logger.debug('Processing answer')
 
     if not sm.has(sk.LEARNING_CARDS) or not sm.has(sk.LEARNING_CURRENT_INDEX):
         logger.warning('Cards or current_index not in session, redirecting to index')

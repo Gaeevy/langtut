@@ -413,13 +413,49 @@ The application includes health check endpoints:
 
 ## Monitoring and Logging
 
+### Logging Architecture
+The application uses a clean, multi-layer logging system:
+
+1. **Application Logs** (`src/config.py`) - Startup and configuration
+2. **Request Logs** (`src/request_logger.py`) - Detailed request/response tracking
+3. **Gunicorn Logs** (`Dockerfile`) - WSGI server logs (minimal/disabled in production)
+
+### Logging Configuration
+
+#### Gunicorn Access Logs
+Gunicorn access logs are **disabled in production** since custom request logging provides better detail:
+```dockerfile
+# Dockerfile CMD configuration
+--access-logfile -       # Logs to stdout (minimal)
+--error-logfile -        # Errors to stdout
+--log-level warning      # Only warnings and errors
+```
+
+#### Custom Request Logging
+Comprehensive request/response logging with automatic filtering:
+```python
+# Automatically excludes noisy endpoints:
+# - /static/* (static assets)
+# - /api/tts/status (TTS polling)
+# - /sw.js (service worker)
+# - /manifest.json (PWA manifest)
+# - /favicon.ico (favicon requests)
+
+# Example log output:
+# REQUEST_START [uuid] GET /flashcard | User: 123 | IP: 1.2.3.4
+# REQUEST_END [uuid] Status: 200 | Duration: 45ms | Size: 1234B
+```
+
 ### Application Logging
 ```python
-# Request logging
+import logging
+logger = logging.getLogger(__name__)
+
+# Request context logging
 logger.info(f'Request: {request.method} {request.path}')
 logger.info(f'User: {user.email if user else "Anonymous"}')
 
-# Error logging
+# Error logging with stack traces
 try:
     # Operation
     pass
@@ -427,8 +463,24 @@ except Exception as e:
     logger.error(f'Operation failed: {e}', exc_info=True)
 ```
 
+### Log Levels
+- **DEBUG:** Detailed diagnostic information (local only)
+- **INFO:** General operational events (startup, requests)
+- **WARNING:** Unexpected situations that don't prevent operation
+- **ERROR:** Errors that require attention
+
+### Filtering Noisy Logs
+To exclude additional endpoints from logging, edit `src/request_logger.py`:
+```python
+excluded_paths = [
+    '/static/',
+    '/favicon.ico',
+    '/api/tts/status',  # Add more polling endpoints here
+]
+```
+
 ### Performance Monitoring
-- Monitor API response times
+- Monitor API response times (logged with each request)
 - Track TTS cache hit rates
 - Monitor Google Sheets API usage
 

@@ -31,41 +31,30 @@ tts_service = TTSService()
 @api_bp.route('/tts/status')
 def tts_status() -> dict[str, Any]:
     """Get the status of the TTS service."""
-    logger.info('=== TTS STATUS API ===')
-    logger.info(f'Request from: {request.remote_addr}')
-    logger.info(f'User agent: {request.headers.get("User-Agent", "Unknown")}')
-
     try:
         # Check if TTS is enabled in configuration
         tts_enabled = settings.get('TTS_ENABLED', False)
-        logger.info(f'TTS enabled in config: {tts_enabled}')
 
         if not tts_enabled:
-            response = {'available': False, 'reason': 'TTS is disabled in configuration'}
-            logger.info(f'TTS status response: {response}')
-            return jsonify(response)
+            return jsonify({'available': False, 'reason': 'TTS is disabled in configuration'})
 
         # Check if TTS service is properly configured
         is_available = tts_service.is_available()
-        logger.info(f'TTS service available: {is_available}')
 
         if not is_available:
-            response = {'available': False, 'reason': 'TTS service is not properly configured'}
-            logger.info(f'TTS status response: {response}')
-            return jsonify(response)
+            return jsonify({'available': False, 'reason': 'TTS service is not properly configured'})
 
-        response = {
-            'available': True,
-            'language': settings.get('TTS_LANGUAGE_CODE', 'pt-PT'),
-            'voice': settings.get('TTS_VOICE_NAME', 'pt-PT-Standard-A'),
-        }
-        logger.info(f'TTS status response: {response}')
-        return jsonify(response)
+        return jsonify(
+            {
+                'available': True,
+                'language': settings.get('TTS_LANGUAGE_CODE', 'pt-PT'),
+                'voice': settings.get('TTS_VOICE_NAME', 'pt-PT-Standard-A'),
+            }
+        )
 
     except Exception as e:
         logger.error(f'TTS status check failed: {e}', exc_info=True)
-        response = {'available': False, 'reason': f'TTS service error: {e!s}'}
-        return jsonify(response)
+        return jsonify({'available': False, 'reason': f'TTS service error: {e!s}'})
 
 
 @api_bp.route('/tts/speak', methods=['POST'])
@@ -98,15 +87,11 @@ def generate_speech() -> dict[str, Any]:
 @api_bp.route('/tts/speak-card', methods=['POST'])
 def speak_card_content() -> dict[str, Any]:
     """Generate speech for card content (word and example)."""
-    logger.info('=== TTS SPEAK-CARD API ===')
-    logger.info(f'Request from: {request.remote_addr}')
-    logger.info(f'User agent: {request.headers.get("User-Agent", "Unknown")}')
-
     try:
         # Get card data from request
         data = request.get_json()
         if not data:
-            logger.warning('No JSON data provided in request')
+            logger.warning('No JSON data provided in speak-card request')
             return jsonify({'success': False, 'error': 'Card data is required'}), 400
 
         word = data.get('word', '').strip()
@@ -115,12 +100,7 @@ def speak_card_content() -> dict[str, Any]:
         spreadsheet_id = data.get('spreadsheet_id')
         sheet_gid = data.get('sheet_gid')
 
-        logger.info('TTS request parameters:')
-        logger.info(f'  Word: "{word}"')
-        logger.info(f'  Example: "{example}"')
-        logger.info(f'  Voice: {voice_name}')
-        logger.info(f'  Spreadsheet ID: {spreadsheet_id}')
-        logger.info(f'  Sheet GID: {sheet_gid}')
+        logger.debug(f'TTS speak-card: word="{word}", example="{example[:30]}..."')
 
         result = {'success': True, 'audio': {}}
 
@@ -160,10 +140,7 @@ def speak_card_content() -> dict[str, Any]:
 @api_bp.route('/cards/<tab_name>')
 def get_card_set_for_listening(tab_name: str) -> dict[str, Any]:
     """Get all cards from a card set for listening mode."""
-    logger.info('=== CARDS API FOR LISTENING ===')
-    logger.info(f'Request from: {request.remote_addr}')
-    logger.info(f'Tab name: {tab_name}')
-    logger.info(f'User agent: {request.headers.get("User-Agent", "Unknown")}')
+    logger.info(f'Loading cards for listening mode: {tab_name}')
 
     try:
         # Check authentication
@@ -241,8 +218,6 @@ def get_card_set_for_listening(tab_name: str) -> dict[str, Any]:
 @api_bp.route('/language-settings', methods=['GET'])
 def get_language_settings() -> dict[str, Any]:
     """Get current language settings for the user's active spreadsheet."""
-    logger.info('=== GET LANGUAGE SETTINGS API ===')
-    logger.info(f'Request from: {request.remote_addr}')
 
     try:
         # Check authentication
@@ -285,8 +260,6 @@ def get_language_settings() -> dict[str, Any]:
 @api_bp.route('/language-settings', methods=['POST'])
 def save_language_settings() -> dict[str, Any]:
     """Save language settings for the user's active spreadsheet with Pydantic validation."""
-    logger.info('=== SAVE LANGUAGE SETTINGS API ===')
-    logger.info(f'Request from: {request.remote_addr}')
 
     try:
         # Check authentication
@@ -419,8 +392,6 @@ def save_language_settings() -> dict[str, Any]:
 @api_bp.route('/language-settings/validate', methods=['POST'])
 def validate_language_settings() -> dict[str, Any]:
     """Validate language settings without saving them."""
-    logger.info('=== VALIDATE LANGUAGE SETTINGS API ===')
-    logger.info(f'Request from: {request.remote_addr}')
 
     try:
         # Get language settings from request
