@@ -35,6 +35,8 @@ For comprehensive information about the application, see our detailed documentat
 
 ## 🛠️ Quick Start
 
+> **👋 New Developer?** See the [**Quick Start Guide**](./docs/quick-start.md) for detailed onboarding instructions, common issues, and how to properly run the application.
+
 ### Prerequisites
 - Python 3.11 or higher
 - uv for fast dependency management ([Install uv](https://docs.astral.sh/uv/))
@@ -54,9 +56,19 @@ uv sync
 cp .secrets.toml.example .secrets.toml
 # Edit .secrets.toml with your credentials
 
+# Initialize database (first time only)
+uv run python init_db.py
+
 # Start development server
+# On Mac/Linux:
 uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
+
+# On Windows (Gunicorn doesn't work - use Waitress instead):
+uv run waitress-serve --host=0.0.0.0 --port=8080 app:app
+# Or simply double-click: run_windows.bat
 ```
+
+> **Windows Users:** Gunicorn requires Unix-specific modules and won't work on Windows. Use Waitress (included) or Flask's dev server instead. See [Quick Start Guide](./docs/quick-start.md) for details.
 
 ### Configuration
 The application uses environment-aware configuration:
