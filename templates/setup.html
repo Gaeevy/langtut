@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Setup Your Spreadsheet{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <h2 class="mb-4">📊 Set Up Your Learning Spreadsheet</h2>
+
+            <div class="alert alert-success mb-4">
+                <h5>✅ You're logged in with Google!</h5>
+                <p>Now let's link your vocabulary spreadsheet to start learning.</p>
+            </div>
+
+            <div class="mb-4">
+                <a href="{{ url_for('settings.settings') }}" class="btn btn-primary btn-lg">
+                    📊 Link My Spreadsheet
+                </a>
+            </div>
+
+            <!-- Instructions -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5>📝 Don't have a spreadsheet yet?</h5>
+                </div>
+                <div class="card-body text-start">
+                    <p>Create a Google Sheets spreadsheet with this structure:</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Column A</th>
+                                    <th>Column B</th>
+                                    <th>Column C</th>
+                                    <th>Column D</th>
+                                    <th>Column E</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>id</strong></td>
+                                    <td><strong>word</strong></td>
+                                    <td><strong>translation</strong></td>
+                                    <td>equivalent</td>
+                                    <td>example</td>
+                                </tr>
+                                <tr class="text-muted">
+                                    <td>1</td>
+                                    <td>olá</td>
+                                    <td>hello</td>
+                                    <td>hi</td>
+                                    <td>Olá, como está?</td>
+                                </tr>
+                                <tr class="text-muted">
+                                    <td>2</td>
+                                    <td>obrigado</td>
+                                    <td>thank you</td>
+                                    <td>thanks</td>
+                                    <td>Obrigado pela ajuda!</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="alert alert-info">
+                        <strong>Tip:</strong> Make sure your spreadsheet is shared with your Google account and has at least the required columns: <code>id</code>, <code>word</code>, and <code>translation</code>.
+                    </div>
+                    <a href="https://docs.google.com/spreadsheets/create" target="_blank" class="btn btn-outline-success">
+                        ➕ Create New Google Sheet
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}

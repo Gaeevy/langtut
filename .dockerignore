@@ -1,0 +1,89 @@
+# Git and version control
+.git/
+.gitignore
+.gitattributes
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+env.bak/
+venv.bak/
+
+# Poetry (keeping uv.lock for Docker build)
+poetry.lock
+
+# Development tools
+.pre-commit-config.yaml
+.ruff_cache/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+.DS_Store
+Thumbs.db
+
+# Documentation (not needed in production)
+*.md
+docs/
+README.md
+LICENSE
+
+# Miscellaneous development files
+misc/
+
+# Secrets and credentials (CRITICAL - never include these!)
+.secrets.toml
+.env
+client_secret.json
+google-cloud-service-account.json
+*service-account*.json
+credentials.json
+token.json
+
+# Database files (will be mounted as volume)
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Session files (will be created at runtime)
+flask_session/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+.tox/
+.nox/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Railway specific
+.railway/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp

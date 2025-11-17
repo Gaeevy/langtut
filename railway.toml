@@ -1,0 +1,16 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+restartPolicyType = "on_failure"
+
+# Note: Environment variables are now managed through Railway dashboard
+# Core variables needed:
+# - LANGTUT_CLIENT_SECRETS_JSON (OAuth credentials)
+# - LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON (TTS credentials)
+# - LANGTUT_SECRET_KEY (Flask session encryption)
+# - RAILWAY_ENVIRONMENT=production (automatically set by Railway)
+
+# Note: Volumes are now created and attached through Railway dashboard
+# The volume should be mounted to /app/data in the Railway dashboard

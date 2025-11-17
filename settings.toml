@@ -1,0 +1,61 @@
+[default]
+# Shared settings across all environments
+max_cards_per_session = 10
+spreadsheet_id = "15_PsHfMb440wtUgZ0d1aJmu5YIXoo9JKytlJINxOV8Q"
+
+# Google OAuth
+client_secrets_file = "client_secret.json"
+scopes = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "openid"
+]
+api_service_name = "sheets"
+api_version = "v4"
+
+# Google TTS
+tts_enabled = true
+tts_language_code = "pt-PT"
+tts_voice_name = "pt-PT-Standard-A"
+tts_audio_encoding = "MP3"
+google_cloud_service_account_file = "google-cloud-service-account.json"
+gcs_audio_bucket = "langtut-tts"
+
+# Flask Session
+session_type = "filesystem"
+session_permanent = false
+session_use_signer = true
+session_cookie_httponly = true
+session_cookie_samesite = "Lax"
+
+# Flask JSON
+json_as_ascii = false
+jsonify_mimetype = "application/json; charset=utf-8"
+
+# Database
+sqlalchemy_track_modifications = false
+
+[local]
+debug = true
+session_cookie_secure = false
+database_path = "data/app.db"
+
+[production]
+debug = false
+session_cookie_secure = true
+database_path = "/app/data/app.db"
+
+[testing]
+debug = false
+session_cookie_secure = false
+database_path = ":memory:"
+tts_enabled = false
+max_cards_per_session = 5
+
+# Testing overrides
+[testing.mock]
+oauth_enabled = false
+sheets_enabled = false
+user_id = "test-user-123"
+user_email = "test@example.com"

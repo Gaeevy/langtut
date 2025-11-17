@@ -1,0 +1,307 @@
+/* Feedback Page Styling */
+
+/* Visual feedback indicators */
+.feedback-indicator {
+    animation: feedbackPulse 0.6s ease-out;
+}
+
+.success-indicator i {
+    font-size: 4rem;
+    color: #28a745;
+    animation: successBounce 0.8s ease-out;
+}
+
+.error-indicator i {
+    font-size: 4rem;
+    color: #dc3545;
+    animation: errorShake 0.6s ease-out;
+}
+
+/* Card border feedback */
+.feedback-card {
+    transition: all 0.5s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.correct-card {
+    border: 3px solid #28a745;
+    box-shadow: 0 0 20px rgba(40, 167, 69, 0.3);
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.05) 0%, rgba(255, 255, 255, 1) 100%);
+}
+
+.incorrect-card {
+    border: 3px solid #dc3545;
+    box-shadow: 0 0 20px rgba(220, 53, 69, 0.3);
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.05) 0%, rgba(255, 255, 255, 1) 100%);
+}
+
+/* TTS Controls Styling */
+.word-with-audio {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.btn-audio-minimal {
+    background: none;
+    border: none;
+    color: #6c757d;
+    font-size: 1.2rem;
+    padding: 8px;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.btn-audio-minimal:hover {
+    background-color: rgba(108, 117, 125, 0.1);
+    color: #4a6da7;
+    transform: scale(1.1);
+}
+
+.btn-audio-minimal:active {
+    transform: scale(0.95);
+}
+
+.btn-audio-minimal:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-audio-minimal:disabled:hover {
+    background: none;
+    color: #6c757d;
+    transform: none;
+}
+
+/* Loading state for minimal button */
+.btn-audio-minimal .bi-hourglass-split {
+    animation: spin 1s linear infinite;
+}
+
+/* Legacy TTS controls (for other pages) */
+.tts-controls {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 15px 0;
+}
+
+.tts-speak-btn {
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 0.875rem;
+    transition: all 0.3s ease;
+    border: 1px solid #6c757d;
+    background-color: transparent;
+    color: #6c757d;
+}
+
+.tts-speak-btn:hover {
+    background-color: #6c757d;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.tts-speak-btn:active {
+    transform: translateY(0);
+}
+
+.tts-speak-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.tts-speak-btn i {
+    margin-right: 4px;
+}
+
+/* Primary TTS button (Listen to all) */
+.tts-speak-btn.btn-outline-primary {
+    border-color: #4a6da7;
+    color: #4a6da7;
+    font-weight: 500;
+}
+
+.tts-speak-btn.btn-outline-primary:hover {
+    background-color: #4a6da7;
+    border-color: #4a6da7;
+    color: white;
+}
+
+/* Secondary TTS buttons (Word/Example) */
+.tts-speak-btn.btn-outline-secondary {
+    border-color: #6c757d;
+    color: #6c757d;
+}
+
+.tts-speak-btn.btn-outline-secondary:hover {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    color: white;
+}
+
+/* Loading state animation */
+.tts-speak-btn .bi-hourglass-split {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Pulse animation for mobile audio hint */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(74, 109, 167, 0.7);
+    }
+    70% {
+        transform: scale(1.05);
+        box-shadow: 0 0 0 10px rgba(74, 109, 167, 0);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(74, 109, 167, 0);
+    }
+}
+
+/* TTS availability indicator */
+.tts-unavailable {
+    display: none;
+}
+
+.tts-controls.unavailable .tts-speak-btn {
+    display: none;
+}
+
+.tts-controls.unavailable::after {
+    content: "🔇 Audio not available";
+    color: #6c757d;
+    font-size: 0.875rem;
+    font-style: italic;
+}
+
+/* Level progression animation */
+.level-dot.level-up {
+    animation: levelUp 1s ease-out;
+}
+
+.level-dot.level-down {
+    animation: levelDown 0.8s ease-out;
+}
+
+/* Feedback card typography hierarchy */
+.feedback-card .card-word {
+    font-size: clamp(2rem, 6vw, 3.5rem);
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 15px;
+}
+
+.feedback-card .card-translation {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: #6c757d;
+    margin-bottom: 10px;
+}
+
+.feedback-card .card-example {
+    font-size: 0.95rem;
+    line-height: 1.4;
+    color: #6c757d;
+    font-style: italic;
+    margin-bottom: 15px;
+    max-width: 90%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.feedback-card .equivalent-content {
+    font-size: 0.9rem;
+    color: #6c757d;
+    padding: 8px 16px;
+    background-color: rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+/* Difficulty rating styling */
+.difficulty-rating {
+    padding: 15px;
+    border-radius: 10px;
+    background-color: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.difficulty-rating .btn-group {
+    gap: 10px;
+}
+
+/* Responsive adjustments for TTS controls */
+@media (max-width: 576px) {
+    .word-with-audio {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .btn-audio-minimal {
+        font-size: 1.1rem;
+        width: 36px;
+        height: 36px;
+    }
+
+    .tts-controls {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .tts-speak-btn {
+        min-width: 120px;
+    }
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+    .success-indicator i,
+    .error-indicator i {
+        font-size: 3rem;
+    }
+
+    .difficulty-rating {
+        padding: 12px;
+    }
+
+    .difficulty-rating .btn {
+        padding: 6px 16px;
+        font-size: 14px;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .feedback-indicator,
+    .success-indicator i,
+    .error-indicator i,
+    .level-dot.level-up,
+    .level-dot.level-down {
+        animation: none;
+    }
+
+    .feedback-card {
+        transition: none;
+    }
+}

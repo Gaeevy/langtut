@@ -1,0 +1,215 @@
+# Cursor Rules - Language Learning Flashcard App
+
+@README.md
+
+## Project Overview
+This is a Flask-based Language Learning Flashcard App with the following characteristics:
+- **Core Purpose**: ANKI-style flashcards with European Portuguese text-to-speech
+- **Data Source**: Google Sheets integration for vocabulary management
+- **Architecture**: Modular Flask app with Blueprint-based routing
+- **Features**: Statistics tracking, PWA support, OAuth authentication
+- **Deployment**: Railway with Docker + uv for fast, reproducible builds
+- **Code Quality**: Pre-commit hooks with ruff linting/formatting
+
+## Current Project Structure
+
+### Core Application Files
+```
+app.py                          # Entry point - creates Flask app and handles dev/prod modes
+src/                           # Main application module
+├── __init__.py               # Flask app factory with blueprint registration
+├── routes/                   # Blueprint-based route organization
+│   ├── __init__.py          # Blueprint registration
+│   ├── auth.py              # Authentication routes
+│   ├── flashcard.py         # Core learning functionality
+│   ├── settings.py          # User settings & spreadsheet config
+│   ├── api.py               # TTS and API endpoints
+│   ├── admin.py             # Database administration
+│   └── test.py              # Testing & debugging
+├── models.py                # Pydantic data models
+├── config.py                # Dynaconf configuration management
+├── gsheet.py                # Google Sheets API integration
+├── auth.py                  # Google OAuth authentication
+├── database.py              # SQLAlchemy database operations
+├── tts_service.py           # Text-to-Speech service
+├── user_manager.py          # User management utilities
+├── session_manager.py       # Centralized session management
+└── utils.py                 # Helper utilities
+```
+
+### Templates & Assets
+```
+templates/                    # Jinja2 HTML templates
+static/                      # Frontend assets (CSS, JS, PWA files)
+docs/                        # Comprehensive documentation
+```
+
+### Configuration & Dependencies
+```
+pyproject.toml              # Project dependencies (PEP 621 format)
+uv.lock                     # Locked dependency versions for reproducibility
+Dockerfile                  # Docker configuration for Railway deployment
+.dockerignore              # Docker build exclusions
+settings.toml              # Main configuration (non-sensitive)
+.secrets.toml              # Sensitive configuration (not in git)
+.pre-commit-config.yaml    # Code quality automation
+```
+
+## Development Rules
+
+### 1. Development Environment Rules
+- **ALWAYS use uv** - Never use direct `python` commands
+  - ✅ `uv run python -c "from src.config import config; print(config.DEBUG)"`
+  - ✅ `uv run pytest`
+  - ✅ `uv run gunicorn --bind 0.0.0.0:8080 --reload app:app`
+  - ❌ `python app.py`
+  - ❌ `python -m pytest`
+- **UV for all development tasks** - Testing, running, debugging (10-100x faster than poetry)
+- **VIRTUAL ENVIRONMENT** - uv manages dependencies and isolation automatically
+
+### 2. File Organization Rules
+- **NEVER add code to monolithic files** - Use blueprint pattern
+- **FEATURE-BASED blueprints**: Each blueprint handles one functional area
+- **BLUEPRINT registration** - Centralized in `routes/__init__.py`
+- **KEEP services focused** - One responsibility per service file
+
+### 3. Code Quality Rules
+- **TYPE HINTS required** - Add type hints to all functions
+- **PYDANTIC models** for all data validation
+- **ERROR HANDLING** - Comprehensive try/catch blocks with logging
+- **PRE-COMMIT HOOKS** - All code must pass ruff linting, formatting, and security checks
+- **NO direct database calls** in routes - use service layer
+- **LOGGING** required for all external API calls
+
+### 4. Session Management Rules
+- **USE SessionManager** - Never access `session[]` directly
+- **IMPORT PATTERN**: `from src.session_manager import SessionManager as sm, SessionKeys as sk`
+- **USAGE PATTERNS**:
+  - Get: `sm.get(sk.USER_ID, default_value)`
+  - Set: `sm.set(sk.AUTH_STATE, value)`
+  - Check: `if sm.has(sk.AUTH_CREDENTIALS):`
+  - Remove: `sm.remove(sk.LEARNING_CARDS)`
+  - Clear namespace: `sm.clear_namespace('auth')`
+- **SESSION KEY NAMESPACES**:
+  - `auth.*` - OAuth state, credentials, redirect URIs
+  - `user.*` - User ID, Google ID
+  - `learning.*` - Cards, progress, answers, review state
+  - `test.*` - Development/debugging
+
+### 5. Data Persistence Rules
+- **DUAL-STORE ARCHITECTURE**:
+  - **Google Sheets**: Content management (cards, vocabulary, learning material)
+  - **SQLite**: Application data (users, sessions, authentication state)
+- **NEVER raw SQL** - Use SQLAlchemy ORM for application data
+- **USE Google Sheets API** for content data with proper error handling
+
+### 6. Configuration Rules
+- **NEVER hardcode credentials** - Use settings.toml/.secrets.toml
+- **ENVIRONMENT variables** take precedence over file config
+- **VALIDATE configuration** on app startup
+
+### 7. Security Rules
+- **VALIDATE all inputs** - Use Pydantic validation
+- **SANITIZE outputs** to prevent XSS
+- **RATE LIMITING** on API endpoints
+- **AUDIT logs** for sensitive operations
+
+### 8. Git Commit Rules
+- **CONCISE commit messages** - Maximum 200 characters total
+- **FORMAT**: `type: brief description (max 150 chars)`
+- **TYPES**: feat, fix, refactor, docs, style, test, chore
+- **FOCUS**: What changed, not why
+
+## Blueprint Patterns
+
+### Blueprint Structure
+```python
+from flask import Blueprint, render_template, request, redirect, url_for
+from typing import Dict, Any, Optional
+
+# Create blueprint with descriptive name
+feature_bp = Blueprint('feature', __name__, url_prefix='/feature')
+
+@feature_bp.route('/endpoint')
+def endpoint_function() -> ReturnType:
+    """Clear docstring describing the endpoint."""
+    # Implementation with proper error handling
+    pass
+```
+
+### Blueprint Registration
+```python
+# In routes/__init__.py
+from flask import Flask
+from .auth import auth_bp
+from .flashcard import flashcard_bp
+
+def register_blueprints(app: Flask) -> None:
+    """Register all blueprints with the Flask app."""
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(flashcard_bp)
+```
+
+### Cross-Blueprint URL Generation
+```python
+# Use blueprint.endpoint format for url_for
+return redirect(url_for('flashcard.index'))
+return redirect(url_for('auth.auth'))
+```
+
+## Route Organization
+
+The application uses 6 main blueprints for route organization:
+
+- **Authentication** (`auth.py`) - OAuth flow, callbacks, credential management
+- **Core Flashcard** (`flashcard.py`) - Learning sessions, card display, feedback
+- **Settings** (`settings.py`) - User preferences, spreadsheet configuration
+- **API** (`api.py`) - TTS endpoints, card management, language settings
+- **Admin** (`admin.py`) - Database administration, user management
+- **Test** (`test.py`) - Development testing and debugging
+
+*For detailed route mappings, see [docs/architecture.md](docs/architecture.md)*
+
+## Development Workflow
+
+### Running the Application
+```bash
+# Start development server (recommended)
+uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
+
+# Run tests
+uv run pytest
+
+# Run pre-commit hooks
+uv run pre-commit run --all-files
+```
+
+### Testing and Debugging
+```bash
+# Test specific functionality
+uv run python -c "from src.tts_service import tts_service; print(tts_service.generate_audio('test'))"
+
+# Check configuration
+uv run python -c "from src.config import config; print(config.DEBUG)"
+
+# Test database connection
+uv run python -c "from src.database import db; print(db.engine.execute('SELECT 1').fetchone())"
+
+# Check uv environment
+uv pip list  # List installed packages
+uv tree      # Show dependency tree
+```
+
+## Pre-commit Configuration
+The project uses automated code quality checks via pre-commit hooks:
+- **Ruff**: Fast Python linting and formatting
+- **File checks**: Trailing whitespace, JSON/YAML/TOML validation
+- **Security**: Bandit security scanning, private key detection
+
+## Documentation
+Comprehensive documentation is available in the `docs/` directory:
+- **Architecture & Configuration** - System design and setup
+- **Feature Documentation** - Listening mode, TTS, user properties
+- **Development Guide** - Setup, testing, deployment procedures
+
+*Always refer to current documentation for detailed implementation guidelines.*

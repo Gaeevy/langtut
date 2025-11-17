@@ -1,0 +1,210 @@
+/* Mobile-First Responsive Design */
+
+/* Touch-friendly interactions */
+.btn {
+    min-height: 44px; /* Apple's recommended touch target size */
+    min-width: 44px;
+    padding: 12px 20px;
+    font-size: 16px; /* Prevents zoom on iOS */
+}
+
+/* Enhanced mobile card design */
+.language-card {
+    padding: 25px 20px;
+    margin: 15px 0;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: transform 0.2s ease;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.language-card:active {
+    transform: scale(0.98);
+}
+
+/* Mobile-optimized form inputs */
+.form-control {
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    transition: border-color 0.2s ease;
+}
+
+.form-control:focus {
+    border-color: #4a6da7;
+    box-shadow: 0 0 0 0.2rem rgba(74, 109, 167, 0.25);
+}
+
+/* Mobile navigation improvements */
+.container {
+    padding-left: 15px;
+    padding-right: 15px;
+}
+
+/* Swipe gestures for cards */
+.swipe-container {
+    position: relative;
+    overflow: hidden;
+    touch-action: pan-y;
+}
+
+.swipe-card {
+    transition: transform 0.3s ease;
+}
+
+/* Mobile-specific progress bar */
+.progress {
+    height: 8px;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+}
+
+.progress-bar {
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+/* Improved mobile typography */
+.card-word {
+    font-size: clamp(1.8rem, 5vw, 3rem);
+    line-height: 1.3;
+    word-break: break-word;
+    font-weight: 500;
+    color: #2c3e50;
+    margin-bottom: 20px;
+}
+
+/* Mobile-optimized alerts */
+.alert {
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+}
+
+/* Tablet breakpoint */
+@media (min-width: 768px) {
+    .container {
+        padding-left: 30px;
+        padding-right: 30px;
+    }
+
+    .language-card {
+        padding: 30px;
+        margin: 20px 0;
+    }
+
+    .btn {
+        min-height: auto;
+        padding: 8px 16px;
+        font-size: 14px;
+    }
+}
+
+/* Desktop breakpoint */
+@media (min-width: 1024px) {
+    .card-container {
+        max-width: 900px;
+        padding: 40px;
+    }
+
+    .language-card {
+        padding: 40px;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: #1a1a1a;
+        color: #ffffff;
+    }
+
+    .card-container,
+    .language-card {
+        background-color: #2d2d2d;
+        color: #ffffff;
+    }
+
+    .form-control {
+        background-color: #3d3d3d;
+        border-color: #555;
+        color: #ffffff;
+    }
+
+    .alert {
+        background-color: #3d3d3d;
+        border-color: #555;
+    }
+}
+
+/* Toggle button styling */
+.equivalent-toggle .btn {
+    border-radius: 20px;
+    font-size: 14px;
+    padding: 6px 16px;
+    transition: all 0.3s ease;
+}
+
+.equivalent-toggle .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+#equivalent-content {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Login screen enhancements */
+.login-icon {
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+
+.btn-lg {
+    border-radius: 25px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+}
+
+.btn-lg:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(74, 109, 167, 0.3);
+}
+
+/* Card example styling */
+.card-example-translation {
+    font-size: 1rem;
+    line-height: 1.4;
+    max-width: 90%;
+    margin: 0 auto;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    #equivalent-content {
+        animation: none;
+    }
+
+    .login-icon {
+        animation: none;
+    }
+}

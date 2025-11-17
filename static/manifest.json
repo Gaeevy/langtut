@@ -1,0 +1,13 @@
+{
+  "name": "Language Learning App",
+  "short_name": "LangTutor",
+  "description": "Practice vocabulary in ANKI style",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#4a6da7",
+  "orientation": "portrait",
+  "icons": [],
+  "categories": ["education", "productivity"],
+  "lang": "en"
+}
