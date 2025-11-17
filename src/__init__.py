@@ -91,7 +91,3 @@ def create_app() -> Flask:
     register_blueprints(app)
 
     return app
-
-
-# Create the app instance (backward compatibility)
-app = create_app()

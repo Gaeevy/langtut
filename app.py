@@ -54,3 +54,9 @@ logger.info('✅ Application startup completed')
 
 # Application ready for Gunicorn
 logger.info(f'🚀 Application ready for Gunicorn in {config.ENVIRONMENT} mode')
+
+# Direct execution support (for debugging only)
+if __name__ == '__main__':
+    logger.warning('🐛 Running Flask development server directly (debugging mode)')
+    logger.warning('⚠️  For production, use: uv run gunicorn --bind 0.0.0.0:8080 app:app')
+    app.run(host='0.0.0.0', port=8080, debug=True)
