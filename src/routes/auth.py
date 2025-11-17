@@ -130,11 +130,7 @@ def oauth2callback():
         # Get the authorization response from the request
         authorization_response = request.url
 
-        # Fix for Railway: ensure HTTPS in authorization response URL
-        if authorization_response.startswith('http://') and (
-            request.host.endswith('.railway.app') or request.host.endswith('.up.railway.app')
-        ):
-            authorization_response = authorization_response.replace('http://', 'https://', 1)
+        authorization_response = authorization_response.replace('http://', 'https://', 1)
 
         flow.fetch_token(authorization_response=authorization_response)
 
