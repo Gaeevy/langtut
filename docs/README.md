@@ -136,7 +136,7 @@ When making changes to the application:
 - [Railway Deployment](https://railway.app/docs)
 
 ### Development Tools
-- [Poetry](https://python-poetry.org/) - Dependency management
+- [uv](https://github.com/astral-sh/uv) - Fast Python package manager
 - [Pydantic](https://pydantic.dev/) - Data validation
 - [SQLAlchemy](https://sqlalchemy.org/) - Database ORM
 - [Bootstrap](https://getbootstrap.com/) - Frontend framework

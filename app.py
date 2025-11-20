@@ -4,7 +4,7 @@ Language Tutor Application
 This is the main entry point for the application.
 Optimized for Gunicorn deployment in all environments.
 
-Development: poetry run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
+Development: uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
 Production:  Uses Railway's automatic Gunicorn deployment
 """
 
