@@ -67,7 +67,7 @@ def get_environment() -> str:
 - **`settings.toml`** - Main configuration with environment sections
 - **`.secrets.toml`** - Sensitive settings (excluded from git)
 - **`railway.toml`** - Railway deployment configuration
-- **`pyproject.toml`** - Poetry dependencies and development tools
+- **`pyproject.toml`** - Python dependencies (PEP 621) and development tools
 
 ### Environment-Specific Settings
 
@@ -166,13 +166,13 @@ class SessionKeys(Enum):
 ### Local Development
 ```bash
 # Install dependencies
-poetry install
+uv sync
 
 # Start development server
-poetry run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
+uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
 
 # Run tests
-poetry run pytest
+uv run pytest
 ```
 
 ### Code Quality
@@ -183,8 +183,8 @@ poetry run pytest
 
 ### Deployment
 - Railway deployment with automatic environment detection
-- Poetry manages dependencies locally
-- `requirements.txt` auto-generated for Railway
+- uv manages dependencies with locked versions (uv.lock)
+- Fast, reproducible builds using uv
 - Environment variables for production credentials
 
 ## Performance Considerations
