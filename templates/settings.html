@@ -3,10 +3,31 @@
 {% block title %}Settings{% endblock %}
 
 {% block content %}
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1060">
+    <div id="settings-toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <strong class="me-auto" id="toast-title">Notification</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="toast-body">
+            Message content
+        </div>
+    </div>
+</div>
+
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-md-8">
-            <h2 class="mb-4">⚙️ Settings</h2>
+            <div class="settings-header">
+                <h2>
+                    <i class="bi bi-gear-fill"></i> Settings
+                </h2>
+                <p class="text-muted mb-0">Manage your language preferences and spreadsheet configuration</p>
+            </div>
 
             <!-- Flash messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -21,7 +42,7 @@
             {% endwith %}
 
             <!-- Language Settings -->
-            <div class="card mb-4">
+            <div class="card settings-card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0">🌐 Language Settings</h5>
                 </div>
@@ -63,84 +84,108 @@
                             </select>
                         </div>
                     </div>
-                    <div class="mt-3">
-                        <button class="btn btn-primary" onclick="saveLanguageSettings()">
-                            💾 Save Language Settings
+                    <div class="settings-btn-group mt-3">
+                        <button class="btn btn-primary" onclick="saveLanguageSettings()" id="save-lang-btn">
+                            <i class="bi bi-save"></i> Save Settings
                         </button>
-                        <button class="btn btn-outline-secondary ms-2" onclick="loadLanguageSettings()">
-                            🔄 Reset to Current
+                        <button class="btn btn-outline-secondary" onclick="loadLanguageSettings()" id="reset-lang-btn">
+                            <i class="bi bi-arrow-counterclockwise"></i> Reset
                         </button>
                     </div>
-                    <div id="language-results" class="mt-3" style="display: none;"></div>
                 </div>
             </div>
 
             <!-- Current Status -->
-            <div class="card mb-4">
+            <div class="card settings-card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0">📋 Current Spreadsheet</h5>
                 </div>
                 <div class="card-body">
                     {% if current_spreadsheet_id %}
-                        <div class="alert alert-success">
-                            <strong>Using Your Spreadsheet</strong><br>
-                            Spreadsheet ID: <code>{{ current_spreadsheet_id }}</code>
+                        <div class="d-flex align-items-start gap-3">
+                            <div class="flex-grow-1">
+                                <div class="status-badge status-badge-success mb-3">
+                                    <i class="bi bi-check-circle-fill"></i> Spreadsheet Connected
+                                </div>
+                                <div class="mb-2">
+                                    <small class="text-muted d-block mb-1">Spreadsheet ID:</small>
+                                    <div class="spreadsheet-id-display">
+                                        {{ current_spreadsheet_id }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <button type="button" class="btn btn-outline-danger btn-sm" 
+                                        onclick="confirmResetSpreadsheet()"
+                                        title="Disconnect this spreadsheet">
+                                    <i class="bi bi-trash"></i> Remove
+                                </button>
+                            </div>
                         </div>
-                        <form method="POST" action="{{ url_for('settings.reset_spreadsheet') }}" class="d-inline" onsubmit="resetSpreadsheet()">
-                            <input type="hidden" name="confirm" value="true">
-                            <button type="submit" class="btn btn-outline-danger btn-sm" disabled id="reset-btn">
-                                Reset to Default
-                            </button>
-                        </form>
                     {% else %}
-                        <div class="alert alert-warning">
-                            <strong>No Spreadsheet Linked</strong><br>
-                            You need to link a spreadsheet to start learning.
+                        <div class="status-badge status-badge-warning">
+                            <i class="bi bi-exclamation-triangle-fill"></i> No Spreadsheet Linked
                         </div>
+                        <p class="mt-3 mb-0 text-muted">
+                            <i class="bi bi-arrow-down"></i> Link a spreadsheet below to start learning
+                        </p>
                     {% endif %}
                 </div>
             </div>
 
             <!-- Spreadsheet ID input form -->
-            <div class="mb-4">
-                <label for="spreadsheet_id" class="form-label">Enter Spreadsheet ID:</label>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="spreadsheet_id"
-                           value="{{ current_spreadsheet_id or '' }}"
-                           placeholder="Enter Google Sheets ID or URL">
-                    <button class="btn btn-outline-secondary" type="button" onclick="validateSpreadsheet()">
-                        Test Connection
-                    </button>
+            <div class="card settings-card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-link-45deg"></i> Link New Spreadsheet
+                    </h5>
                 </div>
-                <div class="form-text">
-                    You can paste the full Google Sheets URL or just the spreadsheet ID.
-                </div>
+                <div class="card-body">
+                    <div class="settings-form-group">
+                        <label for="spreadsheet_id" class="form-label">Spreadsheet ID or URL</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="spreadsheet_id"
+                                value="{{ current_spreadsheet_id or '' }}"
+                                placeholder="Paste Google Sheets URL or ID here">
+                            <button class="btn btn-outline-primary" type="button" 
+                                    onclick="validateSpreadsheet()"
+                                    id="validate-btn">
+                                <i class="bi bi-check-circle"></i> Validate
+                            </button>
+                        </div>
+                        <div class="settings-info">
+                            <small>
+                                <i class="bi bi-info-circle"></i> 
+                                You can paste the full URL (e.g., https://docs.google.com/spreadsheets/d/...) 
+                                or just the spreadsheet ID.
+                            </small>
+                        </div>
+                    </div>
 
-                <!-- Hidden form for setting spreadsheet -->
-                <form method="POST" action="{{ url_for('settings.set_spreadsheet') }}" id="confirm-form" style="display: none;">
-                    <input type="hidden" name="spreadsheet_id" id="confirm-spreadsheet-id">
-                    <input type="hidden" name="confirm" value="true">
-                </form>
+                    <!-- Hidden form for setting spreadsheet -->
+                    <form method="POST" action="{{ url_for('settings.set_spreadsheet') }}" 
+                        id="confirm-form" style="display: none;">
+                        <input type="hidden" name="spreadsheet_id" id="confirm-spreadsheet-id">
+                        <input type="hidden" name="confirm" value="true">
+                    </form>
+                </div>
             </div>
 
-            <!-- Results section -->
-            <div id="results"></div>
-
             <!-- Spreadsheet content preview -->
-            <div id="content-preview" style="display: none;">
-                <div class="card">
+            <div id="content-preview" class="preview-section" style="display: none;">
+                <div class="card settings-card mb-4">
                     <div class="card-header">
                         <h5 class="card-title mb-0">Spreadsheet Preview</h5>
                     </div>
                     <div class="card-body">
                         <div id="spreadsheet-info"></div>
 
-                        <div class="mt-3">
-                            <button class="btn btn-success" onclick="confirmSpreadsheet()">
-                                ✓ Use This Spreadsheet
+                        <div class="settings-btn-group mt-3">
+                            <button class="btn btn-success" onclick="confirmSpreadsheet()" id="confirm-btn">
+                                <i class="bi bi-check-circle"></i> Use This Spreadsheet
                             </button>
-                            <button class="btn btn-secondary ms-2" onclick="hidePreview()">
-                                Cancel
+                            <button class="btn btn-outline-secondary" onclick="hidePreview()" id="cancel-preview-btn">
+                                <i class="bi bi-x-circle"></i> Cancel
                             </button>
                         </div>
                     </div>
@@ -158,6 +203,37 @@
 </div>
 
 <script>
+// Show toast notification
+function showToast(message, type = 'info') {
+    const toastEl = document.getElementById('settings-toast');
+    const toastBody = document.getElementById('toast-body');
+    const toastTitle = document.getElementById('toast-title');
+    const toast = new bootstrap.Toast(toastEl);
+    
+    // Set icon and title based on type
+    const icons = {
+        success: '✓',
+        danger: '✗',
+        warning: '⚠',
+        info: 'ℹ'
+    };
+    
+    const titles = {
+        success: 'Success',
+        danger: 'Error',
+        warning: 'Warning',
+        info: 'Info'
+    };
+    
+    // Update toast appearance
+    toastEl.className = `toast border-${type}`;
+    toastTitle.innerHTML = `${icons[type]} ${titles[type]}`;
+    toastBody.innerHTML = message;
+    
+    // Show toast
+    toast.show();
+}
+
 // Language settings functionality
 function loadLanguageSettings() {
     fetch('/api/language-settings')
@@ -292,14 +368,88 @@ function validateLanguageSettings(languageSettings) {
 }
 
 function showLanguageResult(message, type) {
-    const resultsDiv = document.getElementById('language-results');
-    resultsDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
-    resultsDiv.style.display = 'block';
+    showToast(message, type);
+}
 
-    // Hide after 8 seconds (longer for more detailed messages)
-    setTimeout(() => {
-        resultsDiv.style.display = 'none';
-    }, 8000);
+// Helper function to set button loading state
+function setButtonLoading(buttonId, isLoading, originalText = null) {
+    const button = document.getElementById(buttonId);
+    if (!button) return;
+    
+    if (isLoading) {
+        button.dataset.originalText = button.innerHTML;
+        button.classList.add('btn-loading');
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading...';
+    } else {
+        button.classList.remove('btn-loading');
+        button.disabled = false;
+        button.innerHTML = originalText || button.dataset.originalText;
+    }
+}
+
+function validateSpreadsheet() {
+    const spreadsheetId = document.getElementById('spreadsheet_id').value.trim();
+    const resultsDiv = document.getElementById('results');
+    const previewDiv = document.getElementById('content-preview');
+    const validateBtn = document.getElementById('validate-btn');
+
+    if (!spreadsheetId) {
+        showToast('Please enter a spreadsheet ID or URL', 'danger');
+        return;
+    }
+
+    // Show loading state
+    setButtonLoading('validate-btn', true);
+    previewDiv.style.display = 'none';
+
+    fetch('/validate-spreadsheet', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            spreadsheet_url: spreadsheetId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        setButtonLoading('validate-btn', false, '<i class="bi bi-check-circle"></i> Validate');
+        
+        if (data.success) {
+            // Show preview...
+            showPreview(data);
+        } else {
+            showToast('Validation failed: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        setButtonLoading('validate-btn', false, '<i class="bi bi-check-circle"></i> Validate');
+        showToast('Error: ' + error.message, 'danger');
+    });
+}
+
+function confirmResetSpreadsheet() {
+    if (confirm('Are you sure you want to disconnect this spreadsheet? You will need to link it again to continue learning.')) {
+        fetch('/reset-spreadsheet', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Spreadsheet disconnected successfully', 'success');
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                showToast('Failed to disconnect: ' + data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            showToast('Error: ' + error.message, 'danger');
+        });
+    }
 }
 
 // Load language settings when page loads
@@ -440,8 +590,52 @@ function confirmSpreadsheet() {
     });
 }
 
+function showPreview(data) {
+    const previewDiv = document.getElementById('content-preview');
+    
+    // Build preview content
+    let cardSetsInfo = '';
+    if (data.card_sets && data.card_sets.length > 0) {
+        cardSetsInfo = '<h6 class="mb-3">Card Sets Found:</h6><ul class="list-unstyled">';
+        data.card_sets.forEach(cs => {
+            cardSetsInfo += `
+                <li class="mb-2">
+                    <i class="bi bi-folder-fill text-primary"></i>
+                    <strong>${cs.name}</strong> 
+                    <span class="badge bg-secondary">${cs.card_count} cards</span>
+                </li>`;
+        });
+        cardSetsInfo += '</ul>';
+    }
+
+    document.getElementById('spreadsheet-info').innerHTML = `
+        <div class="status-badge status-badge-success mb-3">
+            <i class="bi bi-check-circle-fill"></i> Spreadsheet Validated Successfully
+        </div>
+        <div class="mb-3">
+            <small class="text-muted d-block mb-1">Spreadsheet ID:</small>
+            <div class="spreadsheet-id-display">
+                ${data.spreadsheet_id}
+            </div>
+        </div>
+        ${cardSetsInfo}
+    `;
+
+    document.getElementById('confirm-spreadsheet-id').value = data.spreadsheet_id;
+
+    // Show with animation
+    previewDiv.style.display = 'block';
+    setTimeout(() => {
+        previewDiv.classList.add('show');
+    }, 10);
+}
+
 function hidePreview() {
-    document.getElementById('content-preview').style.display = 'none';
+    const previewDiv = document.getElementById('content-preview');
+    previewDiv.classList.remove('show');
+    setTimeout(() => {
+        previewDiv.style.display = 'none';
+    }, 300);
 }
 
 function resetSpreadsheet() {
