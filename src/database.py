@@ -11,7 +11,7 @@ db = SQLAlchemy()
 class User(db.Model):
     """User model for storing Google OAuth user information"""
 
-    __tablename__ = 'users'
+    __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
     google_user_id = Column(String(255), unique=True, nullable=False, index=True)
@@ -22,11 +22,11 @@ class User(db.Model):
 
     # Relationship to user spreadsheets
     spreadsheets = relationship(
-        'UserSpreadsheet', back_populates='user', cascade='all, delete-orphan'
+        "UserSpreadsheet", back_populates="user", cascade="all, delete-orphan"
     )
 
     def __repr__(self):
-        return f'<User {self.email}>'
+        return f"<User {self.email}>"
 
     def get_active_spreadsheet(self):
         """Get the user's currently active spreadsheet"""
@@ -34,22 +34,22 @@ class User(db.Model):
 
     def to_dict(self):
         return {
-            'id': self.id,
-            'google_user_id': self.google_user_id,
-            'email': self.email,
-            'name': self.name,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_login': self.last_login.isoformat() if self.last_login else None,
+            "id": self.id,
+            "google_user_id": self.google_user_id,
+            "email": self.email,
+            "name": self.name,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "last_login": self.last_login.isoformat() if self.last_login else None,
         }
 
 
 class UserSpreadsheet(db.Model):
     """Model for storing user's linked spreadsheets"""
 
-    __tablename__ = 'user_spreadsheets'
+    __tablename__ = "user_spreadsheets"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     spreadsheet_id = Column(String(255), nullable=False, index=True)
     spreadsheet_name = Column(String(255))  # User-defined name (future feature)
     spreadsheet_url = Column(Text)  # Full URL for reference
@@ -59,15 +59,15 @@ class UserSpreadsheet(db.Model):
     properties = Column(Text)  # JSON string storage
 
     # Relationship to user
-    user = relationship('User', back_populates='spreadsheets')
+    user = relationship("User", back_populates="spreadsheets")
 
     # Unique constraint to prevent duplicate spreadsheets per user
     __table_args__ = (
-        db.UniqueConstraint('user_id', 'spreadsheet_id', name='unique_user_spreadsheet'),
+        db.UniqueConstraint("user_id", "spreadsheet_id", name="unique_user_spreadsheet"),
     )
 
     def __repr__(self):
-        return f'<UserSpreadsheet {self.spreadsheet_id} for user {self.user_id}>'
+        return f"<UserSpreadsheet {self.spreadsheet_id} for user {self.user_id}>"
 
     def get_properties(self):
         """Get UserSpreadsheetProperty object from JSON string."""
@@ -86,7 +86,7 @@ class UserSpreadsheet(db.Model):
             prop_obj = UserSpreadsheetProperty(**properties)
             self.properties = prop_obj.to_db_string()
         else:
-            raise ValueError('Properties must be UserSpreadsheetProperty object or dict')
+            raise ValueError("Properties must be UserSpreadsheetProperty object or dict")
 
     def get_language_settings(self) -> dict:
         """Get language settings from properties."""
@@ -101,16 +101,16 @@ class UserSpreadsheet(db.Model):
 
     def to_dict(self):
         return {
-            'id': self.id,
-            'user_id': self.user_id,
-            'spreadsheet_id': self.spreadsheet_id,
-            'spreadsheet_name': self.spreadsheet_name,
-            'spreadsheet_url': self.spreadsheet_url,
-            'is_active': self.is_active,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_used': self.last_used.isoformat() if self.last_used else None,
-            'properties': self.properties,
-            'language_settings': self.get_language_settings(),  # Add language settings to dict
+            "id": self.id,
+            "user_id": self.user_id,
+            "spreadsheet_id": self.spreadsheet_id,
+            "spreadsheet_name": self.spreadsheet_name,
+            "spreadsheet_url": self.spreadsheet_url,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "last_used": self.last_used.isoformat() if self.last_used else None,
+            "properties": self.properties,
+            "language_settings": self.get_language_settings(),  # Add language settings to dict
         }
 
 
@@ -128,8 +128,8 @@ def init_database(app):
     # Ensure directory exists (for local development)
     database_path.parent.mkdir(parents=True, exist_ok=True)
 
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{database_path}'
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{database_path}"
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     db.init_app(app)
 
@@ -189,7 +189,7 @@ def add_user_spreadsheet(
             existing.spreadsheet_name = spreadsheet_name
         if make_active:
             UserSpreadsheet.query.filter_by(user_id=user_id, is_active=True).update(
-                {'is_active': False}
+                {"is_active": False}
             )
             existing.is_active = True
         db.session.commit()
@@ -197,7 +197,7 @@ def add_user_spreadsheet(
 
     if make_active:
         UserSpreadsheet.query.filter_by(user_id=user_id, is_active=True).update(
-            {'is_active': False}
+            {"is_active": False}
         )
 
     # Create new spreadsheet with default properties
@@ -239,7 +239,7 @@ def set_active_spreadsheet(user_id, spreadsheet_id):
     """Set a specific spreadsheet as active for the user"""
     ensure_tables()
 
-    UserSpreadsheet.query.filter_by(user_id=user_id, is_active=True).update({'is_active': False})
+    UserSpreadsheet.query.filter_by(user_id=user_id, is_active=True).update({"is_active": False})
 
     target_spreadsheet = UserSpreadsheet.query.filter_by(
         user_id=user_id, spreadsheet_id=spreadsheet_id

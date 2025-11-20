@@ -114,8 +114,8 @@ force-single-line = false
 split-on-trailing-comma = true
 
 [tool.ruff.format]
-# Use single quotes
-quote-style = "single"
+# Use double quotes
+quote-style = "double"
 # Indent with 4 spaces
 indent-style = "space"
 # Don't format docstrings

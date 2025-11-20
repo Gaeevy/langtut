@@ -29,8 +29,8 @@ def setup_logging() -> logging.Logger:
 
     # Create formatter with milliseconds for performance debugging
     formatter = logging.Formatter(
-        '%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
+        "%(asctime)s.%(msecs)03d - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     # Console handler (works on both local and Railway)
@@ -40,8 +40,8 @@ def setup_logging() -> logging.Logger:
     logger.addHandler(console_handler)
 
     # Set specific logger levels
-    logging.getLogger('werkzeug').setLevel(logging.WARNING)
-    logging.getLogger('googleapiclient.discovery').setLevel(logging.WARNING)
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
+    logging.getLogger("googleapiclient.discovery").setLevel(logging.WARNING)
 
     return logger
 
@@ -54,11 +54,11 @@ def get_environment() -> str:
         str: 'production' or 'local'
     """
     # Production environment - Railway sets RAILWAY_ENVIRONMENT automatically
-    if os.getenv('RAILWAY_ENVIRONMENT') == 'production':
-        return 'production'
+    if os.getenv("RAILWAY_ENVIRONMENT") == "production":
+        return "production"
 
     # Default to local development
-    return 'local'
+    return "local"
 
 
 def load_credentials_from_env(env_var_name: str) -> str | None:
@@ -78,12 +78,12 @@ def load_credentials_from_env(env_var_name: str) -> str | None:
     try:
         credentials_data = json.loads(env_json)
         # Create temporary file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as temp_file:
             json.dump(credentials_data, temp_file)
-            logger.info(f'Loaded credentials from environment variable: {env_var_name}')
+            logger.info(f"Loaded credentials from environment variable: {env_var_name}")
             return temp_file.name
     except (json.JSONDecodeError, TypeError) as e:
-        logger.error(f'Error parsing {env_var_name}: {e}')
+        logger.error(f"Error parsing {env_var_name}: {e}")
         return None
 
 
@@ -99,10 +99,10 @@ def load_credentials_from_file(file_path: str) -> str | None:
     """
     path = Path(file_path)
     if path.exists():
-        logger.info(f'Loaded credentials from file: {file_path}')
+        logger.info(f"Loaded credentials from file: {file_path}")
         return str(path)
 
-    logger.warning(f'Credentials file not found: {file_path}')
+    logger.warning(f"Credentials file not found: {file_path}")
     return None
 
 
@@ -111,12 +111,12 @@ logger = setup_logging()
 
 # Load configuration based on environment
 environment = get_environment()
-logger.info(f'Detected environment: {environment}')
+logger.info(f"Detected environment: {environment}")
 
 # Load settings from TOML files
 _settings = Dynaconf(
-    envvar_prefix='LANGTUT',
-    settings_files=['settings.toml', '.secrets.toml'],
+    envvar_prefix="LANGTUT",
+    settings_files=["settings.toml", ".secrets.toml"],
     environments=True,
     env=environment,
     load_dotenv=True,
@@ -137,40 +137,40 @@ class Config(BaseSettings):
 
     # Environment
     environment: str = environment
-    debug: bool = _settings['debug']
+    debug: bool = _settings["debug"]
 
     # Core app
-    secret_key: str | None = _settings.get('SECRET_KEY', None)
-    max_cards_per_session: int = _settings['max_cards_per_session']
-    spreadsheet_id: str = _settings['spreadsheet_id']
+    secret_key: str | None = _settings.get("SECRET_KEY", None)
+    max_cards_per_session: int = _settings["max_cards_per_session"]
+    spreadsheet_id: str = _settings["spreadsheet_id"]
 
     # Database
-    database_path: str = _settings['database_path']
+    database_path: str = _settings["database_path"]
 
     # Flask Session
-    session_type: str = _settings['session_type']
-    session_permanent: bool = _settings['session_permanent']
-    session_use_signer: bool = _settings['session_use_signer']
-    session_cookie_secure: bool = _settings['session_cookie_secure']
-    session_cookie_httponly: bool = _settings['session_cookie_httponly']
-    session_cookie_samesite: str = _settings['session_cookie_samesite']
+    session_type: str = _settings["session_type"]
+    session_permanent: bool = _settings["session_permanent"]
+    session_use_signer: bool = _settings["session_use_signer"]
+    session_cookie_secure: bool = _settings["session_cookie_secure"]
+    session_cookie_httponly: bool = _settings["session_cookie_httponly"]
+    session_cookie_samesite: str = _settings["session_cookie_samesite"]
 
     # Flask JSON
-    json_as_ascii: bool = _settings['json_as_ascii']
+    json_as_ascii: bool = _settings["json_as_ascii"]
 
     # Google OAuth
-    client_secrets_file: str = _settings['client_secrets_file']
-    scopes: list[str] = _settings['scopes']
-    api_service_name: str = _settings['api_service_name']
-    api_version: str = _settings['api_version']
+    client_secrets_file: str = _settings["client_secrets_file"]
+    scopes: list[str] = _settings["scopes"]
+    api_service_name: str = _settings["api_service_name"]
+    api_version: str = _settings["api_version"]
 
     # Google TTS
-    tts_enabled: bool = _settings['tts_enabled']
-    tts_language_code: str = _settings['tts_language_code']
-    tts_voice_name: str = _settings['tts_voice_name']
-    tts_audio_encoding: str = _settings['tts_audio_encoding']
-    google_cloud_service_account_file: str = _settings['google_cloud_service_account_file']
-    gcs_audio_bucket: str = _settings['gcs_audio_bucket']
+    tts_enabled: bool = _settings["tts_enabled"]
+    tts_language_code: str = _settings["tts_language_code"]
+    tts_voice_name: str = _settings["tts_voice_name"]
+    tts_audio_encoding: str = _settings["tts_audio_encoding"]
+    google_cloud_service_account_file: str = _settings["google_cloud_service_account_file"]
+    gcs_audio_bucket: str = _settings["gcs_audio_bucket"]
 
     # Private cached credentials
     _client_secrets_file_cache: str | None = None
@@ -191,7 +191,7 @@ class Config(BaseSettings):
             return self._client_secrets_file_cache
 
         # Try environment variable first (Railway/production)
-        result = load_credentials_from_env('LANGTUT_CLIENT_SECRETS_JSON')
+        result = load_credentials_from_env("LANGTUT_CLIENT_SECRETS_JSON")
         if result:
             self._client_secrets_file_cache = result
             return result
@@ -216,7 +216,7 @@ class Config(BaseSettings):
             return self._google_cloud_service_account_file_cache
 
         # Try environment variable first (Railway/production)
-        result = load_credentials_from_env('LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON')
+        result = load_credentials_from_env("LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON")
         if result:
             self._google_cloud_service_account_file_cache = result
             return result
@@ -231,11 +231,11 @@ class Config(BaseSettings):
 config = Config()
 
 # Log configuration status
-logger.info(f'Configuration loaded for {environment} environment')
-logger.info(f'Debug mode: {config.debug}')
-logger.info(f'Database path: {config.database_path}')
-logger.info(f'TTS enabled: {config.tts_enabled}')
-logger.info(f'OAuth credentials available: {config.client_secrets_file_path is not None}')
+logger.info(f"Configuration loaded for {environment} environment")
+logger.info(f"Debug mode: {config.debug}")
+logger.info(f"Database path: {config.database_path}")
+logger.info(f"TTS enabled: {config.tts_enabled}")
+logger.info(f"OAuth credentials available: {config.client_secrets_file_path is not None}")
 logger.info(
-    f'TTS credentials available: {config.google_cloud_service_account_file_path is not None}'
+    f"TTS credentials available: {config.google_cloud_service_account_file_path is not None}"
 )

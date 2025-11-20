@@ -24,14 +24,14 @@ logger = logging.getLogger(__name__)
 def extract_spreadsheet_id(url_or_id: str) -> str:
     """Extract spreadsheet ID from Google Sheets URL or return ID if already provided"""
     # If it's already just an ID (no slashes), return as-is
-    if '/' not in url_or_id:
+    if "/" not in url_or_id:
         return url_or_id.strip()
 
     # Extract ID from various Google Sheets URL formats
     patterns = [
-        r'/spreadsheets/d/([a-zA-Z0-9-_]+)',  # Standard URL
-        r'[?&]id=([a-zA-Z0-9-_]+)',  # Query parameter
-        r'/d/([a-zA-Z0-9-_]+)/edit',  # Edit URL
+        r"/spreadsheets/d/([a-zA-Z0-9-_]+)",  # Standard URL
+        r"[?&]id=([a-zA-Z0-9-_]+)",  # Query parameter
+        r"/d/([a-zA-Z0-9-_]+)/edit",  # Edit URL
     ]
 
     for pattern in patterns:
@@ -48,76 +48,76 @@ def validate_spreadsheet_access(spreadsheet_id: str) -> tuple[bool, str, list[st
     Validate that the user has access to the spreadsheet and it has the correct format
     Returns: (is_valid, error_message, worksheet_names)
     """
-    logger.info(f'Validating spreadsheet access: {spreadsheet_id}')
+    logger.info(f"Validating spreadsheet access: {spreadsheet_id}")
 
     creds = get_credentials()
     if not creds:
-        logger.warning('No credentials available for spreadsheet validation')
-        return False, 'Not authenticated with Google', []
+        logger.warning("No credentials available for spreadsheet validation")
+        return False, "Not authenticated with Google", []
 
     try:
-        logger.info('Authorizing Google Sheets client...')
+        logger.info("Authorizing Google Sheets client...")
         gc = gspread.authorize(creds)
         spreadsheet = gc.open_by_key(spreadsheet_id)
-        logger.info(f'Successfully opened spreadsheet: {spreadsheet.title}')
+        logger.info(f"Successfully opened spreadsheet: {spreadsheet.title}")
 
         # Get worksheet names
         worksheets = spreadsheet.worksheets()
         worksheet_names = [ws.title for ws in worksheets]
-        logger.info(f'Found {len(worksheets)} worksheets: {worksheet_names}')
+        logger.info(f"Found {len(worksheets)} worksheets: {worksheet_names}")
 
         # Basic validation - check if at least one worksheet exists
         if not worksheets:
-            logger.warning('Spreadsheet has no worksheets')
-            return False, 'Spreadsheet has no worksheets', []
+            logger.warning("Spreadsheet has no worksheets")
+            return False, "Spreadsheet has no worksheets", []
 
         # Try to read the first worksheet to validate format
         first_worksheet = worksheets[0]
-        logger.info(f'Validating format of first worksheet: {first_worksheet.title}')
+        logger.info(f"Validating format of first worksheet: {first_worksheet.title}")
         values = first_worksheet.get_all_values()
 
         if not values or len(values) < 2:  # Need at least header + 1 data row
-            logger.warning('Spreadsheet appears to be empty or has insufficient data')
+            logger.warning("Spreadsheet appears to be empty or has insufficient data")
             return (
                 False,
-                'Spreadsheet appears to be empty or has insufficient data',
+                "Spreadsheet appears to be empty or has insufficient data",
                 worksheet_names,
             )
 
         # Check if header row has expected columns (basic validation)
         header = values[0] if values else []
-        expected_columns = ['id', 'word', 'translation']  # Minimum required columns
-        logger.info(f'Header row: {header}')
-        logger.info(f'Expected columns: {expected_columns}')
+        expected_columns = ["id", "word", "translation"]  # Minimum required columns
+        logger.info(f"Header row: {header}")
+        logger.info(f"Expected columns: {expected_columns}")
 
         # Convert to lowercase for comparison
         header_lower = [col.lower() for col in header]
         missing_columns = [col for col in expected_columns if col not in header_lower]
 
         if missing_columns:
-            logger.warning(f'Missing required columns: {missing_columns}')
+            logger.warning(f"Missing required columns: {missing_columns}")
             return (
                 False,
-                f'Missing required columns: {", ".join(missing_columns)}. Expected columns: id, word, translation, equivalent, example',
+                f"Missing required columns: {', '.join(missing_columns)}. Expected columns: id, word, translation, equivalent, example",
                 worksheet_names,
             )
 
-        logger.info('✅ Spreadsheet validation successful')
-        return True, 'Spreadsheet is valid', worksheet_names
+        logger.info("✅ Spreadsheet validation successful")
+        return True, "Spreadsheet is valid", worksheet_names
 
     except gspread.SpreadsheetNotFound:
-        logger.error(f'Spreadsheet not found: {spreadsheet_id}')
+        logger.error(f"Spreadsheet not found: {spreadsheet_id}")
         return (
             False,
             "Spreadsheet not found. Please check the URL/ID and make sure it's shared with your Google account.",
             [],
         )
     except gspread.APIError as e:
-        logger.error(f'Google Sheets API error: {e}')
-        return False, f'Google Sheets API error: {e!s}', []
+        logger.error(f"Google Sheets API error: {e}")
+        return False, f"Google Sheets API error: {e!s}", []
     except Exception as e:
-        logger.error(f'Error accessing spreadsheet: {e}', exc_info=True)
-        return False, f'Error accessing spreadsheet: {e!s}', []
+        logger.error(f"Error accessing spreadsheet: {e}", exc_info=True)
+        return False, f"Error accessing spreadsheet: {e!s}", []
 
 
 def get_spreadsheet(spreadsheet_id: str = None) -> Spreadsheet | None:
@@ -134,7 +134,7 @@ def get_spreadsheet(spreadsheet_id: str = None) -> Spreadsheet | None:
         spreadsheet = gc.open_by_key(sheet_id)
         return spreadsheet
     except Exception as e:
-        print(f'Error accessing spreadsheet {sheet_id} with auth using creds {creds}: {e}')
+        print(f"Error accessing spreadsheet {sheet_id} with auth using creds {creds}: {e}")
         return None
 
 
@@ -148,7 +148,7 @@ def get_worksheet(worksheet_name, spreadsheet_id: str = None) -> Worksheet | Non
         worksheet = spreadsheet.worksheet(worksheet_name)
         return worksheet
     except Exception as e:
-        print(f'Error accessing worksheet {worksheet_name}: {e}')
+        print(f"Error accessing worksheet {worksheet_name}: {e}")
         return None
 
 
@@ -205,16 +205,16 @@ def read_cards_from_worksheet(worksheet) -> list[Card]:
             continue
 
         # Pad the row if it doesn't have enough columns
-        padded_row = row + [''] * (10 - len(row)) if len(row) < 10 else row
+        padded_row = row + [""] * (10 - len(row)) if len(row) < 10 else row
 
         try:
             card = Card(
                 id=int(padded_row[0]),
                 word=padded_row[1],  # Keep original encoding
-                translation=padded_row[2] if len(padded_row) > 2 else '',
-                equivalent=padded_row[3] if len(padded_row) > 3 else '',
-                example=padded_row[4] if len(padded_row) > 4 else '',
-                example_translation=padded_row[5] if len(padded_row) > 5 else '',
+                translation=padded_row[2] if len(padded_row) > 2 else "",
+                equivalent=padded_row[3] if len(padded_row) > 3 else "",
+                example=padded_row[4] if len(padded_row) > 4 else "",
+                example_translation=padded_row[5] if len(padded_row) > 5 else "",
                 cnt_shown=int(padded_row[6]) if len(padded_row) > 6 and padded_row[6] else 0,
                 cnt_corr_answers=int(padded_row[7]) if len(padded_row) > 7 and padded_row[7] else 0,
                 level=Levels(int(padded_row[8]))
@@ -226,7 +226,7 @@ def read_cards_from_worksheet(worksheet) -> list[Card]:
             )
             cards.append(card)
         except Exception as e:
-            print(f'Error processing row {row}: {e}')
+            print(f"Error processing row {row}: {e}")
             continue
 
     return cards
@@ -235,27 +235,27 @@ def read_cards_from_worksheet(worksheet) -> list[Card]:
 def update_spreadsheet(worksheet_name, cards, spreadsheet_id: str = None):
     """Update data in Google Sheets in bulk for a specific sheet"""
     logger.info(
-        f'Updating spreadsheet: {worksheet_name} ({len(cards)} cards, ID: {spreadsheet_id})'
+        f"Updating spreadsheet: {worksheet_name} ({len(cards)} cards, ID: {spreadsheet_id})"
     )
 
     # Log card details being updated
     for i, card in enumerate(cards):
         logger.info(
-            f'  Card {i + 1}: ID={card.id}, shown={card.cnt_shown}, correct={card.cnt_corr_answers}, level={card.level.value}'
+            f"  Card {i + 1}: ID={card.id}, shown={card.cnt_shown}, correct={card.cnt_corr_answers}, level={card.level.value}"
         )
 
     try:
         # First, we need to get all cards from the sheet
         card_set = read_card_set(worksheet_name, spreadsheet_id)
         if not card_set:
-            raise Exception(f'Could not read worksheet {worksheet_name}')
+            raise Exception(f"Could not read worksheet {worksheet_name}")
 
         all_cards = card_set.cards
-        logger.info(f'Read {len(all_cards)} cards from worksheet')
+        logger.info(f"Read {len(all_cards)} cards from worksheet")
 
         # Create a map of card IDs to their updated versions
         card_updates = {card.id: card for card in cards}
-        logger.info(f'Created update map for card IDs: {list(card_updates.keys())}')
+        logger.info(f"Created update map for card IDs: {list(card_updates.keys())}")
 
         # Update the all_cards list with the modified cards
         updated_count = 0
@@ -269,17 +269,17 @@ def update_spreadsheet(worksheet_name, cards, spreadsheet_id: str = None):
                 all_cards[i].last_shown = updated_card.last_shown
                 updated_count += 1
                 logger.info(
-                    f'Updated card {card.id}: shown={updated_card.cnt_shown}, correct={updated_card.cnt_corr_answers}, level={updated_card.level.value}'
+                    f"Updated card {card.id}: shown={updated_card.cnt_shown}, correct={updated_card.cnt_corr_answers}, level={updated_card.level.value}"
                 )
 
-        logger.info(f'Updated {updated_count} cards in memory')
+        logger.info(f"Updated {updated_count} cards in memory")
 
         # Now proceed with updating only the dynamic columns of the sheet
         worksheet = get_worksheet(worksheet_name, spreadsheet_id)
         if not worksheet:
-            raise Exception(f'Could not access worksheet {worksheet_name}')
+            raise Exception(f"Could not access worksheet {worksheet_name}")
 
-        logger.info('Accessing worksheet for batch update...')
+        logger.info("Accessing worksheet for batch update...")
 
         # Prepare the updates for only the dynamic columns
         # Column indices: cnt_shown=6, cnt_corr_answers=7, level=8, last_shown=9
@@ -296,25 +296,25 @@ def update_spreadsheet(worksheet_name, cards, spreadsheet_id: str = None):
             for col_idx, value in zip(dynamic_columns, values, strict=False):
                 cell_updates.append(
                     {
-                        'range': f'{chr(65 + col_idx)}{i + 2}',  # e.g., G2, H2, I2, J2
-                        'values': [[value]],
+                        "range": f"{chr(65 + col_idx)}{i + 2}",  # e.g., G2, H2, I2, J2
+                        "values": [[value]],
                     }
                 )
 
-        logger.info(f'Prepared {len(cell_updates)} cell updates for batch operation')
+        logger.info(f"Prepared {len(cell_updates)} cell updates for batch operation")
 
         # Execute the batch update if there are changes
         if cell_updates:
-            logger.info('Executing batch update to Google Sheets...')
+            logger.info("Executing batch update to Google Sheets...")
             result = worksheet.batch_update(cell_updates)
             logger.info(
-                f'✅ Batch update completed successfully. Updated {len(cell_updates)} cells'
+                f"✅ Batch update completed successfully. Updated {len(cell_updates)} cells"
             )
             return result
 
-        logger.info('No updates to make')
-        return 'No updates to make'
+        logger.info("No updates to make")
+        return "No updates to make"
 
     except Exception as e:
-        logger.error(f'❌ Error updating spreadsheet: {e}', exc_info=True)
+        logger.error(f"❌ Error updating spreadsheet: {e}", exc_info=True)
         raise

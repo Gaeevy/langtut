@@ -32,74 +32,74 @@ class TTSService:
     def _initialize_clients(self):
         """Initialize the Google Cloud TTS and Storage clients"""
         if not self.enabled:
-            logger.info('TTS is disabled in configuration')
+            logger.info("TTS is disabled in configuration")
             return
 
         service_account_file = config.google_cloud_service_account_file_path
-        logger.info(f'Checking for service account file: {service_account_file}')
+        logger.info(f"Checking for service account file: {service_account_file}")
         logger.info(
-            f'File exists: {service_account_file and os.path.exists(service_account_file) if service_account_file else False}'
+            f"File exists: {service_account_file and os.path.exists(service_account_file) if service_account_file else False}"
         )
 
         try:
             if service_account_file and os.path.exists(service_account_file):
                 # Use service account file
-                logger.info(f'Loading service account from file: {service_account_file}')
+                logger.info(f"Loading service account from file: {service_account_file}")
                 credentials = service_account.Credentials.from_service_account_file(
                     service_account_file
                 )
                 self.tts_client = texttospeech.TextToSpeechClient(credentials=credentials)
                 self.storage_client = storage.Client(credentials=credentials)
-                self.credential_source = 'service_account_file'
-                logger.info('✅ TTS client initialized with service account file')
-                logger.info(f'   Service account email: {credentials.service_account_email}')
-                logger.info(f'   Project ID: {credentials.project_id}')
+                self.credential_source = "service_account_file"
+                logger.info("✅ TTS client initialized with service account file")
+                logger.info(f"   Service account email: {credentials.service_account_email}")
+                logger.info(f"   Project ID: {credentials.project_id}")
             else:
                 # Try to use default credentials (for production with environment variables)
-                logger.info('Service account file not found, trying default credentials...')
+                logger.info("Service account file not found, trying default credentials...")
                 try:
                     self.tts_client = texttospeech.TextToSpeechClient()
                     self.storage_client = storage.Client()
-                    self.credential_source = 'default_credentials'
-                    logger.info('✅ TTS client initialized with default credentials')
+                    self.credential_source = "default_credentials"
+                    logger.info("✅ TTS client initialized with default credentials")
 
                     # Try to get more info about default credentials
                     try:
                         import google.auth
 
                         default_creds, project = google.auth.default()
-                        logger.info(f'   Default credentials type: {type(default_creds).__name__}')
-                        if hasattr(default_creds, 'service_account_email'):
+                        logger.info(f"   Default credentials type: {type(default_creds).__name__}")
+                        if hasattr(default_creds, "service_account_email"):
                             logger.info(
-                                f'   Service account email: {default_creds.service_account_email}'
+                                f"   Service account email: {default_creds.service_account_email}"
                             )
                         if project:
-                            logger.info(f'   Project ID: {project}')
+                            logger.info(f"   Project ID: {project}")
                     except Exception as e:
-                        logger.info(f'   Could not get default credential details: {e}')
+                        logger.info(f"   Could not get default credential details: {e}")
 
                 except Exception as e:
                     logger.error(
-                        f'❌ Failed to initialize TTS client with default credentials: {e}'
+                        f"❌ Failed to initialize TTS client with default credentials: {e}"
                     )
                     self.enabled = False
-                    self.credential_source = 'none'
+                    self.credential_source = "none"
                     return
 
             # Initialize GCS bucket for audio caching
             try:
                 bucket_name = config.gcs_audio_bucket
                 self.bucket = self.storage_client.bucket(bucket_name)
-                logger.info(f'✅ GCS bucket initialized: {bucket_name}')
+                logger.info(f"✅ GCS bucket initialized: {bucket_name}")
             except Exception as e:
-                logger.warning(f'⚠️ GCS bucket initialization failed: {e}')
-                logger.warning('   Continuing without GCS caching...')
+                logger.warning(f"⚠️ GCS bucket initialization failed: {e}")
+                logger.warning("   Continuing without GCS caching...")
                 self.bucket = None
 
         except Exception as e:
-            logger.error(f'❌ Failed to initialize TTS client: {e}')
+            logger.error(f"❌ Failed to initialize TTS client: {e}")
             self.enabled = False
-            self.credential_source = 'none'
+            self.credential_source = "none"
 
     def is_available(self) -> bool:
         """Check if TTS service is available"""
@@ -117,11 +117,11 @@ class TTSService:
             Audio content as bytes, or None if generation fails
         """
         if not self.is_available():
-            logger.info('TTS service is not available')
+            logger.info("TTS service is not available")
             return None
 
         if not text or not text.strip():
-            logger.info('Empty text provided for TTS')
+            logger.info("Empty text provided for TTS")
             return None
 
         try:
@@ -146,7 +146,7 @@ class TTSService:
             return response.audio_content
 
         except Exception as e:
-            logger.error(f'Error generating speech: {e}')
+            logger.error(f"Error generating speech: {e}")
             return None
 
     def generate_speech_base64(self, text: str, voice_name: str | None = None) -> str | None:
@@ -162,7 +162,7 @@ class TTSService:
         """
         audio_content = self.generate_speech(text, voice_name)
         if audio_content:
-            return base64.b64encode(audio_content).decode('utf-8')
+            return base64.b64encode(audio_content).decode("utf-8")
         return None
 
     def get_cache_key(self, text: str, voice_name: str | None = None) -> str:
@@ -177,8 +177,8 @@ class TTSService:
             Cache key string (MD5 hash)
         """
         voice = voice_name or config.tts_voice_name
-        cache_string = f'{text.strip()}_{voice}_{config.tts_language_code}'
-        return hashlib.md5(cache_string.encode('utf-8'), usedforsecurity=False).hexdigest()
+        cache_string = f"{text.strip()}_{voice}_{config.tts_language_code}"
+        return hashlib.md5(cache_string.encode("utf-8"), usedforsecurity=False).hexdigest()
 
     def get_gcs_path(
         self, spreadsheet_id: str, sheet_gid: int, text: str, voice_name: str | None = None
@@ -196,7 +196,7 @@ class TTSService:
             GCS path string
         """
         text_hash = self.get_cache_key(text, voice_name)
-        return f'{spreadsheet_id}/{sheet_gid}/{text_hash}.mp3'
+        return f"{spreadsheet_id}/{sheet_gid}/{text_hash}.mp3"
 
     def get_audio_from_gcs(
         self, spreadsheet_id: str, sheet_gid: int, text: str, voice_name: str | None = None
@@ -221,14 +221,14 @@ class TTSService:
             blob = self.bucket.blob(gcs_path)
 
             if blob.exists():
-                logger.debug(f'🎯 Cache HIT: {gcs_path}')
+                logger.debug(f"🎯 Cache HIT: {gcs_path}")
                 return blob.download_as_bytes()
             else:
-                logger.debug(f'🎯 Cache MISS: {gcs_path}')
+                logger.debug(f"🎯 Cache MISS: {gcs_path}")
                 return None
 
         except Exception as e:
-            logger.warning(f'⚠️ Error checking GCS cache: {e}')
+            logger.warning(f"⚠️ Error checking GCS cache: {e}")
             return None
 
     def cache_audio_to_gcs(
@@ -260,12 +260,12 @@ class TTSService:
             blob = self.bucket.blob(gcs_path)
 
             # Upload with MP3 content type
-            blob.upload_from_string(audio_content, content_type='audio/mpeg')
-            logger.info(f'💾 Cached audio: {gcs_path}')
+            blob.upload_from_string(audio_content, content_type="audio/mpeg")
+            logger.info(f"💾 Cached audio: {gcs_path}")
             return True
 
         except Exception as e:
-            logger.warning(f'⚠️ Error caching audio to GCS: {e}')
+            logger.warning(f"⚠️ Error caching audio to GCS: {e}")
             return False
 
     def text_to_speech(
@@ -288,18 +288,18 @@ class TTSService:
             Base64 encoded audio content, or None if generation fails
         """
         if not self.is_available():
-            logger.warning('TTS service is not available')
+            logger.warning("TTS service is not available")
             return None
 
         if not text or not text.strip():
-            logger.info('Empty text provided for TTS')
+            logger.info("Empty text provided for TTS")
             return None
 
         # Try to get from cache first (if we have caching context)
         if spreadsheet_id and sheet_gid is not None:
             cached_audio = self.get_audio_from_gcs(spreadsheet_id, sheet_gid, text, voice_name)
             if cached_audio:
-                return base64.b64encode(cached_audio).decode('utf-8')
+                return base64.b64encode(cached_audio).decode("utf-8")
 
         # Generate new audio via TTS API
         audio_content = self.generate_speech(text, voice_name)
@@ -311,7 +311,7 @@ class TTSService:
             self.cache_audio_to_gcs(spreadsheet_id, sheet_gid, text, audio_content, voice_name)
 
         # Return base64 encoded audio
-        return base64.b64encode(audio_content).decode('utf-8')
+        return base64.b64encode(audio_content).decode("utf-8")
 
     def get_available_voices(self) -> list:
         """
@@ -331,29 +331,29 @@ class TTSService:
             portuguese_voices = []
             for voice in voices.voices:
                 for language_code in voice.language_codes:
-                    if language_code.startswith('pt-PT'):
+                    if language_code.startswith("pt-PT"):
                         portuguese_voices.append(
                             {
-                                'name': voice.name,
-                                'language_code': language_code,
-                                'gender': voice.ssml_gender.name,
+                                "name": voice.name,
+                                "language_code": language_code,
+                                "gender": voice.ssml_gender.name,
                             }
                         )
 
             return portuguese_voices
 
         except Exception as e:
-            logger.error(f'Error listing voices: {e}')
+            logger.error(f"Error listing voices: {e}")
             return []
 
     def get_credential_info(self) -> dict:
         """Get information about which credentials are being used"""
         service_account_file = config.google_cloud_service_account_file_path
         return {
-            'source': getattr(self, 'credential_source', 'unknown'),
-            'available': self.is_available(),
-            'service_account_file_path': service_account_file,
-            'service_account_file_exists': service_account_file
+            "source": getattr(self, "credential_source", "unknown"),
+            "available": self.is_available(),
+            "service_account_file_path": service_account_file,
+            "service_account_file_exists": service_account_file
             and os.path.exists(service_account_file)
             if service_account_file
             else False,
