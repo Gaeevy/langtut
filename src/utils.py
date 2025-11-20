@@ -18,7 +18,7 @@ def load_redirect_uris():
         list: List of registered redirect URIs
     """
     try:
-        with open(config.CLIENT_SECRETS_FILE) as f:
+        with open(config.client_secrets_file_path) as f:
             client_secrets = json.load(f)
             return client_secrets['web']['redirect_uris']
     except (FileNotFoundError, KeyError, json.JSONDecodeError):

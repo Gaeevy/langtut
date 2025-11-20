@@ -140,11 +140,11 @@ def start_learning(tab_name: str):
         # Read cards from the specified tab
         card_set = read_card_set(worksheet_name=tab_name, spreadsheet_id=user_spreadsheet_id)
         cards = card_set.get_cards_to_review(
-            limit=config.MAX_CARDS_PER_SESSION, ignore_unshown=False
+            limit=config.max_cards_per_session, ignore_unshown=False
         )
 
         logger.info(f'Loaded {len(cards)} cards from tab "{tab_name}" for review')
-        logger.info(f'Max cards per session: {config.MAX_CARDS_PER_SESSION}')
+        logger.info(f'Max cards per session: {config.max_cards_per_session}')
 
         # Log card details
         for i, card in enumerate(cards[:3]):  # Log first 3 cards

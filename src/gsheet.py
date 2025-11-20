@@ -127,7 +127,7 @@ def get_spreadsheet(spreadsheet_id: str = None) -> Spreadsheet | None:
         return None
 
     # Use provided ID or fall back to default
-    sheet_id = spreadsheet_id or config.SPREADSHEET_ID
+    sheet_id = spreadsheet_id or config.spreadsheet_id
 
     try:
         gc = gspread.authorize(creds)

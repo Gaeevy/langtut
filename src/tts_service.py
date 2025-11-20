@@ -13,7 +13,7 @@ import os
 from google.cloud import storage, texttospeech
 from google.oauth2 import service_account
 
-from src.config import config, settings
+from src.config import config
 
 # Create logger
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class TTSService:
         self.tts_client = None
         self.storage_client = None
         self.bucket = None
-        self.enabled = config.TTS_ENABLED
+        self.enabled = config.tts_enabled
         self._initialize_clients()
 
     def _initialize_clients(self):
@@ -35,23 +35,18 @@ class TTSService:
             logger.info('TTS is disabled in configuration')
             return
 
+        service_account_file = config.google_cloud_service_account_file_path
+        logger.info(f'Checking for service account file: {service_account_file}')
         logger.info(
-            f'Checking for service account file: {config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE}'
-        )
-        logger.info(
-            f'File exists: {config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE and os.path.exists(config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE) if config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE else False}'
+            f'File exists: {service_account_file and os.path.exists(service_account_file) if service_account_file else False}'
         )
 
         try:
-            if config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE and os.path.exists(
-                config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE
-            ):
+            if service_account_file and os.path.exists(service_account_file):
                 # Use service account file
-                logger.info(
-                    f'Loading service account from file: {config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE}'
-                )
+                logger.info(f'Loading service account from file: {service_account_file}')
                 credentials = service_account.Credentials.from_service_account_file(
-                    config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE
+                    service_account_file
                 )
                 self.tts_client = texttospeech.TextToSpeechClient(credentials=credentials)
                 self.storage_client = storage.Client(credentials=credentials)
@@ -93,7 +88,7 @@ class TTSService:
 
             # Initialize GCS bucket for audio caching
             try:
-                bucket_name = settings.get('GCS_AUDIO_BUCKET', 'langtut-tts')
+                bucket_name = config.gcs_audio_bucket
                 self.bucket = self.storage_client.bucket(bucket_name)
                 logger.info(f'✅ GCS bucket initialized: {bucket_name}')
             except Exception as e:
@@ -135,12 +130,12 @@ class TTSService:
 
             # Build the voice request
             voice = texttospeech.VoiceSelectionParams(
-                language_code=config.TTS_LANGUAGE_CODE, name=voice_name or config.TTS_VOICE_NAME
+                language_code=config.tts_language_code, name=voice_name or config.tts_voice_name
             )
 
             # Select the type of audio file you want returned
             audio_config = texttospeech.AudioConfig(
-                audio_encoding=getattr(texttospeech.AudioEncoding, config.TTS_AUDIO_ENCODING)
+                audio_encoding=getattr(texttospeech.AudioEncoding, config.tts_audio_encoding)
             )
 
             # Perform the text-to-speech request
@@ -181,8 +176,8 @@ class TTSService:
         Returns:
             Cache key string (MD5 hash)
         """
-        voice = voice_name or config.TTS_VOICE_NAME
-        cache_string = f'{text.strip()}_{voice}_{config.TTS_LANGUAGE_CODE}'
+        voice = voice_name or config.tts_voice_name
+        cache_string = f'{text.strip()}_{voice}_{config.tts_language_code}'
         return hashlib.md5(cache_string.encode('utf-8'), usedforsecurity=False).hexdigest()
 
     def get_gcs_path(
@@ -353,13 +348,14 @@ class TTSService:
 
     def get_credential_info(self) -> dict:
         """Get information about which credentials are being used"""
+        service_account_file = config.google_cloud_service_account_file_path
         return {
             'source': getattr(self, 'credential_source', 'unknown'),
             'available': self.is_available(),
-            'service_account_file_path': config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE,
-            'service_account_file_exists': config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE
-            and os.path.exists(config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE)
-            if config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE
+            'service_account_file_path': service_account_file,
+            'service_account_file_exists': service_account_file
+            and os.path.exists(service_account_file)
+            if service_account_file
             else False,
         }
 

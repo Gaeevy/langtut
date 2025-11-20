@@ -2,7 +2,7 @@
 Unified configuration management for Language Learning Flashcard App.
 
 Single source of truth for all configuration with environment-aware settings
-and dual credential handling (local files vs production environment variables).
+and simplified credential handling (env vars first, then file paths).
 """
 
 import json
@@ -13,9 +13,11 @@ import tempfile
 from pathlib import Path
 
 from dynaconf import Dynaconf
+from pydantic import computed_field
+from pydantic_settings import BaseSettings
 
 
-def setup_logging():
+def setup_logging() -> logging.Logger:
     """Configure logging for both local development and Railway deployment."""
     # Create logger
     logger = logging.getLogger()
@@ -38,10 +40,8 @@ def setup_logging():
     logger.addHandler(console_handler)
 
     # Set specific logger levels
-    logging.getLogger('werkzeug').setLevel(logging.WARNING)  # Reduce Flask request noise
-    logging.getLogger('googleapiclient.discovery').setLevel(
-        logging.WARNING
-    )  # Reduce Google API noise
+    logging.getLogger('werkzeug').setLevel(logging.WARNING)
+    logging.getLogger('googleapiclient.discovery').setLevel(logging.WARNING)
 
     return logger
 
@@ -51,16 +51,8 @@ def get_environment() -> str:
     Environment detection using Railway's automatic variables.
 
     Returns:
-        str: 'testing', 'production', or 'local'
+        str: 'production' or 'local'
     """
-    # Testing environment
-    if (
-        os.getenv('PYTEST_CURRENT_TEST') is not None
-        or os.getenv('ENVIRONMENT') == 'testing'
-        or 'pytest' in sys.modules
-    ):
-        return 'testing'
-
     # Production environment - Railway sets RAILWAY_ENVIRONMENT automatically
     if os.getenv('RAILWAY_ENVIRONMENT') == 'production':
         return 'production'
@@ -69,47 +61,49 @@ def get_environment() -> str:
     return 'local'
 
 
-def get_credentials_file(
-    settings_obj, setting_key: str, env_var_key: str, default_file: str
-) -> str | None:
+def load_credentials_from_env(env_var_name: str) -> str | None:
     """
-    Get credentials file path with dual handling:
-    - Local: Use file from settings
-    - Production: Create temp file from environment variable
+    Load credentials from environment variable as JSON string.
 
     Args:
-        settings_obj: Dynaconf settings object
-        setting_key: Key in settings.toml for local file path
-        env_var_key: Environment variable key for production JSON
-        default_file: Default file name if setting not found
+        env_var_name: Name of environment variable containing JSON credentials
 
     Returns:
-        str: Path to credentials file, or None if not available
+        Path to temporary credentials file, or None if not found
     """
-    # Check for environment variable (production)
-    env_var_content = settings_obj.get(env_var_key, None)
-
-    if env_var_content:
-        # Production: Create temporary file from env var
-        try:
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
-                if isinstance(env_var_content, str):
-                    credentials_data = json.loads(env_var_content)
-                else:
-                    credentials_data = env_var_content
-
-                json.dump(credentials_data, temp_file)
-                return temp_file.name
-        except (json.JSONDecodeError, TypeError) as e:
-            logger.error(f'Error parsing {env_var_key}: {e}')
-            return None
-    else:
-        # Local: Use file from settings
-        file_path = settings_obj.get(setting_key, default_file)
-        if Path(file_path).exists():
-            return file_path
-        logger.warning(f'Credentials file not found: {file_path}')
+    env_json = os.getenv(env_var_name)
+    if not env_json:
         return None
+
+    try:
+        credentials_data = json.loads(env_json)
+        # Create temporary file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
+            json.dump(credentials_data, temp_file)
+            logger.info(f'Loaded credentials from environment variable: {env_var_name}')
+            return temp_file.name
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.error(f'Error parsing {env_var_name}: {e}')
+        return None
+
+
+def load_credentials_from_file(file_path: str) -> str | None:
+    """
+    Load credentials from file path.
+
+    Args:
+        file_path: Path to credentials file
+
+    Returns:
+        Absolute path to credentials file, or None if not found
+    """
+    path = Path(file_path)
+    if path.exists():
+        logger.info(f'Loaded credentials from file: {file_path}')
+        return str(path)
+
+    logger.warning(f'Credentials file not found: {file_path}')
+    return None
 
 
 # Initialize logging
@@ -119,7 +113,8 @@ logger = setup_logging()
 environment = get_environment()
 logger.info(f'Detected environment: {environment}')
 
-settings = Dynaconf(
+# Load settings from TOML files
+_settings = Dynaconf(
     envvar_prefix='LANGTUT',
     settings_files=['settings.toml', '.secrets.toml'],
     environments=True,
@@ -128,67 +123,108 @@ settings = Dynaconf(
 )
 
 
-class Config:
+class Config(BaseSettings):
     """
-    Unified configuration object.
+    Unified configuration using Pydantic.
 
     Single source of truth for all application settings with environment-aware
-    configuration and dual credential handling.
+    configuration and simplified credential handling.
+
+    Credentials are loaded with priority:
+    1. Environment variable (JSON string for Railway)
+    2. File path (for local development)
     """
 
     # Environment
-    ENVIRONMENT = environment
-    DEBUG = settings.get('debug', False)
+    environment: str = environment
+    debug: bool = _settings['debug']
 
     # Core app
-    SECRET_KEY = settings.get('SECRET_KEY', None)
-    MAX_CARDS_PER_SESSION = settings.get('max_cards_per_session', 10)
-    SPREADSHEET_ID = settings.get('spreadsheet_id')
+    secret_key: str | None = _settings.get('SECRET_KEY', None)
+    max_cards_per_session: int = _settings['max_cards_per_session']
+    spreadsheet_id: str = _settings['spreadsheet_id']
 
     # Database
-    DATABASE_PATH = settings.get('database_path')
-    SQLALCHEMY_TRACK_MODIFICATIONS = settings.get('sqlalchemy_track_modifications', False)
+    database_path: str = _settings['database_path']
 
     # Flask Session
-    SESSION_TYPE = settings.get('session_type', 'filesystem')
-    SESSION_PERMANENT = settings.get('session_permanent', False)
-    SESSION_USE_SIGNER = settings.get('session_use_signer', True)
-    SESSION_COOKIE_SECURE = settings.get('session_cookie_secure', False)
-    SESSION_COOKIE_HTTPONLY = settings.get('session_cookie_httponly', True)
-    SESSION_COOKIE_SAMESITE = settings.get('session_cookie_samesite', 'Lax')
+    session_type: str = _settings['session_type']
+    session_permanent: bool = _settings['session_permanent']
+    session_use_signer: bool = _settings['session_use_signer']
+    session_cookie_secure: bool = _settings['session_cookie_secure']
+    session_cookie_httponly: bool = _settings['session_cookie_httponly']
+    session_cookie_samesite: str = _settings['session_cookie_samesite']
 
     # Flask JSON
-    JSON_AS_ASCII = settings.get('json_as_ascii', False)
-    JSONIFY_MIMETYPE = settings.get('jsonify_mimetype', 'application/json; charset=utf-8')
+    json_as_ascii: bool = _settings['json_as_ascii']
 
-    # Google OAuth - Dual credential handling
-    CLIENT_SECRETS_FILE = get_credentials_file(
-        settings, 'client_secrets_file', 'CLIENT_SECRETS_JSON', 'client_secret.json'
-    )
-    SCOPES = settings.get('scopes', [])
-    API_SERVICE_NAME = settings.get('api_service_name', 'sheets')
-    API_VERSION = settings.get('api_version', 'v4')
+    # Google OAuth
+    client_secrets_file: str = _settings['client_secrets_file']
+    scopes: list[str] = _settings['scopes']
+    api_service_name: str = _settings['api_service_name']
+    api_version: str = _settings['api_version']
 
-    # Google TTS - Dual credential handling
-    TTS_ENABLED = settings.get('tts_enabled', True)
-    TTS_LANGUAGE_CODE = settings.get('tts_language_code', 'pt-PT')
-    TTS_VOICE_NAME = settings.get('tts_voice_name', 'pt-PT-Standard-A')
-    TTS_AUDIO_ENCODING = settings.get('tts_audio_encoding', 'MP3')
-    GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE = get_credentials_file(
-        settings,
-        'google_cloud_service_account_file',
-        'GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON',
-        'google-cloud-service-account.json',
-    )
-    GCS_AUDIO_BUCKET = settings.get('gcs_audio_bucket', 'langtut-tts')
+    # Google TTS
+    tts_enabled: bool = _settings['tts_enabled']
+    tts_language_code: str = _settings['tts_language_code']
+    tts_voice_name: str = _settings['tts_voice_name']
+    tts_audio_encoding: str = _settings['tts_audio_encoding']
+    google_cloud_service_account_file: str = _settings['google_cloud_service_account_file']
+    gcs_audio_bucket: str = _settings['gcs_audio_bucket']
 
-    # Testing mocks
-    TESTING_MOCK_OAUTH = (
-        settings.get('mock.oauth_enabled', False) if environment == 'testing' else False
-    )
-    TESTING_MOCK_SHEETS = (
-        settings.get('mock.sheets_enabled', False) if environment == 'testing' else False
-    )
+    # Private cached credentials
+    _client_secrets_file_cache: str | None = None
+    _google_cloud_service_account_file_cache: str | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def client_secrets_file_path(self) -> str | None:
+        """
+        Get OAuth client secrets file path.
+
+        Priority:
+        1. LANGTUT_CLIENT_SECRETS_JSON env var (JSON string)
+        2. client_secrets_file path from settings
+        """
+        # Return cached value if available
+        if self._client_secrets_file_cache is not None:
+            return self._client_secrets_file_cache
+
+        # Try environment variable first (Railway/production)
+        result = load_credentials_from_env('LANGTUT_CLIENT_SECRETS_JSON')
+        if result:
+            self._client_secrets_file_cache = result
+            return result
+
+        # Try file path (local development)
+        result = load_credentials_from_file(self.client_secrets_file)
+        self._client_secrets_file_cache = result
+        return result
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def google_cloud_service_account_file_path(self) -> str | None:
+        """
+        Get Google Cloud service account credentials file path.
+
+        Priority:
+        1. LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON env var (JSON string)
+        2. google_cloud_service_account_file path from settings
+        """
+        # Return cached value if available
+        if self._google_cloud_service_account_file_cache is not None:
+            return self._google_cloud_service_account_file_cache
+
+        # Try environment variable first (Railway/production)
+        result = load_credentials_from_env('LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON')
+        if result:
+            self._google_cloud_service_account_file_cache = result
+            return result
+
+        # Try file path (local development)
+        result = load_credentials_from_file(self.google_cloud_service_account_file)
+        self._google_cloud_service_account_file_cache = result
+        return result
 
 
 # Export single config object
@@ -196,8 +232,10 @@ config = Config()
 
 # Log configuration status
 logger.info(f'Configuration loaded for {environment} environment')
-logger.info(f'Debug mode: {config.DEBUG}')
-logger.info(f'Database path: {config.DATABASE_PATH}')
-logger.info(f'TTS enabled: {config.TTS_ENABLED}')
-logger.info(f'OAuth credentials available: {config.CLIENT_SECRETS_FILE is not None}')
-logger.info(f'TTS credentials available: {config.GOOGLE_CLOUD_SERVICE_ACCOUNT_FILE is not None}')
+logger.info(f'Debug mode: {config.debug}')
+logger.info(f'Database path: {config.database_path}')
+logger.info(f'TTS enabled: {config.tts_enabled}')
+logger.info(f'OAuth credentials available: {config.client_secrets_file_path is not None}')
+logger.info(
+    f'TTS credentials available: {config.google_cloud_service_account_file_path is not None}'
+)

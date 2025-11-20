@@ -58,12 +58,6 @@ uv run python init_db.py
 
 Railway deployment uses Gunicorn (because it runs on Linux), but local Windows development needs a different approach.
 
-## Full Documentation
-
-For complete setup instructions and troubleshooting, see:
-- [Quick Start Guide](./docs/quick-start.md)
-- [Windows Setup Guide](./docs/windows-setup-guide.md) (if it exists in your branch)
-
 ## Quick Reference
 
 | Platform | Command |

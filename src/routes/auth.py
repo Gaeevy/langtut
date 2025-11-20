@@ -71,7 +71,7 @@ def auth():
 
         # Create flow instance to manage the OAuth 2.0 Authorization Grant Flow steps
         flow = Flow.from_client_secrets_file(
-            config.CLIENT_SECRETS_FILE, scopes=config.SCOPES, redirect_uri=redirect_uri
+            config.client_secrets_file_path, scopes=config.scopes, redirect_uri=redirect_uri
         )
 
         # Generate URL for request to Google's OAuth 2.0 server
@@ -124,7 +124,10 @@ def oauth2callback():
                     redirect_uri = f'http://{request.host}/oauth2callback'
 
         flow = Flow.from_client_secrets_file(
-            config.CLIENT_SECRETS_FILE, scopes=config.SCOPES, state=state, redirect_uri=redirect_uri
+            config.client_secrets_file_path,
+            scopes=config.scopes,
+            state=state,
+            redirect_uri=redirect_uri,
         )
 
         # Get the authorization response from the request

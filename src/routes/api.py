@@ -11,7 +11,7 @@ from typing import Any
 from flask import Blueprint, jsonify, request
 from pydantic import ValidationError
 
-from src.config import settings
+from src.config import config
 from src.database import db
 from src.gsheet import read_card_set
 from src.models import SpreadsheetLanguages
@@ -33,9 +33,7 @@ def tts_status() -> dict[str, Any]:
     """Get the status of the TTS service."""
     try:
         # Check if TTS is enabled in configuration
-        tts_enabled = settings.get('TTS_ENABLED', False)
-
-        if not tts_enabled:
+        if not config.tts_enabled:
             return jsonify({'available': False, 'reason': 'TTS is disabled in configuration'})
 
         # Check if TTS service is properly configured
@@ -47,8 +45,8 @@ def tts_status() -> dict[str, Any]:
         return jsonify(
             {
                 'available': True,
-                'language': settings.get('TTS_LANGUAGE_CODE', 'pt-PT'),
-                'voice': settings.get('TTS_VOICE_NAME', 'pt-PT-Standard-A'),
+                'language': config.tts_language_code,
+                'voice': config.tts_voice_name,
             }
         )
 

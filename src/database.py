@@ -1,5 +1,5 @@
-import os
 from datetime import datetime
+from pathlib import Path
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
@@ -120,12 +120,13 @@ _tables_created = False
 
 def init_database(app):
     """Initialize database with Flask app"""
-    # Set database path based on environment
-    if os.getenv('RAILWAY_ENVIRONMENT'):
-        database_path = '/app/data/app.db'
-    else:
-        database_path = os.path.abspath('data/app.db')
-        os.makedirs('data', exist_ok=True)
+    from src.config import config
+
+    # Get database path from config
+    database_path = Path(config.database_path).resolve()
+
+    # Ensure directory exists (for local development)
+    database_path.parent.mkdir(parents=True, exist_ok=True)
 
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{database_path}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False

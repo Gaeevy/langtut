@@ -25,11 +25,11 @@ def test() -> dict[str, Any]:
     """Test endpoint for checking application functionality."""
     try:
         # Test reading card sets
-        card_sets = read_all_card_sets(config.SPREADSHEET_ID)
+        card_sets = read_all_card_sets(config.spreadsheet_id)
 
         # Test Google Sheets access
         try:
-            card_sets = read_all_card_sets(config.SPREADSHEET_ID)
+            card_sets = read_all_card_sets(config.spreadsheet_id)
             sheets_status = {
                 'working': True,
                 'card_sets_count': len(card_sets),
@@ -61,7 +61,7 @@ def test() -> dict[str, Any]:
             'timestamp': datetime.now().isoformat(),
             'card_sets': len(card_sets),
             'total_cards': total_cards,
-            'spreadsheet_id': config.SPREADSHEET_ID,
+            'spreadsheet_id': config.spreadsheet_id,
             'environment': 'test',
             'health_check': True,
         }
