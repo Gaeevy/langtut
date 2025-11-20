@@ -33,12 +33,12 @@ def get_credentials():
 def credentials_to_dict(credentials):
     """Convert Credentials object to dictionary for session storage."""
     return {
-        'token': credentials.token,
-        'refresh_token': credentials.refresh_token,
-        'token_uri': credentials.token_uri,
-        'client_id': credentials.client_id,
-        'client_secret': credentials.client_secret,
-        'scopes': credentials.scopes,
+        "token": credentials.token,
+        "refresh_token": credentials.refresh_token,
+        "token_uri": credentials.token_uri,
+        "client_id": credentials.client_id,
+        "client_secret": credentials.client_secret,
+        "scopes": credentials.scopes,
     }
 
 
@@ -53,10 +53,10 @@ def dict_to_credentials(credentials_dict):
         Google OAuth credentials object
     """
     return Credentials(
-        token=credentials_dict.get('token'),
-        refresh_token=credentials_dict.get('refresh_token'),
-        token_uri=credentials_dict.get('token_uri'),
-        client_id=credentials_dict.get('client_id'),
-        client_secret=credentials_dict.get('client_secret'),
-        scopes=credentials_dict.get('scopes'),
+        token=credentials_dict.get("token"),
+        refresh_token=credentials_dict.get("refresh_token"),
+        token_uri=credentials_dict.get("token_uri"),
+        client_id=credentials_dict.get("client_id"),
+        client_secret=credentials_dict.get("client_secret"),
+        scopes=credentials_dict.get("scopes"),
     )

@@ -42,11 +42,11 @@ def should_log_request() -> bool:
     """
     # Define paths to exclude from logging
     excluded_paths = [
-        '/static/',  # Static assets
-        '/favicon.ico',  # Favicon requests
-        '/api/tts/status',  # TTS status polling
-        '/sw.js',  # Service worker
-        '/manifest.json',  # PWA manifest
+        "/static/",  # Static assets
+        "/favicon.ico",  # Favicon requests
+        "/api/tts/status",  # TTS status polling
+        "/sw.js",  # Service worker
+        "/manifest.json",  # PWA manifest
     ]
 
     # Check if request path matches any excluded pattern
@@ -66,22 +66,22 @@ def safe_get_request_body() -> Any:
     """
     try:
         # Only try to get JSON if content type suggests it
-        if request.content_type and 'application/json' in request.content_type:
+        if request.content_type and "application/json" in request.content_type:
             return request.get_json(silent=True)
 
         # For form data
-        if request.content_type and 'application/x-www-form-urlencoded' in request.content_type:
+        if request.content_type and "application/x-www-form-urlencoded" in request.content_type:
             return dict(request.form)
 
         # For other data types, return raw data as string (truncated for safety)
         if request.data:
-            raw_data = request.data.decode('utf-8', errors='ignore')
+            raw_data = request.data.decode("utf-8", errors="ignore")
             return raw_data[:1000] if len(raw_data) > 1000 else raw_data
 
         return None
 
     except Exception as e:
-        logger.warning(f'Could not parse request body: {e}')
+        logger.warning(f"Could not parse request body: {e}")
         return None
 
 
@@ -104,28 +104,28 @@ def log_request_ingress() -> None:
     query_params = dict(request.args)
 
     log_message = (
-        f'REQUEST_START [{g.request_id}] '
-        f'{request.method} {request.path} | '
-        f'User: {g.user_id} | '
-        f'IP: {request.remote_addr} | '
-        f'Endpoint: {request.endpoint}'
+        f"REQUEST_START [{g.request_id}] "
+        f"{request.method} {request.path} | "
+        f"User: {g.user_id} | "
+        f"IP: {request.remote_addr} | "
+        f"Endpoint: {request.endpoint}"
     )
 
     # Add query params if present
     if query_params:
-        log_message += f' | Query: {query_params}'
+        log_message += f" | Query: {query_params}"
 
     # Add request body if present
     if request_body:
         # Truncate body for readability if it's too long
         body_str = str(request_body)
         if len(body_str) > 200:
-            body_str = body_str[:200] + '...'
-        log_message += f' | Body: {body_str}'
+            body_str = body_str[:200] + "..."
+        log_message += f" | Body: {body_str}"
 
     # Add content type if present
     if request.content_type:
-        log_message += f' | Content-Type: {request.content_type}'
+        log_message += f" | Content-Type: {request.content_type}"
 
     logger.info(log_message)
 
@@ -144,25 +144,25 @@ def log_request_egress(response) -> None:
 
     # Calculate request duration
     duration_ms = None
-    if hasattr(g, 'start_time'):
+    if hasattr(g, "start_time"):
         duration_ms = round((time.time() - g.start_time) * 1000, 2)
 
     # Build detailed log message
-    request_id = getattr(g, 'request_id', 'unknown')
-    user_id = getattr(g, 'user_id', None)
+    request_id = getattr(g, "request_id", "unknown")
+    user_id = getattr(g, "user_id", None)
     response_size = len(response.get_data()) if response.get_data() else 0
 
     log_message = (
-        f'REQUEST_END [{request_id}] '
-        f'Status: {response.status_code} | '
-        f'Duration: {duration_ms}ms | '
-        f'User: {user_id} | '
-        f'Size: {response_size}B'
+        f"REQUEST_END [{request_id}] "
+        f"Status: {response.status_code} | "
+        f"Duration: {duration_ms}ms | "
+        f"User: {user_id} | "
+        f"Size: {response_size}B"
     )
 
     # Add content type if present
     if response.content_type:
-        log_message += f' | Content-Type: {response.content_type}'
+        log_message += f" | Content-Type: {response.content_type}"
 
     # Log at different levels based on status code
     if response.status_code >= 500:
@@ -188,7 +188,7 @@ def setup_request_logging(app):
             log_request_ingress()
         except Exception as e:
             # Don't let logging errors break the request
-            logger.error(f'Error in request ingress logging: {e}', exc_info=True)
+            logger.error(f"Error in request ingress logging: {e}", exc_info=True)
 
     @app.after_request
     def after_request_handler(response):
@@ -197,7 +197,7 @@ def setup_request_logging(app):
             log_request_egress(response)
         except Exception as e:
             # Don't let logging errors break the response
-            logger.error(f'Error in request egress logging: {e}', exc_info=True)
+            logger.error(f"Error in request egress logging: {e}", exc_info=True)
         return response
 
-    logger.info('✅ Request logging hooks installed')
+    logger.info("✅ Request logging hooks installed")

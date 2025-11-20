@@ -4,16 +4,6 @@ Welcome to the Language Learning Flashcard App documentation. This documentation
 
 ## 📚 Documentation Overview
 
-### [Quick Start Guide](./quick-start.md) ⭐ NEW
-Essential onboarding guide for new developers - start here!
-
-**Topics covered:**
-- How to properly run the application (and common mistakes to avoid)
-- Application architecture and entry points explained
-- Database initialization and troubleshooting
-- Common issues and solutions
-- Development workflow and best practices
-
 ### [Architecture & Configuration](./architecture.md)
 Complete overview of the application's architecture, configuration system, and design decisions.
 

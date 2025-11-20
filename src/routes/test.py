@@ -14,56 +14,56 @@ from src.gsheet import read_all_card_sets
 from src.tts_service import TTSService
 
 # Create blueprint
-test_bp = Blueprint('test', __name__)
+test_bp = Blueprint("test", __name__)
 
 # Initialize TTS service for testing
 tts_service = TTSService()
 
 
-@test_bp.route('/test')
+@test_bp.route("/test")
 def test() -> dict[str, Any]:
     """Test endpoint for checking application functionality."""
     try:
         # Test reading card sets
-        card_sets = read_all_card_sets(config.SPREADSHEET_ID)
+        card_sets = read_all_card_sets(config.spreadsheet_id)
 
         # Test Google Sheets access
         try:
-            card_sets = read_all_card_sets(config.SPREADSHEET_ID)
+            card_sets = read_all_card_sets(config.spreadsheet_id)
             sheets_status = {
-                'working': True,
-                'card_sets_count': len(card_sets),
-                'card_sets': [cs.name for cs in card_sets[:3]],  # First 3 for brevity
+                "working": True,
+                "card_sets_count": len(card_sets),
+                "card_sets": [cs.name for cs in card_sets[:3]],  # First 3 for brevity
             }
         except Exception as e:
-            sheets_status = {'working': False, 'error': str(e)}
+            sheets_status = {"working": False, "error": str(e)}
 
         # Test TTS service
         try:
             tts_configured = tts_service.is_configured()
             if tts_configured:
                 # Try a simple synthesis test
-                test_audio = tts_service.generate_speech('teste')
-                tts_status = {'configured': True, 'synthesis_test': test_audio is not None}
+                test_audio = tts_service.generate_speech("teste")
+                tts_status = {"configured": True, "synthesis_test": test_audio is not None}
             else:
-                tts_status = {'configured': False, 'synthesis_test': False}
+                tts_status = {"configured": False, "synthesis_test": False}
         except Exception as e:
-            tts_status = {'configured': False, 'synthesis_test': False, 'error': str(e)}
+            tts_status = {"configured": False, "synthesis_test": False, "error": str(e)}
 
         # Count total cards
         total_cards = sum(len(cs.cards) for cs in card_sets)
 
         # Create test data
         test_data = {
-            'status': 'success',
-            'sheets_status': sheets_status,
-            'tts_status': tts_status,
-            'timestamp': datetime.now().isoformat(),
-            'card_sets': len(card_sets),
-            'total_cards': total_cards,
-            'spreadsheet_id': config.SPREADSHEET_ID,
-            'environment': 'test',
-            'health_check': True,
+            "status": "success",
+            "sheets_status": sheets_status,
+            "tts_status": tts_status,
+            "timestamp": datetime.now().isoformat(),
+            "card_sets": len(card_sets),
+            "total_cards": total_cards,
+            "spreadsheet_id": config.spreadsheet_id,
+            "environment": "test",
+            "health_check": True,
         }
 
         # Return test data
@@ -73,16 +73,16 @@ def test() -> dict[str, Any]:
         # Error handling
         return jsonify(
             {
-                'status': 'error',
-                'error': str(e),
-                'timestamp': datetime.now().isoformat(),
-                'environment': 'test',
-                'health_check': False,
+                "status": "error",
+                "error": str(e),
+                "timestamp": datetime.now().isoformat(),
+                "environment": "test",
+                "health_check": False,
             }
         )
 
 
-@test_bp.route('/test-tts')
+@test_bp.route("/test-tts")
 def test_tts():
     """Test TTS functionality"""
-    return render_template('test_tts.html')
+    return render_template("test_tts.html")

@@ -15,33 +15,33 @@ class SessionKeys(Enum):
     """Enumerated session keys with prefix namespacing for organization."""
 
     # Auth namespace - OAuth and authentication state
-    AUTH_STATE = 'auth.state'
-    AUTH_REDIRECT_URI = 'auth.redirect_uri'
-    AUTH_CREDENTIALS = 'auth.credentials'
+    AUTH_STATE = "auth.state"
+    AUTH_REDIRECT_URI = "auth.redirect_uri"
+    AUTH_CREDENTIALS = "auth.credentials"
 
     # User namespace - User identification and metadata
-    USER_ID = 'user.id'
-    USER_GOOGLE_ID = 'user.google_id'
+    USER_ID = "user.id"
+    USER_GOOGLE_ID = "user.google_id"
 
     # Learning namespace - Flashcard session state
-    LEARNING_CARDS = 'learning.cards'
-    LEARNING_CURRENT_INDEX = 'learning.current_index'
-    LEARNING_ANSWERS = 'learning.answers'
-    LEARNING_INCORRECT_CARDS = 'learning.incorrect_cards'
-    LEARNING_REVIEWING_INCORRECT = 'learning.reviewing_incorrect'
-    LEARNING_ACTIVE_TAB = 'learning.active_tab'
-    LEARNING_ORIGINAL_COUNT = 'learning.original_count'
-    LEARNING_SHEET_GID = 'learning.sheet_gid'
-    LEARNING_LAST_LEVEL_CHANGE = 'learning.last_level_change'
+    LEARNING_CARDS = "learning.cards"
+    LEARNING_CURRENT_INDEX = "learning.current_index"
+    LEARNING_ANSWERS = "learning.answers"
+    LEARNING_INCORRECT_CARDS = "learning.incorrect_cards"
+    LEARNING_REVIEWING_INCORRECT = "learning.reviewing_incorrect"
+    LEARNING_ACTIVE_TAB = "learning.active_tab"
+    LEARNING_ORIGINAL_COUNT = "learning.original_count"
+    LEARNING_SHEET_GID = "learning.sheet_gid"
+    LEARNING_LAST_LEVEL_CHANGE = "learning.last_level_change"
 
     # Review namespace - Review mode session state
-    REVIEW_CARDS = 'review.cards'
-    REVIEW_CURRENT_INDEX = 'review.current_index'
-    REVIEW_ACTIVE_TAB = 'review.active_tab'
-    REVIEW_SHEET_GID = 'review.sheet_gid'
+    REVIEW_CARDS = "review.cards"
+    REVIEW_CURRENT_INDEX = "review.current_index"
+    REVIEW_ACTIVE_TAB = "review.active_tab"
+    REVIEW_SHEET_GID = "review.sheet_gid"
 
     # Test namespace - Development and debugging
-    TEST_SESSION = 'test.session'
+    TEST_SESSION = "test.session"
 
 
 class SessionManager:
@@ -108,6 +108,6 @@ class SessionManager:
         Args:
             namespace: Namespace prefix (e.g., 'auth', 'learning')
         """
-        keys_to_remove = [key for key in session if key.startswith(f'{namespace}.')]
+        keys_to_remove = [key for key in session if key.startswith(f"{namespace}.")]
         for key in keys_to_remove:
             session.pop(key, None)

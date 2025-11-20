@@ -147,31 +147,31 @@ class SpreadsheetLanguages(BaseModel):
     """
 
     original: str = Field(
-        default='ru', description='Language being learned from', min_length=2, max_length=5
+        default="ru", description="Language being learned from", min_length=2, max_length=5
     )
     target: str = Field(
-        default='pt', description='Language being learned to', min_length=2, max_length=5
+        default="pt", description="Language being learned to", min_length=2, max_length=5
     )
     hint: str = Field(
-        default='en', description='Interface/hint language', min_length=2, max_length=5
+        default="en", description="Interface/hint language", min_length=2, max_length=5
     )
 
     @classmethod
-    def get_default(cls) -> 'SpreadsheetLanguages':
+    def get_default(cls) -> "SpreadsheetLanguages":
         """Get default language settings."""
         return cls()
 
     def to_dict(self) -> dict[str, str]:
         """Convert to dictionary for backward compatibility."""
-        return {'original': self.original, 'target': self.target, 'hint': self.hint}
+        return {"original": self.original, "target": self.target, "hint": self.hint}
 
     @classmethod
-    def from_dict(cls, data: dict[str, str]) -> 'SpreadsheetLanguages':
+    def from_dict(cls, data: dict[str, str]) -> "SpreadsheetLanguages":
         """Create from dictionary for backward compatibility."""
         return cls(
-            original=data.get('original', 'ru'),
-            target=data.get('target', 'pt'),
-            hint=data.get('hint', 'en'),
+            original=data.get("original", "ru"),
+            target=data.get("target", "pt"),
+            hint=data.get("hint", "en"),
         )
 
     def is_valid_configuration(self) -> bool:
@@ -180,7 +180,7 @@ class SpreadsheetLanguages(BaseModel):
         languages = [self.original, self.target, self.hint]
         return len(set(languages)) == len(languages)  # No duplicates
 
-    def update_from_dict(self, updates: dict[str, str]) -> 'SpreadsheetLanguages':
+    def update_from_dict(self, updates: dict[str, str]) -> "SpreadsheetLanguages":
         """Create a new instance with updated values from dictionary."""
         current_dict = self.to_dict()
         current_dict.update(updates)
@@ -201,7 +201,7 @@ class UserSpreadsheetProperty(BaseModel):
         return json.dumps(self.model_dump())
 
     @classmethod
-    def from_db_string(cls, value: str | None) -> 'UserSpreadsheetProperty':
+    def from_db_string(cls, value: str | None) -> "UserSpreadsheetProperty":
         """Create UserSpreadsheetProperty from database JSON string."""
         if not value:
             return cls()  # Return default values
@@ -210,8 +210,8 @@ class UserSpreadsheetProperty(BaseModel):
             data = json.loads(value)
 
             # Handle backward compatibility - if language is a dict, convert it
-            if 'language' in data and isinstance(data['language'], dict):
-                data['language'] = SpreadsheetLanguages.from_dict(data['language'])
+            if "language" in data and isinstance(data["language"], dict):
+                data["language"] = SpreadsheetLanguages.from_dict(data["language"])
 
             return cls(**data)
         except (json.JSONDecodeError, TypeError, ValueError):
@@ -219,7 +219,7 @@ class UserSpreadsheetProperty(BaseModel):
             return cls()
 
     @classmethod
-    def get_default(cls) -> 'UserSpreadsheetProperty':
+    def get_default(cls) -> "UserSpreadsheetProperty":
         """Get default properties."""
         return cls()
 

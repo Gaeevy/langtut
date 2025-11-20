@@ -24,20 +24,19 @@ def configure_app(app: Flask) -> None:
         app: Flask application instance
     """
     # Core app configuration
-    app.secret_key = config.SECRET_KEY or os.urandom(24)
-    app.config['DEBUG'] = config.DEBUG
+    app.secret_key = config.secret_key or os.urandom(24)
+    app.config["DEBUG"] = config.debug
 
     # Session configuration
-    app.config['SESSION_TYPE'] = config.SESSION_TYPE
-    app.config['SESSION_PERMANENT'] = config.SESSION_PERMANENT
-    app.config['SESSION_USE_SIGNER'] = config.SESSION_USE_SIGNER
-    app.config['SESSION_COOKIE_SECURE'] = config.SESSION_COOKIE_SECURE
-    app.config['SESSION_COOKIE_HTTPONLY'] = config.SESSION_COOKIE_HTTPONLY
-    app.config['SESSION_COOKIE_SAMESITE'] = config.SESSION_COOKIE_SAMESITE
+    app.config["SESSION_TYPE"] = config.session_type
+    app.config["SESSION_PERMANENT"] = config.session_permanent
+    app.config["SESSION_USE_SIGNER"] = config.session_use_signer
+    app.config["SESSION_COOKIE_SECURE"] = config.session_cookie_secure
+    app.config["SESSION_COOKIE_HTTPONLY"] = config.session_cookie_httponly
+    app.config["SESSION_COOKIE_SAMESITE"] = config.session_cookie_samesite
 
     # JSON configuration
-    app.config['JSON_AS_ASCII'] = config.JSON_AS_ASCII
-    app.config['JSONIFY_MIMETYPE'] = config.JSONIFY_MIMETYPE
+    app.config["JSON_AS_ASCII"] = config.json_as_ascii
 
 
 def initialize_extensions(app: Flask) -> None:
@@ -76,7 +75,7 @@ def create_app() -> Flask:
     ensure_utf8_encoding()
 
     # Create Flask app with template and static folders
-    app = Flask(__name__, template_folder='../templates', static_folder='../static')
+    app = Flask(__name__, template_folder="../templates", static_folder="../static")
 
     # Configure application settings
     configure_app(app)

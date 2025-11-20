@@ -18,9 +18,9 @@ def load_redirect_uris():
         list: List of registered redirect URIs
     """
     try:
-        with open(config.CLIENT_SECRETS_FILE) as f:
+        with open(config.client_secrets_file_path) as f:
             client_secrets = json.load(f)
-            return client_secrets['web']['redirect_uris']
+            return client_secrets["web"]["redirect_uris"]
     except (FileNotFoundError, KeyError, json.JSONDecodeError):
         return []
 
@@ -47,7 +47,7 @@ def format_timestamp(dt):
     """
     if isinstance(dt, str):
         return dt
-    return dt.strftime('%Y-%m-%d %H:%M:%S')
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def parse_timestamp(timestamp_str):
@@ -66,7 +66,7 @@ def parse_timestamp(timestamp_str):
         return NEVER_SHOWN
 
     try:
-        return datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+        return datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
     except Exception:
         return NEVER_SHOWN
 
@@ -77,7 +77,7 @@ def ensure_utf8_encoding():
     """
     import sys
 
-    if sys.stdout.encoding != 'utf-8':
-        sys.stdout.reconfigure(encoding='utf-8')
-    if sys.stderr.encoding != 'utf-8':
-        sys.stderr.reconfigure(encoding='utf-8')
+    if sys.stdout.encoding != "utf-8":
+        sys.stdout.reconfigure(encoding="utf-8")
+    if sys.stderr.encoding != "utf-8":
+        sys.stderr.reconfigure(encoding="utf-8")

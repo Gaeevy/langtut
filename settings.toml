@@ -31,10 +31,6 @@ session_cookie_samesite = "Lax"
 
 # Flask JSON
 json_as_ascii = false
-jsonify_mimetype = "application/json; charset=utf-8"
-
-# Database
-sqlalchemy_track_modifications = false
 
 [local]
 debug = true
@@ -45,17 +41,3 @@ database_path = "data/app.db"
 debug = false
 session_cookie_secure = true
 database_path = "/app/data/app.db"
-
-[testing]
-debug = false
-session_cookie_secure = false
-database_path = ":memory:"
-tts_enabled = false
-max_cards_per_session = 5
-
-# Testing overrides
-[testing.mock]
-oauth_enabled = false
-sheets_enabled = false
-user_id = "test-user-123"
-user_email = "test@example.com"

@@ -41,10 +41,10 @@ def login_user(session_obj, credentials_dict):
     user_info = get_google_user_info(credentials_dict)
 
     if not user_info:
-        raise Exception('Failed to get user information from Google')
+        raise Exception("Failed to get user information from Google")
 
-    google_user_id = user_info['google_user_id']
-    email = user_info['email']
+    google_user_id = user_info["google_user_id"]
+    email = user_info["email"]
 
     # Find or create user
     user = User.query.filter_by(google_user_id=google_user_id).first()
@@ -54,13 +54,13 @@ def login_user(session_obj, credentials_dict):
         user = User(google_user_id=google_user_id, email=email)
         db.session.add(user)
         db.session.commit()
-        print(f'New user created: {email} (ID: {user.id})')
+        print(f"New user created: {email} (ID: {user.id})")
     else:
         # Update existing user email if it changed
         if user.email != email:
             user.email = email
             db.session.commit()
-        print(f'User logged in: {email} (ID: {user.id})')
+        print(f"User logged in: {email} (ID: {user.id})")
 
     # Store user info in session using SessionManager
     sm.set(sk.USER_ID, user.id)
@@ -77,15 +77,15 @@ def clear_user_session(session_obj):
         session_obj: Flask session object (for backward compatibility)
     """
     # Clear auth namespace
-    sm.clear_namespace('auth')
+    sm.clear_namespace("auth")
 
     # Clear user namespace
-    sm.clear_namespace('user')
+    sm.clear_namespace("user")
 
     # Clear learning namespace
-    sm.clear_namespace('learning')
+    sm.clear_namespace("learning")
 
-    print('User session cleared')
+    print("User session cleared")
 
 
 def is_authenticated():
@@ -112,17 +112,17 @@ def get_google_user_info(credentials_dict):
         credentials = Credentials(**credentials_dict)
 
         # Use the OAuth2 API to get user info (simpler and more reliable)
-        service = build('oauth2', 'v2', credentials=credentials)
+        service = build("oauth2", "v2", credentials=credentials)
         user_info_response = service.userinfo().get().execute()
 
         return {
-            'google_user_id': user_info_response.get('id') or user_info_response.get('email'),
-            'email': user_info_response.get('email'),
-            'name': user_info_response.get('name'),
+            "google_user_id": user_info_response.get("id") or user_info_response.get("email"),
+            "email": user_info_response.get("email"),
+            "name": user_info_response.get("name"),
         }
 
     except Exception as e:
-        print(f'Error getting Google user info: {e}')
+        print(f"Error getting Google user info: {e}")
         return None
 
 
@@ -143,7 +143,7 @@ def set_user_spreadsheet(session_obj, spreadsheet_id, spreadsheet_url=None, spre
     """Set a spreadsheet as active for the current user"""
     user = get_current_user()
     if not user:
-        raise Exception('User not logged in')
+        raise Exception("User not logged in")
 
     # Add/update spreadsheet in database
     user_spreadsheet = add_user_spreadsheet(
@@ -154,7 +154,7 @@ def set_user_spreadsheet(session_obj, spreadsheet_id, spreadsheet_url=None, spre
         make_active=True,
     )
 
-    print(f'Set active spreadsheet {spreadsheet_id} for user {user.email}')
+    print(f"Set active spreadsheet {spreadsheet_id} for user {user.email}")
     return user_spreadsheet
 
 
