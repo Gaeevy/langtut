@@ -390,7 +390,6 @@ function setButtonLoading(buttonId, isLoading, originalText = null) {
 
 function validateSpreadsheet() {
     const spreadsheetId = document.getElementById('spreadsheet_id').value.trim();
-    const resultsDiv = document.getElementById('results');
     const previewDiv = document.getElementById('content-preview');
     const validateBtn = document.getElementById('validate-btn');
 
@@ -457,71 +456,10 @@ document.addEventListener('DOMContentLoaded', function() {
     loadLanguageSettings();
 });
 
-// Spreadsheet validation functionality (existing code)
-function validateSpreadsheet() {
-    const spreadsheetId = document.getElementById('spreadsheet_id').value.trim();
-    const resultsDiv = document.getElementById('results');
-    const previewDiv = document.getElementById('content-preview');
-
-    if (!spreadsheetId) {
-        resultsDiv.innerHTML = '<div class="alert alert-danger">Please enter a spreadsheet ID or URL.</div>';
-        resultsDiv.style.display = 'block';
-        return;
-    }
-
-    // Show loading
-    resultsDiv.innerHTML = '<div class="alert alert-info">⏳ Validating spreadsheet...</div>';
-    resultsDiv.style.display = 'block';
-    previewDiv.style.display = 'none';
-
-    fetch('/validate-spreadsheet', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            spreadsheet_url: spreadsheetId
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Show preview
-            let cardSetsInfo = '';
-            if (data.card_sets && data.card_sets.length > 0) {
-                cardSetsInfo = '<h6>Card Sets Found:</h6><ul>';
-                data.card_sets.forEach(cs => {
-                    cardSetsInfo += `<li><strong>${cs.name}</strong> (${cs.card_count} cards)</li>`;
-                });
-                cardSetsInfo += '</ul>';
-            }
-
-            document.getElementById('spreadsheet-info').innerHTML = `
-                <div class="alert alert-success">
-                    <strong>✅ Spreadsheet Validated Successfully!</strong><br>
-                    <strong>Spreadsheet ID:</strong> <code>${data.spreadsheet_id}</code><br>
-                    ${cardSetsInfo}
-                </div>
-            `;
-
-            document.getElementById('confirm-spreadsheet-id').value = data.spreadsheet_id;
-
-            resultsDiv.style.display = 'none';
-            previewDiv.style.display = 'block';
-
-        } else {
-            resultsDiv.innerHTML = `<div class="alert alert-danger"><strong>❌ Validation Failed:</strong> ${data.error}</div>`;
-        }
-    })
-    .catch(error => {
-        resultsDiv.innerHTML = `<div class="alert alert-danger"><strong>❌ Error:</strong> ${error.message}</div>`;
-    });
-}
-
 function confirmSpreadsheet() {
     const spreadsheetId = document.getElementById('confirm-spreadsheet-id').value;
     const button = document.querySelector('#content-preview .btn-success');
-    const cancelButton = document.querySelector('#content-preview .btn-secondary');
+    const cancelButton = document.querySelector('#content-preview .btn-outline-secondary');
 
     // Show loading state
     button.disabled = true;
