@@ -33,10 +33,10 @@ def settings():
             current_spreadsheet_name = active_spreadsheet.spreadsheet_name
 
     return render_template(
-        "settings.html", 
-        user=user, 
+        "settings.html",
+        user=user,
         current_spreadsheet_id=current_spreadsheet_id,
-        current_spreadsheet_name=current_spreadsheet_name
+        current_spreadsheet_name=current_spreadsheet_name,
     )
 
 
@@ -63,7 +63,7 @@ def validate_spreadsheet():
         spreadsheet_property = validate_spreadsheet_access(spreadsheet_id)
         spreadsheet_name = spreadsheet_property[3]
         set_user_spreadsheet(spreadsheet_id, spreadsheet_url, spreadsheet_name)
-        
+
         if not spreadsheet_property:
             return jsonify(
                 {

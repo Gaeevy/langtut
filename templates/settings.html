@@ -115,7 +115,7 @@
                                 </div>
                             </div>
                             <div>
-                                <button type="button" class="btn btn-outline-danger btn-sm" 
+                                <button type="button" class="btn btn-outline-danger btn-sm"
                                         onclick="confirmResetSpreadsheet()"
                                         title="Disconnect this spreadsheet">
                                     <i class="bi bi-trash"></i> Remove
@@ -147,7 +147,7 @@
                             <input type="text" class="form-control" id="spreadsheet_id"
                                 value="{{ current_spreadsheet_id or '' }}"
                                 placeholder="Paste Google Sheets URL or ID here">
-                            <button class="btn btn-outline-primary" type="button" 
+                            <button class="btn btn-outline-primary" type="button"
                                     onclick="validateSpreadsheet()"
                                     id="validate-btn">
                                 <i class="bi bi-check-circle"></i> Validate
@@ -155,15 +155,15 @@
                         </div>
                         <div class="settings-info">
                             <small>
-                                <i class="bi bi-info-circle"></i> 
-                                You can paste the full URL (e.g., https://docs.google.com/spreadsheets/d/...) 
+                                <i class="bi bi-info-circle"></i>
+                                You can paste the full URL (e.g., https://docs.google.com/spreadsheets/d/...)
                                 or just the spreadsheet ID.
                             </small>
                         </div>
                     </div>
 
                     <!-- Hidden form for setting spreadsheet -->
-                    <form method="POST" action="{{ url_for('settings.set_spreadsheet') }}" 
+                    <form method="POST" action="{{ url_for('settings.set_spreadsheet') }}"
                         id="confirm-form" style="display: none;">
                         <input type="hidden" name="spreadsheet_id" id="confirm-spreadsheet-id">
                         <input type="hidden" name="confirm" value="true">
@@ -209,7 +209,7 @@ function showToast(message, type = 'info') {
     const toastBody = document.getElementById('toast-body');
     const toastTitle = document.getElementById('toast-title');
     const toast = new bootstrap.Toast(toastEl);
-    
+
     // Set icon and title based on type
     const icons = {
         success: '✓',
@@ -217,19 +217,19 @@ function showToast(message, type = 'info') {
         warning: '⚠',
         info: 'ℹ'
     };
-    
+
     const titles = {
         success: 'Success',
         danger: 'Error',
         warning: 'Warning',
         info: 'Info'
     };
-    
+
     // Update toast appearance
     toastEl.className = `toast border-${type}`;
     toastTitle.innerHTML = `${icons[type]} ${titles[type]}`;
     toastBody.innerHTML = message;
-    
+
     // Show toast
     toast.show();
 }
@@ -375,7 +375,7 @@ function showLanguageResult(message, type) {
 function setButtonLoading(buttonId, isLoading, originalText = null) {
     const button = document.getElementById(buttonId);
     if (!button) return;
-    
+
     if (isLoading) {
         button.dataset.originalText = button.innerHTML;
         button.classList.add('btn-loading');
@@ -414,7 +414,7 @@ function validateSpreadsheet() {
     .then(response => response.json())
     .then(data => {
         setButtonLoading('validate-btn', false, '<i class="bi bi-check-circle"></i> Validate');
-        
+
         if (data.success) {
             // Show preview...
             showPreview(data);
@@ -530,7 +530,7 @@ function confirmSpreadsheet() {
 
 function showPreview(data) {
     const previewDiv = document.getElementById('content-preview');
-    
+
     // Build preview content
     let cardSetsInfo = '';
     if (data.card_sets && data.card_sets.length > 0) {
@@ -539,7 +539,7 @@ function showPreview(data) {
             cardSetsInfo += `
                 <li class="mb-2">
                     <i class="bi bi-folder-fill text-primary"></i>
-                    <strong>${cs.name}</strong> 
+                    <strong>${cs.name}</strong>
                     <span class="badge bg-secondary">${cs.card_count} cards</span>
                 </li>`;
         });

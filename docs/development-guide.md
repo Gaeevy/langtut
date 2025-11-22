@@ -3,7 +3,7 @@
 ## Getting Started
 
 ### Prerequisites
-- Python 3.11 or higher
+- Python 3.13.0
 - uv for fast dependency management ([Install uv](https://docs.astral.sh/uv/))
 - Google Cloud service account (for TTS)
 - Google OAuth credentials (for Sheets access)
