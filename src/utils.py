@@ -14,8 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_timestamp():
-    """
-    Get current timestamp as datetime object.
+    """Get current timestamp as datetime object.
 
     Returns:
         Current datetime object
@@ -24,8 +23,7 @@ def get_timestamp():
 
 
 def format_timestamp(dt):
-    """
-    Format a datetime object to string.
+    """Format a datetime object to string.
 
     Args:
         dt: Datetime object to format
@@ -39,8 +37,7 @@ def format_timestamp(dt):
 
 
 def parse_timestamp(timestamp_str):
-    """
-    Parse a timestamp string to datetime object.
+    """Parse a timestamp string to datetime object.
 
     Args:
         timestamp_str: String timestamp in format '%Y-%m-%d %H:%M:%S'
@@ -60,9 +57,7 @@ def parse_timestamp(timestamp_str):
 
 
 def ensure_utf8_encoding():
-    """
-    Ensure stdout and stderr are using UTF-8 encoding.
-    """
+    """Ensure stdout and stderr are using UTF-8 encoding."""
     import sys
 
     if sys.stdout.encoding != "utf-8":

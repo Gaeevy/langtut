@@ -26,8 +26,7 @@ def credentials_to_dict(credentials: Credentials) -> dict:
 
 
 def get_redirect_uri(host: str) -> str:
-    """
-    Get redirect URI based on environment.
+    """Get redirect URI based on environment.
 
     Args:
         host: Request host (e.g., 'localhost:8080' or 'app.railway.app')
@@ -41,8 +40,7 @@ def get_redirect_uri(host: str) -> str:
 
 
 def create_oauth_flow(redirect_uri: str, state: str | None = None) -> Flow:
-    """
-    Create OAuth flow instance.
+    """Create OAuth flow instance.
 
     Args:
         redirect_uri: OAuth callback redirect URI
@@ -63,8 +61,7 @@ def create_oauth_flow(redirect_uri: str, state: str | None = None) -> Flow:
 
 
 def get_credentials() -> Credentials | None:
-    """
-    Get OAuth2 credentials from session.
+    """Get OAuth2 credentials from session.
 
     Returns:
         Google Credentials object or None if not authenticated

@@ -45,8 +45,7 @@ class SessionKeys(Enum):
 
 
 class SessionManager:
-    """
-    Centralized session management with static methods.
+    """Centralized session management with static methods.
 
     Provides a clean interface for session operations while maintaining
     compatibility with Flask's session object.
@@ -54,8 +53,7 @@ class SessionManager:
 
     @staticmethod
     def get(key: SessionKeys, default: Any = None) -> Any:
-        """
-        Get session value with optional default.
+        """Get session value with optional default.
 
         Args:
             key: SessionKeys enum value
@@ -68,8 +66,7 @@ class SessionManager:
 
     @staticmethod
     def set(key: SessionKeys, value: Any) -> None:
-        """
-        Set session value.
+        """Set session value.
 
         Args:
             key: SessionKeys enum value
@@ -79,8 +76,7 @@ class SessionManager:
 
     @staticmethod
     def remove(key: SessionKeys) -> None:
-        """
-        Remove session key.
+        """Remove session key.
 
         Args:
             key: SessionKeys enum value to remove
@@ -89,8 +85,7 @@ class SessionManager:
 
     @staticmethod
     def has(key: SessionKeys) -> bool:
-        """
-        Check if session key exists.
+        """Check if session key exists.
 
         Args:
             key: SessionKeys enum value to check
@@ -102,8 +97,7 @@ class SessionManager:
 
     @staticmethod
     def clear_namespace(namespace: str) -> None:
-        """
-        Clear all session keys with the given namespace prefix.
+        """Clear all session keys with the given namespace prefix.
 
         Args:
             namespace: Namespace prefix (e.g., 'auth', 'learning')

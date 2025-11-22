@@ -18,8 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_current_user() -> User | None:
-    """
-    Get the current authenticated user from the session.
+    """Get the current authenticated user from the session.
 
     Returns:
         User object if authenticated, None otherwise
@@ -87,8 +86,7 @@ def clear_user_session():
 
 
 def is_authenticated():
-    """
-    Check if the current user is authenticated.
+    """Check if the current user is authenticated.
 
     Returns:
         bool: True if user is authenticated with valid credentials

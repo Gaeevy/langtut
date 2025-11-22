@@ -47,8 +47,7 @@ days_to_review = {
 
 
 class Card(BaseModel):
-    """
-    Represents a language learning flashcard.
+    """Represents a language learning flashcard.
 
     Attributes:
         id: Unique identifier for the card
@@ -93,8 +92,7 @@ class Card(BaseModel):
 
 # Pydantic model for tabs
 class CardSet(BaseModel):
-    """
-    Represents a collection of cards (a tab in the spreadsheet).
+    """Represents a collection of cards (a tab in the spreadsheet).
 
     Attributes:
         name: The name of the tab
@@ -137,8 +135,7 @@ class CardSet(BaseModel):
 
 
 class SpreadsheetLanguages(BaseModel):
-    """
-    Language settings for spreadsheet learning configuration.
+    """Language settings for spreadsheet learning configuration.
 
     Attributes:
         original: Language code being learned FROM (e.g., 'ru' for Russian)
@@ -188,8 +185,7 @@ class SpreadsheetLanguages(BaseModel):
 
 
 class UserSpreadsheetProperty(BaseModel):
-    """
-    Properties for UserSpreadsheet configuration.
+    """Properties for UserSpreadsheet configuration.
 
     Stores language settings and other user-specific spreadsheet configurations.
     """

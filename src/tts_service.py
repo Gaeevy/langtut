@@ -106,8 +106,7 @@ class TTSService:
         return self.enabled and self.tts_client is not None
 
     def generate_speech(self, text: str, voice_name: str | None = None) -> bytes | None:
-        """
-        Generate speech audio from text using Google Cloud TTS
+        """Generate speech audio from text using Google Cloud TTS.
 
         Args:
             text: Text to convert to speech
@@ -150,8 +149,7 @@ class TTSService:
             return None
 
     def generate_speech_base64(self, text: str, voice_name: str | None = None) -> str | None:
-        """
-        Generate speech and return as base64 encoded string for web use
+        """Generate speech and return as base64 encoded string for web use.
 
         Args:
             text: Text to convert to speech
@@ -166,8 +164,7 @@ class TTSService:
         return None
 
     def get_cache_key(self, text: str, voice_name: str | None = None) -> str:
-        """
-        Generate cache key for TTS audio based on text and voice
+        """Generate cache key for TTS audio based on text and voice.
 
         Args:
             text: Text to be spoken
@@ -183,8 +180,7 @@ class TTSService:
     def get_gcs_path(
         self, spreadsheet_id: str, sheet_gid: int, text: str, voice_name: str | None = None
     ) -> str:
-        """
-        Generate GCS path for audio file using spreadsheet_id/sheet_gid/text_hash structure
+        """Generate GCS path for audio file using spreadsheet_id/sheet_gid/text_hash structure.
 
         Args:
             spreadsheet_id: Google Sheets spreadsheet ID
@@ -201,8 +197,7 @@ class TTSService:
     def get_audio_from_gcs(
         self, spreadsheet_id: str, sheet_gid: int, text: str, voice_name: str | None = None
     ) -> bytes | None:
-        """
-        Try to get cached audio from GCS
+        """Try to get cached audio from GCS.
 
         Args:
             spreadsheet_id: Google Sheets spreadsheet ID
@@ -239,8 +234,7 @@ class TTSService:
         audio_content: bytes,
         voice_name: str | None = None,
     ) -> bool:
-        """
-        Cache audio content to GCS
+        """Cache audio content to GCS.
 
         Args:
             spreadsheet_id: Google Sheets spreadsheet ID
@@ -275,8 +269,7 @@ class TTSService:
         sheet_gid: int = None,
         voice_name: str | None = None,
     ) -> str | None:
-        """
-        Generate speech with GCS caching support (returns base64)
+        """Generate speech with GCS caching support (returns base64).
 
         Args:
             text: Text to convert to speech
@@ -314,8 +307,7 @@ class TTSService:
         return base64.b64encode(audio_content).decode("utf-8")
 
     def get_available_voices(self) -> list:
-        """
-        Get list of available Portuguese voices
+        """Get list of available Portuguese voices.
 
         Returns:
             List of available voice names for Portuguese

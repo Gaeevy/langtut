@@ -21,8 +21,7 @@ class Environment(StrEnum):
 
 
 def resolve_environment() -> Environment:
-    """
-    Environment detection using Railway's automatic variables.
+    """Environment detection using Railway's automatic variables.
 
     Returns:
         str: 'production' or 'local'
@@ -62,8 +61,7 @@ _google_cloud_service_account_file_path = resolve_secrets_file_path(
 
 
 class Config(BaseSettings):
-    """
-    Unified configuration using Pydantic.
+    """Unified configuration using Pydantic.
 
     Single source of truth for all application settings with environment-aware
     configuration and simplified credential handling.

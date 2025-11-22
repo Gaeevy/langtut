@@ -17,8 +17,7 @@ from src.utils import ensure_utf8_encoding
 
 
 def configure_app(app: Flask) -> None:
-    """
-    Configure Flask application with settings from unified config.
+    """Configure Flask application with settings from unified config.
 
     Args:
         app: Flask application instance
@@ -40,8 +39,7 @@ def configure_app(app: Flask) -> None:
 
 
 def initialize_extensions(app: Flask) -> None:
-    """
-    Initialize Flask extensions.
+    """Initialize Flask extensions.
 
     Args:
         app: Flask application instance
@@ -51,8 +49,7 @@ def initialize_extensions(app: Flask) -> None:
 
 
 def setup_middleware(app: Flask) -> None:
-    """
-    Setup middleware and request/response hooks.
+    """Setup middleware and request/response hooks.
 
     Args:
         app: Flask application instance
@@ -62,8 +59,7 @@ def setup_middleware(app: Flask) -> None:
 
 
 def create_app() -> Flask:
-    """
-    Application factory function.
+    """Application factory function.
 
     Creates and configures the Flask application with all necessary
     components properly initialized.

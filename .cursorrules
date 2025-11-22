@@ -80,6 +80,14 @@ settings.toml              # Main configuration (non-sensitive)
 - **PRE-COMMIT HOOKS** - All code must pass ruff linting, formatting, and security checks
 - **NO direct database calls** in routes - use service layer
 - **LOGGING** required for all external API calls
+- **DOCSTRING STYLE** - Summary on first line with opening quotes:
+  ```python
+  def function():
+      """Summary description on first line.
+
+      Additional details, Args, Returns on subsequent lines.
+      """
+  ```
 
 ### 4. Session Management Rules
 - **USE SessionManager** - Never access `session[]` directly
