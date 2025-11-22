@@ -56,9 +56,9 @@ def validate_spreadsheet():
             return jsonify({"success": False, "error": "Invalid spreadsheet URL"})
 
         # Validate access to the spreadsheet
-        is_valid = validate_spreadsheet_access(spreadsheet_id)
+        spreadsheet_property = validate_spreadsheet_access(spreadsheet_id)
 
-        if not is_valid:
+        if not spreadsheet_property:
             return jsonify(
                 {
                     "success": False,
@@ -69,6 +69,7 @@ def validate_spreadsheet():
         # Try to read card sets to validate structure
         try:
             card_sets = read_all_card_sets(spreadsheet_id)
+            spreadsheet_name = spreadsheet_property[3]
             if not card_sets:
                 return jsonify(
                     {"success": False, "error": "No valid card sets found in the spreadsheet"}
@@ -78,6 +79,7 @@ def validate_spreadsheet():
                 {
                     "success": True,
                     "spreadsheet_id": spreadsheet_id,
+                    "spreadsheet_name": spreadsheet_name,
                     "card_sets": [
                         {"name": cs.name, "card_count": len(cs.cards)} for cs in card_sets
                     ],
