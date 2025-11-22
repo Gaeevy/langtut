@@ -108,9 +108,9 @@
                                     <i class="bi bi-check-circle-fill"></i> Spreadsheet Connected
                                 </div>
                                 <div class="mb-2">
-                                    <small class="text-muted d-block mb-1">Spreadsheet ID:</small>
+                                    <small class="text-muted d-block mb-1">Spreadsheet name:</small>
                                     <div class="spreadsheet-id-display">
-                                        {{ current_spreadsheet_id }}
+                                        {{ current_spreadsheet_name }}
                                     </div>
                                 </div>
                             </div>
@@ -551,15 +551,21 @@ function showPreview(data) {
             <i class="bi bi-check-circle-fill"></i> Spreadsheet Validated Successfully
         </div>
         <div class="mb-3">
-            <small class="text-muted d-block mb-1">Spreadsheet ID:</small>
+            <small class="text-muted d-block mb-1">Spreadsheet Name:</small>
             <div class="spreadsheet-id-display">
-                ${data.spreadsheet_id}
+                ${data.spreadsheet_name}
             </div>
         </div>
         ${cardSetsInfo}
     `;
 
     document.getElementById('confirm-spreadsheet-id').value = data.spreadsheet_id;
+
+    // Update the name of the current table in the block Current Status
+    const spreadsheetNameElement = document.querySelector('.spreadsheet-id-display');
+    if (spreadsheetNameElement) {
+        spreadsheetNameElement.textContent = data.spreadsheet_name;
+    }
 
     // Show with animation
     previewDiv.style.display = 'block';

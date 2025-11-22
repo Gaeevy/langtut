@@ -61,6 +61,9 @@ def validate_spreadsheet_access(spreadsheet_id: str) -> tuple[bool, str, list[st
         spreadsheet = gc.open_by_key(spreadsheet_id)
         logger.info(f"Successfully opened spreadsheet: {spreadsheet.title}")
 
+        # Get spreadsheet name
+        spreadsheet_name = spreadsheet.title
+
         # Get worksheet names
         worksheets = spreadsheet.worksheets()
         worksheet_names = [ws.title for ws in worksheets]
@@ -103,7 +106,7 @@ def validate_spreadsheet_access(spreadsheet_id: str) -> tuple[bool, str, list[st
             )
 
         logger.info("✅ Spreadsheet validation successful")
-        return True, "Spreadsheet is valid", worksheet_names
+        return True, "Spreadsheet is valid", worksheet_names, spreadsheet_name
 
     except gspread.SpreadsheetNotFound:
         logger.error(f"Spreadsheet not found: {spreadsheet_id}")

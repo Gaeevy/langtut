@@ -4,7 +4,7 @@ Settings routes for the Language Learning Flashcard App.
 Handles user settings and spreadsheet configuration.
 """
 
-from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 
 from src.gsheet import extract_spreadsheet_id, read_all_card_sets, validate_spreadsheet_access
 from src.session_manager import SessionKeys as sk
@@ -30,9 +30,13 @@ def settings():
         active_spreadsheet = user.get_active_spreadsheet()
         if active_spreadsheet:
             current_spreadsheet_id = active_spreadsheet.spreadsheet_id
+            current_spreadsheet_name = active_spreadsheet.spreadsheet_name
 
     return render_template(
-        "settings.html", user=user, current_spreadsheet_id=current_spreadsheet_id
+        "settings.html", 
+        user=user, 
+        current_spreadsheet_id=current_spreadsheet_id,
+        current_spreadsheet_name=current_spreadsheet_name
     )
 
 
@@ -56,9 +60,11 @@ def validate_spreadsheet():
             return jsonify({"success": False, "error": "Invalid spreadsheet URL"})
 
         # Validate access to the spreadsheet
-        is_valid = validate_spreadsheet_access(spreadsheet_id)
-
-        if not is_valid:
+        spreadsheet_property = validate_spreadsheet_access(spreadsheet_id)
+        spreadsheet_name = spreadsheet_property[3]
+        set_user_spreadsheet(spreadsheet_id, spreadsheet_url, spreadsheet_name)
+        
+        if not spreadsheet_property:
             return jsonify(
                 {
                     "success": False,
@@ -78,6 +84,7 @@ def validate_spreadsheet():
                 {
                     "success": True,
                     "spreadsheet_id": spreadsheet_id,
+                    "spreadsheet_name": spreadsheet_name,
                     "card_sets": [
                         {"name": cs.name, "card_count": len(cs.cards)} for cs in card_sets
                     ],
@@ -105,7 +112,7 @@ def set_spreadsheet():
 
     try:
         # Set the user's spreadsheet
-        success = set_user_spreadsheet(session, spreadsheet_id)
+        success = set_user_spreadsheet(spreadsheet_id)
 
         if success:
             return jsonify({"success": True, "message": "Spreadsheet set successfully"})
@@ -125,7 +132,7 @@ def reset_spreadsheet():
 
     try:
         # Reset to None (no spreadsheet)
-        success = set_user_spreadsheet(session, None)
+        success = set_user_spreadsheet(None)
 
         if success:
             return jsonify({"success": True, "message": "Spreadsheet reset successfully"})
