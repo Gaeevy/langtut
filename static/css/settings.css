@@ -176,12 +176,12 @@
         flex-direction: column;
         width: 100%;
     }
-    
+
     .settings-btn-group .btn {
         width: 100%;
         min-width: auto;
     }
-    
+
     .settings-toast {
         right: 10px;
         left: 10px;
@@ -195,7 +195,7 @@
         background-color: #2d3748;
         color: #e2e8f0;
     }
-    
+
     .settings-form-group label {
         color: #e2e8f0;
     }

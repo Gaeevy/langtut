@@ -12,9 +12,9 @@ import gspread
 from gspread.spreadsheet import Spreadsheet
 from gspread.worksheet import Worksheet
 
-from src.auth import get_credentials
 from src.config import config
 from src.models import NEVER_SHOWN, Card, CardSet, Levels
+from src.services.auth import get_credentials
 from src.utils import format_timestamp, parse_timestamp
 
 # Create logger

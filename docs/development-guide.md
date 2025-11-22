@@ -3,7 +3,7 @@
 ## Getting Started
 
 ### Prerequisites
-- Python 3.11 or higher
+- Python 3.13.0
 - uv for fast dependency management ([Install uv](https://docs.astral.sh/uv/))
 - Google Cloud service account (for TTS)
 - Google OAuth credentials (for Sheets access)
@@ -16,10 +16,6 @@ cd langtut
 
 # Install dependencies (automatically creates virtual environment)
 uv sync
-
-# Set up configuration
-cp .secrets.toml.example .secrets.toml
-# Edit .secrets.toml with your credentials
 
 # Start development server
 uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app

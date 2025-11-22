@@ -34,7 +34,7 @@ For comprehensive information about the application, see our detailed documentat
 - **[Development Guide](./docs/development-guide.md)** - Setup and development workflow
 
 ### Prerequisites
-- Python 3.11 or higher
+- Python 3.13.0
 - uv for fast dependency management ([Install uv](https://docs.astral.sh/uv/))
 - Google Cloud service account (for TTS)
 - Google OAuth credentials (for Sheets access)
@@ -48,20 +48,9 @@ cd langtut
 # Install dependencies (uv will automatically create a virtual environment)
 uv sync
 
-# Set up configuration
-cp .secrets.toml.example .secrets.toml
-# Edit .secrets.toml with your credentials
-
-# Initialize database (first time only)
-uv run python init_db.py
-
 # Start development server
 # On Mac/Linux:
 uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
-
-# On Windows (Gunicorn doesn't work - use Waitress instead):
-uv run waitress-serve --host=0.0.0.0 --port=8080 app:app
-# Or simply double-click: run_windows.bat
 ```
 
 ### Configuration
@@ -151,7 +140,7 @@ LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id
 ### Docker Deployment
 The application uses a multi-stage Dockerfile for optimized production builds:
 - **Stage 1 (builder):** Install dependencies with uv
-- **Stage 2 (runtime):** Minimal production image with Python 3.11.10-slim
+- **Stage 2 (runtime):** Minimal production image with Python 3.13.0-slim
 
 ```bash
 # Build Docker image locally
