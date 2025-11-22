@@ -48,20 +48,9 @@ cd langtut
 # Install dependencies (uv will automatically create a virtual environment)
 uv sync
 
-# Set up configuration
-cp .secrets.toml.example .secrets.toml
-# Edit .secrets.toml with your credentials
-
-# Initialize database (first time only)
-uv run python init_db.py
-
 # Start development server
 # On Mac/Linux:
 uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
-
-# On Windows (Gunicorn doesn't work - use Waitress instead):
-uv run waitress-serve --host=0.0.0.0 --port=8080 app:app
-# Or simply double-click: run_windows.bat
 ```
 
 ### Configuration

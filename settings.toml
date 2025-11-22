@@ -4,7 +4,6 @@ max_cards_per_session = 10
 spreadsheet_id = "15_PsHfMb440wtUgZ0d1aJmu5YIXoo9JKytlJINxOV8Q"
 
 # Google OAuth
-client_secrets_file = "client_secret.json"
 scopes = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/userinfo.email",
@@ -19,7 +18,6 @@ tts_enabled = true
 tts_language_code = "pt-PT"
 tts_voice_name = "pt-PT-Standard-A"
 tts_audio_encoding = "MP3"
-google_cloud_service_account_file = "google-cloud-service-account.json"
 gcs_audio_bucket = "langtut-tts"
 
 # Flask Session
@@ -33,6 +31,8 @@ session_cookie_samesite = "Lax"
 json_as_ascii = false
 
 [local]
+client_secrets_file = "client_secret.json"
+google_cloud_service_account_file = "google-cloud-service-account.json"
 debug = true
 session_cookie_secure = false
 database_path = "data/app.db"

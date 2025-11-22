@@ -17,10 +17,6 @@ cd langtut
 # Install dependencies (automatically creates virtual environment)
 uv sync
 
-# Set up configuration
-cp .secrets.toml.example .secrets.toml
-# Edit .secrets.toml with your credentials
-
 # Start development server
 uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
 ```

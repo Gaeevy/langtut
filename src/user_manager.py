@@ -7,8 +7,8 @@ Handles user authentication, session management, and database operations for use
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
-from src.auth import get_credentials
 from src.database import User, add_user_spreadsheet, db, get_user_active_spreadsheet
+from src.services.auth import get_credentials
 from src.session_manager import SessionKeys as sk
 from src.session_manager import SessionManager as sm
 

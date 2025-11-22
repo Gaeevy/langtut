@@ -4,9 +4,12 @@ Google OAuth2 authentication utilities.
 Provides functions for managing Google OAuth2 credentials and authentication state.
 """
 
+import json
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 
+from src import config
 from src.session_manager import SessionKeys as sk
 from src.session_manager import SessionManager as sm
 
@@ -60,3 +63,18 @@ def dict_to_credentials(credentials_dict):
         client_secret=credentials_dict.get("client_secret"),
         scopes=credentials_dict.get("scopes"),
     )
+
+
+def load_redirect_uris():
+    """
+    Load registered redirect URIs from client_secret.json file.
+
+    Returns:
+        list: List of registered redirect URIs
+    """
+    try:
+        with open(config.client_secrets_file_path) as f:
+            client_secrets = json.load(f)
+            return client_secrets["web"]["redirect_uris"]
+    except (FileNotFoundError, KeyError, json.JSONDecodeError):
+        return []

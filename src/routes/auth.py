@@ -7,12 +7,11 @@ Handles Google OAuth authentication flow.
 from flask import Blueprint, redirect, render_template, request, session, url_for
 from google_auth_oauthlib.flow import Flow
 
-from src.auth import credentials_to_dict
-from src.config import config
+from src.config import Environment, config
+from src.services.auth import credentials_to_dict, load_redirect_uris
 from src.session_manager import SessionKeys as sk
 from src.session_manager import SessionManager as sm
 from src.user_manager import clear_user_session, login_user
-from src.utils import load_redirect_uris
 
 # Create blueprint
 auth_bp = Blueprint("auth", __name__)
@@ -24,12 +23,9 @@ REGISTERED_REDIRECT_URIS = load_redirect_uris()
 @auth_bp.route("/auth")
 def auth():
     """Initiate the OAuth flow to authorize the application."""
-    try:
-        # Determine if we're in production or development
-        is_production = request.host.endswith(".railway.app") or request.host.endswith(
-            ".up.railway.app"
-        )
+    is_production = config.environment == Environment.PRODUCTION
 
+    try:
         if is_production:
             # In production, use the Railway domain
             redirect_uri = f"https://{request.host}/oauth2callback"
