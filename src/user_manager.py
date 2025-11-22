@@ -4,6 +4,8 @@ User management utilities for the Language Learning Flashcard App.
 Handles user authentication, session management, and database operations for users.
 """
 
+import logging
+
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
@@ -11,6 +13,8 @@ from src.database import User, add_user_spreadsheet, db, get_user_active_spreads
 from src.services.auth import get_credentials
 from src.session_manager import SessionKeys as sk
 from src.session_manager import SessionManager as sm
+
+logger = logging.getLogger(__name__)
 
 
 def get_current_user() -> User | None:
@@ -26,12 +30,10 @@ def get_current_user() -> User | None:
     return None
 
 
-def login_user(session_obj, credentials_dict):
-    """
-    Login user and create/update user record.
+def login_user(credentials_dict):
+    """Login user and create/update user record.
 
     Args:
-        session_obj: Flask session object (for backward compatibility)
         credentials_dict: OAuth credentials dictionary
 
     Returns:
@@ -54,13 +56,13 @@ def login_user(session_obj, credentials_dict):
         user = User(google_user_id=google_user_id, email=email)
         db.session.add(user)
         db.session.commit()
-        print(f"New user created: {email} (ID: {user.id})")
+        logger.debug(f"New user created: {email} (ID: {user.id})")
     else:
         # Update existing user email if it changed
         if user.email != email:
             user.email = email
             db.session.commit()
-        print(f"User logged in: {email} (ID: {user.id})")
+        logger.debug(f"User logged in: {email} (ID: {user.id})")
 
     # Store user info in session using SessionManager
     sm.set(sk.USER_ID, user.id)
@@ -69,13 +71,9 @@ def login_user(session_obj, credentials_dict):
     return user
 
 
-def clear_user_session(session_obj):
-    """
-    Clear user authentication data from session.
+def clear_user_session():
+    """Clear user authentication data from session."""
 
-    Args:
-        session_obj: Flask session object (for backward compatibility)
-    """
     # Clear auth namespace
     sm.clear_namespace("auth")
 
@@ -85,7 +83,7 @@ def clear_user_session(session_obj):
     # Clear learning namespace
     sm.clear_namespace("learning")
 
-    print("User session cleared")
+    logger.debug("User session cleared")
 
 
 def is_authenticated():
@@ -122,7 +120,7 @@ def get_google_user_info(credentials_dict):
         }
 
     except Exception as e:
-        print(f"Error getting Google user info: {e}")
+        logger.error(f"Error getting Google user info: {e}")
         return None
 
 
@@ -154,7 +152,7 @@ def set_user_spreadsheet(spreadsheet_id, spreadsheet_url=None, spreadsheet_name=
         make_active=True,
     )
 
-    print(f"Set active spreadsheet {spreadsheet_id} for user {user.email}")
+    logger.debug(f"Set active spreadsheet {spreadsheet_id} for user {user.email}")
     return user_spreadsheet
 
 

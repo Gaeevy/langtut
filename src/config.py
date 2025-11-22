@@ -78,7 +78,7 @@ class Config(BaseSettings):
     debug: bool = _settings["debug"]
 
     # Core app
-    secret_key: str | None = _settings.get("SECRET_KEY", None)
+    secret_key: str | None = _settings.get("SECRET_KEY")
     max_cards_per_session: int = _settings["max_cards_per_session"]
     spreadsheet_id: str = _settings["spreadsheet_id"]
 
