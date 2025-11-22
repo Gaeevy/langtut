@@ -11,7 +11,7 @@ from flask import Flask
 
 from flask_session import Session
 from src.config import config
-from src.request_logger import setup_request_logging
+from src.logging import setup_request_logging
 from src.routes import register_blueprints
 from src.utils import ensure_utf8_encoding
 
