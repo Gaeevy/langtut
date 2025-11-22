@@ -140,7 +140,7 @@ LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id
 ### Docker Deployment
 The application uses a multi-stage Dockerfile for optimized production builds:
 - **Stage 1 (builder):** Install dependencies with uv
-- **Stage 2 (runtime):** Minimal production image with Python 3.13.0-slim
+- **Stage 2 (runtime):** Minimal production image with Python 3.13-slim
 
 ```bash
 # Build Docker image locally
