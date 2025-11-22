@@ -139,7 +139,7 @@ def get_user_spreadsheet_id(session_obj):
     return None
 
 
-def set_user_spreadsheet(session_obj, spreadsheet_id, spreadsheet_url=None, spreadsheet_name=None):
+def set_user_spreadsheet(spreadsheet_id, spreadsheet_url=None, spreadsheet_name=None):
     """Set a spreadsheet as active for the current user"""
     user = get_current_user()
     if not user:
