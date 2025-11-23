@@ -12,9 +12,10 @@ from flask import Blueprint, redirect, render_template, request, session, url_fo
 from src.config import config
 from src.gsheet import read_all_card_sets, read_card_set, update_spreadsheet
 from src.models import Card
+from src.services.auth_manager import auth_manager
 from src.session_manager import SessionKeys as sk
 from src.session_manager import SessionManager as sm
-from src.user_manager import get_user_spreadsheet_id, is_authenticated
+from src.user_manager import get_user_spreadsheet_id
 from src.utils import format_timestamp, get_timestamp, parse_timestamp
 
 # Create logger
@@ -91,8 +92,8 @@ def index():
     if not sm.has(sk.TEST_SESSION):
         sm.set(sk.TEST_SESSION, "Session is working")
 
-    # Check authentication status using SessionManager
-    user_is_authenticated = is_authenticated()
+    # Check authentication status using AuthManager
+    user_is_authenticated = auth_manager.is_authenticated()
     user_spreadsheet_id = get_user_spreadsheet_id(session)
 
     logger.info(f"Authentication status: {user_is_authenticated}")
@@ -127,6 +128,7 @@ def index():
 
 
 @flashcard_bp.route("/start/<tab_name>", methods=["POST"])
+@auth_manager.require_auth
 def start_learning(tab_name: str):
     """Start a learning session with cards from the specified tab."""
     logger.info(f"Starting learning session: {tab_name}")
@@ -188,6 +190,7 @@ def start_learning(tab_name: str):
 
 
 @flashcard_bp.route("/review/<tab_name>")
+@auth_manager.require_auth
 def start_review(tab_name: str):
     """Start a review session with ALL cards from the specified tab."""
     logger.info(f"Starting review session: {tab_name}")
@@ -236,6 +239,7 @@ def start_review(tab_name: str):
 
 
 @flashcard_bp.route("/review/nav/<direction>")
+@auth_manager.require_auth
 def navigate_review(direction: str):
     """Navigate between cards in review mode with wraparound."""
     logger.info(f"=== REVIEW NAVIGATION: {direction} ===")
@@ -264,6 +268,7 @@ def navigate_review(direction: str):
 
 @flashcard_bp.route("/card")
 @flashcard_bp.route("/card/<mode>")
+@auth_manager.require_auth
 def show_card(mode="study"):
     """Display the current flashcard."""
     logger.debug(f"Showing card - mode: {mode}")
@@ -384,6 +389,7 @@ def show_card(mode="study"):
 
 
 @flashcard_bp.route("/answer", methods=["POST"])
+@auth_manager.require_auth
 def process_answer():
     """Process the user's answer to a flashcard."""
     logger.debug("Processing answer")
@@ -508,12 +514,14 @@ def process_answer():
 
 
 @flashcard_bp.route("/feedback/<correct>")
+@auth_manager.require_auth
 def show_feedback(correct: str):
     """Show feedback after answering a card."""
     return show_feedback_with_mode(correct, "study")
 
 
 @flashcard_bp.route("/feedback/<correct>/<mode>")
+@auth_manager.require_auth
 def show_feedback_with_mode(correct: str, mode: str = "study"):
     """Show feedback after answering a card or flip view in review mode."""
 
@@ -590,6 +598,7 @@ def show_feedback_with_mode(correct: str, mode: str = "study"):
 
 
 @flashcard_bp.route("/rate-difficulty/<int:card_index>/<difficulty>")
+@auth_manager.require_auth
 def rate_difficulty(card_index: int, difficulty: str):
     """Rate the difficulty of a card (for future spaced repetition)."""
     # For now, just acknowledge the rating and continue
@@ -599,6 +608,7 @@ def rate_difficulty(card_index: int, difficulty: str):
 
 
 @flashcard_bp.route("/next")
+@auth_manager.require_auth
 def next_card():
     """Move to the next card in the session."""
     if not sm.has(sk.LEARNING_CURRENT_INDEX):
@@ -610,6 +620,7 @@ def next_card():
 
 
 @flashcard_bp.route("/results")
+@auth_manager.require_auth
 def show_results():
     """Display the results of the learning session."""
     if not sm.has(sk.LEARNING_ANSWERS):
@@ -652,12 +663,13 @@ def show_results():
         first_attempt_count=first_attempt_count,
         answers=answers,
         original_count=original_count,
-        is_authenticated=is_authenticated(),
+        is_authenticated=auth_manager.is_authenticated(),
         updated=update_successful,  # Now reflects actual update status
     )
 
 
 @flashcard_bp.route("/end-session")
+@auth_manager.require_auth
 def end_session_early():
     """End the current learning session early."""
     # Calculate partial results
@@ -698,6 +710,6 @@ def end_session_early():
         original_count=original_count,
         ended_early=True,
         cards_remaining=original_count - total_answered,
-        is_authenticated=is_authenticated(),
+        is_authenticated=auth_manager.is_authenticated(),
         updated=update_successful,  # Now reflects actual update status
     )

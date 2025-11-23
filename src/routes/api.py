@@ -15,8 +15,9 @@ from src.config import config
 from src.database import db
 from src.gsheet import read_card_set
 from src.models import SpreadsheetLanguages
+from src.services.auth_manager import auth_manager
 from src.tts_service import TTSService
-from src.user_manager import get_current_user, is_authenticated
+from src.user_manager import get_current_user
 
 # Create logger
 logger = logging.getLogger(__name__)
@@ -142,7 +143,7 @@ def get_card_set_for_listening(tab_name: str) -> dict[str, Any]:
 
     try:
         # Check authentication
-        if not is_authenticated():
+        if not auth_manager.is_authenticated():
             logger.warning("User not authenticated")
             return jsonify({"success": False, "error": "Authentication required"}), 401
 

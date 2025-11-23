@@ -31,8 +31,6 @@ session_cookie_samesite = "Lax"
 json_as_ascii = false
 
 [local]
-client_secrets_file = "client_secret.json"
-google_cloud_service_account_file = "google-cloud-service-account.json"
 debug = true
 session_cookie_secure = false
 database_path = "data/app.db"

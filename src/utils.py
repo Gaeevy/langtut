@@ -10,6 +10,8 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
+from cryptography.fernet import Fernet
+
 logger = logging.getLogger(__name__)
 
 
@@ -116,3 +118,63 @@ def resolve_secrets_file_path(env_variable: str | None, file_path: str | None) -
     if env_variable:
         return load_credentials_from_env(env_variable)
     return load_credentials_from_file(file_path)
+
+
+# Token Encryption Functions
+
+
+def get_encryption_key() -> bytes:
+    """Get encryption key from config.
+
+    The encryption key should be set in .secrets.toml (local) or as an
+    environment variable ENCRYPTION_KEY (production).
+
+    Returns:
+        Encryption key as bytes
+
+    Raises:
+        ValueError: If ENCRYPTION_KEY is not configured
+    """
+    from src.config import config
+
+    key = config.encryption_key
+    if not key:
+        raise ValueError(
+            "ENCRYPTION_KEY not configured. Generate one with: "
+            'python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
+        )
+    return key.encode()
+
+
+def encrypt_token(token: str) -> str:
+    """Encrypt token using Fernet symmetric encryption.
+
+    Used to encrypt OAuth refresh tokens before storing in database.
+
+    Args:
+        token: Plain text token to encrypt
+
+    Returns:
+        Encrypted token as string (base64 encoded)
+    """
+    f = Fernet(get_encryption_key())
+    return f.encrypt(token.encode()).decode()
+
+
+def decrypt_token(encrypted_token: str) -> str:
+    """Decrypt token using Fernet symmetric encryption.
+
+    Used to decrypt OAuth refresh tokens retrieved from database.
+
+    Args:
+        encrypted_token: Encrypted token string (base64 encoded)
+
+    Returns:
+        Decrypted plain text token
+
+    Raises:
+        cryptography.fernet.InvalidToken: If token cannot be decrypted
+            (wrong key, corrupted data, or tampered token)
+    """
+    f = Fernet(get_encryption_key())
+    return f.decrypt(encrypted_token.encode()).decode()

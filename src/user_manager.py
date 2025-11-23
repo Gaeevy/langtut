@@ -10,7 +10,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
 from src.database import User, add_user_spreadsheet, db, get_user_active_spreadsheet
-from src.services.auth import get_credentials
+from src.services.auth_manager import auth_manager
 from src.session_manager import SessionKeys as sk
 from src.session_manager import SessionManager as sm
 
@@ -92,7 +92,7 @@ def is_authenticated():
         bool: True if user is authenticated with valid credentials
     """
     # Check if we have valid credentials
-    credentials = get_credentials()
+    credentials = auth_manager.get_credentials()
     if not credentials:
         return False
 
