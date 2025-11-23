@@ -8,6 +8,7 @@ import logging
 
 from flask import Blueprint, redirect, render_template, request, url_for
 
+from src.config import Environment, config
 from src.services.auth import create_oauth_flow, credentials_to_dict, get_redirect_uri
 from src.session_manager import SessionKeys as sk
 from src.session_manager import SessionManager as sm
@@ -49,7 +50,13 @@ def oauth2callback():
         redirect_uri = sm.get(sk.AUTH_REDIRECT_URI) or get_redirect_uri(request.host)
         flow = create_oauth_flow(redirect_uri, state)
 
+        # Fix for Railway: ensure HTTPS in authorization response URL
         authorization_response = request.url
+        if config.environment == Environment.PRODUCTION and authorization_response.startswith(
+            "http://"
+        ):
+            authorization_response = authorization_response.replace("http://", "https://", 1)
+
         flow.fetch_token(authorization_response=authorization_response)
 
         credentials = flow.credentials
