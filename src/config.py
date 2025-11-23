@@ -51,7 +51,7 @@ _settings = Dynaconf(
 )
 
 _client_secrets_file_path = resolve_secrets_file_path(
-    _settings.get("client_secret_json"),
+    _settings.get("client_secrets_json"),
     _settings.get("client_secrets_file"),
 )
 _google_cloud_service_account_file_path = resolve_secrets_file_path(
