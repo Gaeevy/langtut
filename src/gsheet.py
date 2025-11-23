@@ -43,84 +43,35 @@ def extract_spreadsheet_id(url_or_id: str) -> str:
     return url_or_id.strip()
 
 
-def validate_spreadsheet_access(spreadsheet_id: str) -> tuple[bool, str, list[str]]:
-    """
-    Validate that the user has access to the spreadsheet and it has the correct format
-    Returns: (is_valid, error_message, worksheet_names)
+def validate_spreadsheet_access(spreadsheet_id: str) -> str:
+    """Validate spreadsheet access and return spreadsheet name.
+
+    Args:
+        spreadsheet_id: Google Sheets spreadsheet ID
+
+    Returns:
+        Spreadsheet name/title
+
+    Raises:
+        gspread.SpreadsheetNotFound: If spreadsheet doesn't exist or no access
+        gspread.APIError: If Google Sheets API error occurs
+        Exception: For other errors (auth issues, network, etc.)
+
+    Note:
+        Structure validation (headers, data) is done later when reading cards.
+        This just checks if we can access the spreadsheet and gets its name.
     """
     logger.info(f"Validating spreadsheet access: {spreadsheet_id}")
 
     creds = auth_manager.get_credentials()
     if not creds:
-        logger.warning("No credentials available for spreadsheet validation")
-        return False, "Not authenticated with Google", []
+        raise ValueError("Not authenticated with Google")
 
-    try:
-        logger.info("Authorizing Google Sheets client...")
-        gc = gspread.authorize(creds)
-        spreadsheet = gc.open_by_key(spreadsheet_id)
-        logger.info(f"Successfully opened spreadsheet: {spreadsheet.title}")
+    gc = gspread.authorize(creds)
+    spreadsheet = gc.open_by_key(spreadsheet_id)
 
-        # Get spreadsheet name
-        spreadsheet_name = spreadsheet.title
-
-        # Get worksheet names
-        worksheets = spreadsheet.worksheets()
-        worksheet_names = [ws.title for ws in worksheets]
-        logger.info(f"Found {len(worksheets)} worksheets: {worksheet_names}")
-
-        # Basic validation - check if at least one worksheet exists
-        if not worksheets:
-            logger.warning("Spreadsheet has no worksheets")
-            return False, "Spreadsheet has no worksheets", []
-
-        # Try to read the first worksheet to validate format
-        first_worksheet = worksheets[0]
-        logger.info(f"Validating format of first worksheet: {first_worksheet.title}")
-        values = first_worksheet.get_all_values()
-
-        if not values or len(values) < 2:  # Need at least header + 1 data row
-            logger.warning("Spreadsheet appears to be empty or has insufficient data")
-            return (
-                False,
-                "Spreadsheet appears to be empty or has insufficient data",
-                worksheet_names,
-            )
-
-        # Check if header row has expected columns (basic validation)
-        header = values[0] if values else []
-        expected_columns = ["id", "word", "translation"]  # Minimum required columns
-        logger.info(f"Header row: {header}")
-        logger.info(f"Expected columns: {expected_columns}")
-
-        # Convert to lowercase for comparison
-        header_lower = [col.lower() for col in header]
-        missing_columns = [col for col in expected_columns if col not in header_lower]
-
-        if missing_columns:
-            logger.warning(f"Missing required columns: {missing_columns}")
-            return (
-                False,
-                f"Missing required columns: {', '.join(missing_columns)}. Expected columns: id, word, translation, equivalent, example",
-                worksheet_names,
-            )
-
-        logger.info("✅ Spreadsheet validation successful")
-        return True, "Spreadsheet is valid", worksheet_names, spreadsheet_name
-
-    except gspread.SpreadsheetNotFound:
-        logger.error(f"Spreadsheet not found: {spreadsheet_id}")
-        return (
-            False,
-            "Spreadsheet not found. Please check the URL/ID and make sure it's shared with your Google account.",
-            [],
-        )
-    except gspread.APIError as e:
-        logger.error(f"Google Sheets API error: {e}")
-        return False, f"Google Sheets API error: {e!s}", []
-    except Exception as e:
-        logger.error(f"Error accessing spreadsheet: {e}", exc_info=True)
-        return False, f"Error accessing spreadsheet: {e!s}", []
+    logger.info(f"✅ Spreadsheet access validated: {spreadsheet.title}")
+    return spreadsheet.title
 
 
 def get_spreadsheet(spreadsheet_id: str = None) -> Spreadsheet | None:

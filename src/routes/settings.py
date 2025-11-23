@@ -52,40 +52,27 @@ def validate_spreadsheet():
         if not spreadsheet_id:
             return jsonify({"success": False, "error": "Invalid spreadsheet URL"})
 
-        # Validate access to the spreadsheet
-        spreadsheet_property = validate_spreadsheet_access(spreadsheet_id)
-        spreadsheet_name = spreadsheet_property[3]
-        set_user_spreadsheet(spreadsheet_id, spreadsheet_url, spreadsheet_name)
-
-        if not spreadsheet_property:
-            return jsonify(
-                {
-                    "success": False,
-                    "error": "Cannot access spreadsheet. Make sure it is shared publicly or with your Google account.",
-                }
-            )
+        # Validate access and get spreadsheet name
+        spreadsheet_name = validate_spreadsheet_access(spreadsheet_id)
 
         # Try to read card sets to validate structure
-        try:
-            card_sets = read_all_card_sets(spreadsheet_id)
-            if not card_sets:
-                return jsonify(
-                    {"success": False, "error": "No valid card sets found in the spreadsheet"}
-                )
-
+        card_sets = read_all_card_sets(spreadsheet_id)
+        if not card_sets:
             return jsonify(
-                {
-                    "success": True,
-                    "spreadsheet_id": spreadsheet_id,
-                    "spreadsheet_name": spreadsheet_name,
-                    "card_sets": [
-                        {"name": cs.name, "card_count": len(cs.cards)} for cs in card_sets
-                    ],
-                }
+                {"success": False, "error": "No valid card sets found in the spreadsheet"}
             )
 
-        except Exception as e:
-            return jsonify({"success": False, "error": f"Spreadsheet structure is invalid: {e!s}"})
+        # Save to user's account
+        set_user_spreadsheet(spreadsheet_id, spreadsheet_url, spreadsheet_name)
+
+        return jsonify(
+            {
+                "success": True,
+                "spreadsheet_id": spreadsheet_id,
+                "spreadsheet_name": spreadsheet_name,
+                "card_sets": [{"name": cs.name, "card_count": len(cs.cards)} for cs in card_sets],
+            }
+        )
 
     except Exception as e:
         return jsonify({"success": False, "error": f"Error validating spreadsheet: {e!s}"})
