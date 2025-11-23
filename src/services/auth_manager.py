@@ -178,29 +178,18 @@ class AuthManager:
     # OAuth token refresh buffer - refresh 5 minutes before expiry
     TOKEN_REFRESH_BUFFER = timedelta(minutes=5)
 
-    # Client config cache
-    _client_config = None
+    def __init__(self):
+        """Initialize AuthManager and load OAuth client configuration."""
+        # Load client secrets from file
+        with open(config.client_secrets_file_path) as f:
+            secrets = json.load(f)
+            # Handle both "web" and "installed" app types
+            client_config = secrets.get("web") or secrets.get("installed")
 
-    @classmethod
-    def _get_client_config(cls) -> dict[str, str]:
-        """Load and cache client configuration from secrets file.
-
-        Returns:
-            Dictionary with client_id and client_secret
-        """
-        if cls._client_config is None:
-            with open(config.client_secrets_file_path) as f:
-                secrets = json.load(f)
-                # Handle both "web" and "installed" app types
-                client_config = secrets.get("web") or secrets.get("installed")
-                cls._client_config = {
-                    "client_id": client_config["client_id"],
-                    "client_secret": client_config["client_secret"],
-                    "token_uri": client_config.get(
-                        "token_uri", "https://oauth2.googleapis.com/token"
-                    ),
-                }
-        return cls._client_config
+            # Store as instance attributes for easy access
+            self.client_id = client_config["client_id"]
+            self.client_secret = client_config["client_secret"]
+            self.token_uri = client_config.get("token_uri", "https://oauth2.googleapis.com/token")
 
     # OAuth Flow Methods
 
@@ -321,8 +310,7 @@ class AuthManager:
         Returns:
             Dictionary with google_user_id, email, and name
         """
-        client_config = self._get_client_config()
-        id_info = id_token.verify_oauth2_token(id_token_jwt, Request(), client_config["client_id"])
+        id_info = id_token.verify_oauth2_token(id_token_jwt, Request(), self.client_id)
 
         user_info = {
             "google_user_id": id_info["sub"],
@@ -405,15 +393,39 @@ class AuthManager:
     def get_credentials(self) -> Credentials | None:
         """Get valid credentials, refreshing if needed.
 
+        This is a PASSIVE GETTER - it returns credentials or None without
+        enforcing authentication. It does NOT redirect to login or raise errors.
+
+        Responsibility: Data retrieval (no policy enforcement)
+
         Flow:
-        1. Start with creds = None
-        2. Check if user authenticated
-        3. Check if token needs refresh and refresh if needed
+        1. Check if user is logged in (user_id in session)
+        2. Check if access token needs refresh
+        3. If needed, refresh using database refresh token
         4. Get credentials from session
-        5. Return credentials
+        5. Return credentials or None
+
+        Who should enforce re-login?
+        - Routes: Use @require_auth decorator (redirects to login)
+        - APIs: Manual check + return JSON error
+        - Services: Get credentials, handle None appropriately
+
+        Usage Examples:
+            # Service layer (internal use)
+            creds = auth_manager.get_credentials()
+            if not creds:
+                return None  # Handle gracefully
+
+            # Don't use this for route protection - use @require_auth instead!
 
         Returns:
-            Valid Credentials object or None if not authenticated
+            Valid Credentials object if authenticated, None otherwise
+
+        Note:
+            Returns None if:
+            - User not logged in (no user_id in session)
+            - Access token expired and refresh failed
+            - No refresh token in database
         """
         creds = None
 
@@ -421,7 +433,7 @@ class AuthManager:
         user_id = sm.get(sk.USER_ID)
         if not user_id:
             logger.debug("No user_id in session")
-            return creds
+            return None
 
         # Check if token needs refresh
         if self._needs_token_refresh():
@@ -482,13 +494,12 @@ class AuthManager:
             refresh_token = refresh_token_obj.get_decrypted_token()
 
             # Create credentials object with refresh token
-            client_config = self._get_client_config()
             credentials = Credentials(
                 token=None,  # Will be refreshed
                 refresh_token=refresh_token,
-                token_uri=client_config["token_uri"],
-                client_id=client_config["client_id"],
-                client_secret=client_config["client_secret"],
+                token_uri=self.token_uri,
+                client_id=self.client_id,
+                client_secret=self.client_secret,
             )
 
             # Refresh the access token
@@ -550,13 +561,12 @@ class AuthManager:
             expiry = datetime.fromisoformat(expiry)
 
         # Create credentials without refresh token (we keep that in DB only)
-        client_config = self._get_client_config()
         return Credentials(
             token=access_token,
             refresh_token=None,  # Don't include refresh token
-            token_uri=client_config["token_uri"],
-            client_id=client_config["client_id"],
-            client_secret=client_config["client_secret"],
+            token_uri=self.token_uri,
+            client_id=self.client_id,
+            client_secret=self.client_secret,
             expiry=expiry,
         )
 
@@ -565,24 +575,85 @@ class AuthManager:
     def is_authenticated(self) -> bool:
         """Check if the current user is authenticated.
 
+        This is a PASSIVE CHECKER - it returns True/False without enforcing
+        authentication. It does NOT redirect to login or raise errors.
+
+        Responsibility: State checking (no policy enforcement)
+
+        How it works:
+        1. Calls get_credentials() to get credentials (auto-refreshes if needed)
+        2. Returns True if credentials exist and are valid
+        3. Returns False otherwise (no side effects)
+
+        Who should enforce re-login?
+        - Routes: Use @require_auth decorator (not this method)
+        - APIs: Use this method + return JSON error
+        - Services: Use get_credentials() directly
+
+        Usage Examples:
+            # API endpoint (JSON response)
+            @api_bp.route('/api/data')
+            def api_data():
+                if not auth_manager.is_authenticated():
+                    return jsonify({"error": "Unauthorized"}), 401
+                return jsonify({"data": "..."})
+
+            # Don't use for route protection - use @require_auth decorator instead!
+
         Returns:
             True if user is authenticated with valid credentials, False otherwise
+
+        Note:
+            This method has NO side effects - it only checks state.
+            For route protection, use @require_auth decorator.
         """
         # Try to get valid credentials (will auto-refresh if needed)
         credentials = self.get_credentials()
         return credentials is not None and credentials.valid
 
     def require_auth(self, f):
-        """Decorator for route protection.
+        """Decorator for route protection - enforces authentication.
 
-        Automatically redirects to login if user is not authenticated.
-        Transparently handles token refresh if needed.
+        This is an ACTIVE ENFORCER - it redirects to login if user is not
+        authenticated. This is WHERE re-login enforcement happens.
 
-        Usage:
+        Responsibility: Policy enforcement (has side effects - redirects)
+
+        How it works:
+        1. Checks if user is authenticated (calls is_authenticated())
+        2. If authenticated → Calls the wrapped function normally
+        3. If NOT authenticated → Redirects to /auth (login page)
+        4. Transparently handles token refresh (via is_authenticated())
+
+        This is the PRIMARY way to protect routes that render HTML.
+
+        When to use:
+        - ✅ HTML routes that need authentication
+        - ✅ Routes that should redirect to login page
+        - ❌ API routes (use manual check + JSON error instead)
+        - ❌ Service layer functions (use get_credentials() instead)
+
+        Usage Examples:
+            # Protecting HTML routes (RECOMMENDED)
             @flashcard_bp.route('/learn')
             @auth_manager.require_auth
             def learn():
-                return render_template('card.html')
+                # At this point, user is GUARANTEED to be authenticated
+                user = auth_manager.get_current_user()  # Will never be None
+                return render_template('card.html', user=user)
+
+            # API routes - DON'T use this decorator (use manual check)
+            @api_bp.route('/api/data')
+            def api_data():
+                if not auth_manager.is_authenticated():
+                    return jsonify({"error": "Unauthorized"}), 401  # JSON, not redirect
+                return jsonify({"data": "..."})
+
+        Returns:
+            Decorated function that enforces authentication before execution
+
+        Side Effects:
+            Redirects to login page if user is not authenticated
         """
 
         @wraps(f)
@@ -597,8 +668,34 @@ class AuthManager:
     def get_current_user(self) -> User | None:
         """Get the current authenticated user from the session.
 
+        This is a PASSIVE GETTER - returns User or None without enforcing
+        authentication. It only checks session, does NOT verify credentials.
+
+        Responsibility: User retrieval (no authentication check)
+
+        Best Practice:
+        - Use inside @require_auth protected routes (user guaranteed to exist)
+        - Don't use this to check authentication (use is_authenticated() instead)
+
+        Usage Examples:
+            # Inside protected route (RECOMMENDED)
+            @flashcard_bp.route('/learn')
+            @auth_manager.require_auth
+            def learn():
+                user = auth_manager.get_current_user()  # Will never be None here
+                return render_template('card.html', user=user)
+
+            # Checking auth + getting user (if you can't use decorator)
+            if auth_manager.is_authenticated():
+                user = auth_manager.get_current_user()
+                # Process user...
+
         Returns:
-            User object if authenticated, None otherwise
+            User object if user_id in session, None otherwise
+
+        Note:
+            This does NOT verify credentials are valid - it only checks if
+            user_id exists in session. For full auth check, use is_authenticated().
         """
         user_id = sm.get(sk.USER_ID)
         if user_id:

@@ -18,15 +18,16 @@ src/                           # Main application module
 │   ├── api.py               # TTS and API endpoints
 │   ├── admin.py             # Database administration
 │   └── test.py              # Testing & debugging routes
+├── services/                # Service layer
+│   └── auth_manager.py      # Centralized authentication manager
 ├── config.py                # Unified configuration management
 ├── database.py              # SQLAlchemy database models
 ├── session_manager.py       # Centralized session management
 ├── user_manager.py          # User management utilities
 ├── gsheet.py                # Google Sheets API integration
-├── auth.py                  # OAuth authentication logic
 ├── tts_service.py           # Text-to-Speech service
 ├── models.py                # Pydantic data models
-├── utils.py                 # Helper utilities
+├── utils.py                 # Helper utilities (includes token encryption)
 └── request_logger.py        # Request logging middleware
 ```
 
@@ -206,7 +207,38 @@ uv run pytest
 
 ## Security Features
 
-### Authentication
+### Authentication System
+
+**Centralized AuthManager**: All authentication logic is managed by `AuthManager` class in `src/services/auth_manager.py`.
+
+**Token Storage Strategy**:
+- **Access Tokens** (short-lived, ~1 hour): Stored in Flask session
+- **Refresh Tokens** (long-lived): Encrypted and stored in database (`RefreshToken` table)
+- **Encryption**: Refresh tokens encrypted using Fernet symmetric encryption
+- **Rotation**: Refresh tokens rotated on re-authentication and when Google provides new tokens
+
+**Authentication Flow**:
+1. User redirected to Google OAuth consent screen
+2. OAuth callback receives access token, refresh token, and ID token
+3. User identified/created using `google_user_id` from ID token
+4. Refresh token encrypted and stored in database
+5. Access token stored in session for API calls
+6. Automatic token refresh when access token expires
+
+**Route Protection**:
+- Protected routes use `@auth_manager.require_auth` decorator
+- Decorator automatically redirects to login if not authenticated
+- Transparent token refresh - users don't see expired token errors
+
+**Key Components**:
+- `AuthManager` - Centralized auth logic (OAuth flow, token management, auth state)
+- `RefreshToken` model - Database storage for encrypted refresh tokens
+- `SessionManager` - Session key management with namespaces
+- Token encryption utilities in `utils.py`
+
+### Legacy Authentication
+- `AUTH_CREDENTIALS` session key deprecated (previously stored full credentials in session)
+- Replaced with separate `ACCESS_TOKEN` (session) and refresh token (encrypted database)
 - Google OAuth 2.0 integration
 - Secure session management
 - CSRF protection via Flask-WTF
