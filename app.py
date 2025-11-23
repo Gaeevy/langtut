@@ -13,7 +13,7 @@ from pathlib import Path
 
 from src import create_app
 from src.config import Environment, config, logger
-from src.database import init_database
+from src.database import ensure_tables, init_database
 
 # Log startup information
 logger.info("=== LANGUAGE TUTOR STARTUP ===")
@@ -28,6 +28,12 @@ app = create_app()
 # Initialize database
 logger.info("Initializing database...")
 init_database(app)
+
+# Ensure all tables exist
+logger.info("Ensuring database tables exist...")
+with app.app_context():
+    ensure_tables()
+logger.info("Database tables ready")
 
 # Development-specific setup
 if config.environment == Environment.LOCAL:
