@@ -48,6 +48,13 @@ cd langtut
 # Install dependencies (uv will automatically create a virtual environment)
 uv sync
 
+# Configure secrets (credentials and encryption key)
+cp .secrets.toml.example .secrets.toml
+# Edit .secrets.toml and add your credentials:
+# - Generate ENCRYPTION_KEY (see instructions in file)
+# - Add OAuth credentials file path
+# - Add Google Cloud service account file path
+
 # Start development server
 # On Mac/Linux:
 uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
@@ -55,7 +62,9 @@ uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
 
 ### Configuration
 The application uses environment-aware configuration:
-- **Local Development:** Uses local credential files
+- **`settings.toml`**: Non-sensitive settings (committed to git)
+- **`.secrets.toml`**: Sensitive credentials (NOT in git, use `.secrets.toml.example` as template)
+- **Local Development:** Uses local credential files from `.secrets.toml`
 - **Production:** Uses environment variables on Railway
 - **Testing:** Uses in-memory database and disabled TTS
 

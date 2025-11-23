@@ -253,8 +253,11 @@ class AuthManager:
 
             # Step 4: Store tokens
             if credentials.refresh_token:
-                self._save_refresh_token(user.id, credentials.refresh_token)
-                logger.info(f"Refresh token stored for user {user.id}")
+                refresh_token_id = self._save_refresh_token(user.id, credentials.refresh_token)
+                sm.set(sk.REFRESH_TOKEN_ID, refresh_token_id)  # Track which token THIS session uses
+                logger.info(
+                    f"Refresh token stored for user {user.id} (token_id: {refresh_token_id})"
+                )
             else:
                 # Check if user already has a refresh token in database
                 existing_token = RefreshToken.query.filter_by(user_id=user.id).first()
@@ -472,6 +475,9 @@ class AuthManager:
     def _refresh_credentials(self, user_id: int) -> bool:
         """Refresh access token using refresh token from database.
 
+        Uses the specific refresh token for THIS session (tracked by token_id in session).
+        Falls back to most recent token if session token_id is not found.
+
         Args:
             user_id: User ID to refresh credentials for
 
@@ -479,12 +485,29 @@ class AuthManager:
             True if refresh successful, False otherwise
         """
         try:
-            # Get most recent refresh token from database
-            refresh_token_obj = (
-                RefreshToken.query.filter_by(user_id=user_id)
-                .order_by(RefreshToken.last_used.desc())
-                .first()
-            )
+            # Try to get the specific refresh token for THIS session
+            refresh_token_id = sm.get(sk.REFRESH_TOKEN_ID)
+            if refresh_token_id:
+                refresh_token_obj = RefreshToken.query.get(refresh_token_id)
+                if refresh_token_obj and refresh_token_obj.user_id == user_id:
+                    logger.debug(f"Using session-specific refresh token {refresh_token_id}")
+                else:
+                    logger.warning(
+                        f"Session token {refresh_token_id} not found, falling back to most recent"
+                    )
+                    refresh_token_obj = None
+            else:
+                refresh_token_obj = None
+
+            # Fallback: Get most recent refresh token if session token not found
+            if not refresh_token_obj:
+                refresh_token_obj = (
+                    RefreshToken.query.filter_by(user_id=user_id)
+                    .order_by(RefreshToken.last_used.desc())
+                    .first()
+                )
+                if refresh_token_obj:
+                    logger.debug(f"Using most recent refresh token {refresh_token_obj.id}")
 
             if not refresh_token_obj:
                 logger.warning(f"No refresh token found for user {user_id}")
@@ -527,19 +550,23 @@ class AuthManager:
             logger.error(f"Failed to refresh credentials for user {user_id}: {e}", exc_info=True)
             return False
 
-    def _save_refresh_token(self, user_id: int, token: str) -> None:
+    def _save_refresh_token(self, user_id: int, token: str) -> int:
         """Save refresh token to database (encrypted).
 
         Args:
             user_id: User ID to save token for
             token: Plain text refresh token from Google
+
+        Returns:
+            ID of the created RefreshToken record
         """
         try:
             refresh_token_obj = RefreshToken(user_id=user_id)
             refresh_token_obj.encrypt_and_store(token)
             db.session.add(refresh_token_obj)
             db.session.commit()
-            logger.info(f"Refresh token saved for user {user_id}")
+            logger.info(f"Refresh token saved for user {user_id} (ID: {refresh_token_obj.id})")
+            return refresh_token_obj.id
 
         except Exception as e:
             logger.error(f"Failed to save refresh token for user {user_id}: {e}", exc_info=True)
@@ -713,20 +740,41 @@ class AuthManager:
         sm.clear_namespace("user")
         logger.info("Auth session cleared")
 
-    def logout(self) -> None:
+    def logout(self, logout_all_devices: bool = False) -> None:
         """Logout user.
 
-        Clears session and removes refresh tokens from database.
-        This logs out the user from ALL devices/sessions.
+        By default, logs out only THIS session (single device).
+        Optionally can log out ALL sessions/devices.
+
+        Args:
+            logout_all_devices: If True, delete ALL refresh tokens (logout everywhere).
+                              If False (default), delete only THIS session's token.
+
+        Multi-device behavior:
+            - Default: Logs out THIS device only, other sessions remain active
+            - logout_all_devices=True: Logs out from ALL devices/sessions
         """
         user_id = sm.get(sk.USER_ID)
+        refresh_token_id = sm.get(sk.REFRESH_TOKEN_ID)
 
         if user_id:
-            # Delete all refresh tokens for user
             try:
-                RefreshToken.query.filter_by(user_id=user_id).delete()
-                db.session.commit()
-                logger.info(f"All refresh tokens deleted for user {user_id}")
+                if logout_all_devices:
+                    # Delete ALL refresh tokens for user (logout everywhere)
+                    count = RefreshToken.query.filter_by(user_id=user_id).delete()
+                    db.session.commit()
+                    logger.info(f"All refresh tokens deleted for user {user_id} ({count} tokens)")
+                elif refresh_token_id:
+                    # Delete only THIS session's refresh token (single device logout)
+                    token = RefreshToken.query.get(refresh_token_id)
+                    if token and token.user_id == user_id:
+                        db.session.delete(token)
+                        db.session.commit()
+                        logger.info(f"Refresh token {refresh_token_id} deleted for user {user_id}")
+                    else:
+                        logger.warning(f"Session token {refresh_token_id} not found for logout")
+                else:
+                    logger.warning(f"No refresh token ID in session for user {user_id}")
             except Exception as e:
                 logger.error(f"Error deleting refresh tokens: {e}", exc_info=True)
 
