@@ -43,6 +43,76 @@ class User(db.Model):
         }
 
 
+class RefreshToken(db.Model):
+    """Store encrypted refresh tokens for users.
+
+    Each row represents a refresh token for a user session. Users can have
+    multiple refresh tokens (e.g., different devices, different sessions).
+
+    Tokens are encrypted at rest using Fernet symmetric encryption.
+    """
+
+    __tablename__ = "refresh_tokens"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token_encrypted = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_used = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_rotated = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    # Relationship to user
+    user = relationship("User", backref=db.backref("refresh_tokens", lazy=True))
+
+    def __repr__(self):
+        return f"<RefreshToken {self.id} for user {self.user_id}>"
+
+    def encrypt_and_store(self, token: str) -> None:
+        """Encrypt and store refresh token.
+
+        Args:
+            token: Plain text refresh token from Google OAuth
+        """
+        from src.utils import encrypt_token
+
+        self.token_encrypted = encrypt_token(token)
+
+    def get_decrypted_token(self) -> str:
+        """Decrypt and return refresh token.
+
+        Returns:
+            Plain text refresh token
+
+        Raises:
+            ValueError: If token cannot be decrypted (corrupted or wrong key)
+        """
+        from src.utils import decrypt_token
+
+        return decrypt_token(self.token_encrypted)
+
+    def rotate_token(self, new_token: str) -> None:
+        """Rotate refresh token (store new one).
+
+        Called when Google provides a new refresh token during access token refresh.
+        Updates the encrypted token and rotation timestamp.
+
+        Args:
+            new_token: New plain text refresh token from Google
+        """
+        from src.utils import encrypt_token
+
+        self.token_encrypted = encrypt_token(new_token)
+        self.last_rotated = datetime.utcnow()
+        self.last_used = datetime.utcnow()
+
+    def touch(self) -> None:
+        """Update last_used timestamp.
+
+        Called when the refresh token is used to obtain a new access token.
+        """
+        self.last_used = datetime.utcnow()
+
+
 class UserSpreadsheet(db.Model):
     """Model for storing user's linked spreadsheets"""
 
@@ -143,6 +213,7 @@ def ensure_tables():
     try:
         # Quick check if tables exist
         User.query.first()
+        RefreshToken.query.first()
         _tables_created = True
     except:
         # Tables don't exist, create them

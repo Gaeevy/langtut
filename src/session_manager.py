@@ -17,7 +17,11 @@ class SessionKeys(Enum):
     # Auth namespace - OAuth and authentication state
     AUTH_STATE = "auth.state"
     AUTH_REDIRECT_URI = "auth.redirect_uri"
-    AUTH_CREDENTIALS = "auth.credentials"
+    AUTH_CREDENTIALS = (
+        "auth.credentials"  # DEPRECATED - Will be removed after AuthManager migration
+    )
+    ACCESS_TOKEN = "auth.access_token"  # NEW - OAuth access token (short-lived)
+    ACCESS_TOKEN_EXPIRY = "auth.access_token_expiry"  # NEW - Token expiry datetime
 
     # User namespace - User identification and metadata
     USER_ID = "user.id"

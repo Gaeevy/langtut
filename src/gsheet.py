@@ -14,7 +14,7 @@ from gspread.worksheet import Worksheet
 
 from src.config import config
 from src.models import NEVER_SHOWN, Card, CardSet, Levels
-from src.services.auth import get_credentials
+from src.services.auth_manager import auth_manager
 from src.utils import format_timestamp, parse_timestamp
 
 # Create logger
@@ -50,7 +50,7 @@ def validate_spreadsheet_access(spreadsheet_id: str) -> tuple[bool, str, list[st
     """
     logger.info(f"Validating spreadsheet access: {spreadsheet_id}")
 
-    creds = get_credentials()
+    creds = auth_manager.get_credentials()
     if not creds:
         logger.warning("No credentials available for spreadsheet validation")
         return False, "Not authenticated with Google", []
@@ -125,7 +125,7 @@ def validate_spreadsheet_access(spreadsheet_id: str) -> tuple[bool, str, list[st
 
 def get_spreadsheet(spreadsheet_id: str = None) -> Spreadsheet | None:
     """Get spreadsheet by ID, falls back to default if not provided"""
-    creds = get_credentials()
+    creds = auth_manager.get_credentials()
     if not creds:
         return None
 

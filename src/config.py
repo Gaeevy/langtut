@@ -110,6 +110,9 @@ class Config(BaseSettings):
     client_secrets_file_path: str = _client_secrets_file_path
     google_cloud_service_account_file_path: str = _google_cloud_service_account_file_path
 
+    # Encryption
+    encryption_key: str = _settings.get("ENCRYPTION_KEY", "")
+
 
 # Export single config object
 config = Config()

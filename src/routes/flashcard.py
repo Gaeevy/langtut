@@ -12,9 +12,10 @@ from flask import Blueprint, redirect, render_template, request, session, url_fo
 from src.config import config
 from src.gsheet import read_all_card_sets, read_card_set, update_spreadsheet
 from src.models import Card
+from src.services.auth_manager import auth_manager
 from src.session_manager import SessionKeys as sk
 from src.session_manager import SessionManager as sm
-from src.user_manager import get_user_spreadsheet_id, is_authenticated
+from src.user_manager import get_user_spreadsheet_id
 from src.utils import format_timestamp, get_timestamp, parse_timestamp
 
 # Create logger
@@ -91,8 +92,8 @@ def index():
     if not sm.has(sk.TEST_SESSION):
         sm.set(sk.TEST_SESSION, "Session is working")
 
-    # Check authentication status using SessionManager
-    user_is_authenticated = is_authenticated()
+    # Check authentication status using AuthManager
+    user_is_authenticated = auth_manager.is_authenticated()
     user_spreadsheet_id = get_user_spreadsheet_id(session)
 
     logger.info(f"Authentication status: {user_is_authenticated}")
@@ -652,7 +653,7 @@ def show_results():
         first_attempt_count=first_attempt_count,
         answers=answers,
         original_count=original_count,
-        is_authenticated=is_authenticated(),
+        is_authenticated=auth_manager.is_authenticated(),
         updated=update_successful,  # Now reflects actual update status
     )
 
@@ -698,6 +699,6 @@ def end_session_early():
         original_count=original_count,
         ended_early=True,
         cards_remaining=original_count - total_answered,
-        is_authenticated=is_authenticated(),
+        is_authenticated=auth_manager.is_authenticated(),
         updated=update_successful,  # Now reflects actual update status
     )
