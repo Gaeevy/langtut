@@ -114,13 +114,6 @@
                                     </div>
                                 </div>
                             </div>
-                            <div>
-                                <button type="button" class="btn btn-outline-danger btn-sm"
-                                        onclick="confirmResetSpreadsheet()"
-                                        title="Disconnect this spreadsheet">
-                                    <i class="bi bi-trash"></i> Remove
-                                </button>
-                            </div>
                         </div>
                     {% else %}
                         <div class="status-badge status-badge-warning">
@@ -537,29 +530,6 @@ function validateSpreadsheet() {
         setButtonLoading('validate-btn', false, '<i class="bi bi-check-circle"></i> Validate');
         showToast('Error: ' + error.message, 'danger');
     });
-}
-
-function confirmResetSpreadsheet() {
-    if (confirm('Are you sure you want to disconnect this spreadsheet? You will need to link it again to continue learning.')) {
-        fetch('/reset-spreadsheet', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showToast('Spreadsheet disconnected successfully', 'success');
-                setTimeout(() => window.location.reload(), 1500);
-            } else {
-                showToast('Failed to disconnect: ' + data.error, 'danger');
-            }
-        })
-        .catch(error => {
-            showToast('Error: ' + error.message, 'danger');
-        });
-    }
 }
 
 // Load language settings when page loads

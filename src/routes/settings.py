@@ -105,22 +105,6 @@ def set_spreadsheet():
         return jsonify({"success": False, "error": f"Error setting spreadsheet: {e!s}"})
 
 
-@settings_bp.route("/reset-spreadsheet", methods=["POST"])
-@auth_manager.require_auth
-def reset_spreadsheet():
-    """Reset the user's spreadsheet to the default."""
-    try:
-        # Reset to None (no spreadsheet)
-        success = set_user_spreadsheet(None)
-
-        if success:
-            return jsonify({"success": True, "message": "Spreadsheet reset successfully"})
-        else:
-            return jsonify({"success": False, "error": "Failed to reset spreadsheet"})
-
-    except Exception as e:
-        return jsonify({"success": False, "error": f"Error resetting spreadsheet: {e!s}"})
-
 @settings_bp.route("/settings/activate-spreadsheet", methods=["POST"])
 @auth_manager.require_auth
 def activate_spreadsheet():
