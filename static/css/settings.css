@@ -1,4 +1,7 @@
 /* Settings Page Styles */
+.btn.disabled {
+    pointer-events: none;
+}
 
 /* Page Header */
 .settings-header {

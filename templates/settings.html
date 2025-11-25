@@ -49,8 +49,7 @@
                 </div>
                 <div class="card-body">
                     <!-- Spreadsheet selector dropdown -->
-                    {% if spreadsheets and spreadsheets|length > 1 %}
-                    <div class="mt-4">
+                    <div class="mt-0">
                         <div class="input-group">
                             <select class="form-select" id="spreadsheet-selector">
                                 {% for spreadsheet in spreadsheets %}
@@ -80,7 +79,6 @@
                             </small>
                         </div>
                     </div>
-                    {% endif %}
                 </div>
             </div>
 
@@ -510,11 +508,6 @@ function validateSpreadsheet() {
     });
 }
 
-// Load language settings when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    loadLanguageSettings();
-});
-
 function confirmSpreadsheet() {
     const spreadsheetId = document.getElementById('confirm-spreadsheet-id').value;
     const button = document.querySelector('#content-preview .btn-success');
@@ -644,5 +637,31 @@ function hidePreview() {
 function resetSpreadsheet() {
     return true;
 }
+
+function updateActivateButtonState() {
+    const selector = document.getElementById('spreadsheet-selector');
+    const activateBtn = document.getElementById('activate-spreadsheet-btn');
+    const selectedOption = selector.options[selector.selectedIndex];
+    
+    if (selectedOption.text.includes('(Active)')) {
+        activateBtn.disabled = true;
+        activateBtn.classList.add('disabled');
+        activateBtn.title = 'This spreadsheet is already active';
+    } else {
+        activateBtn.disabled = false;
+        activateBtn.classList.remove('disabled');
+        activateBtn.title = 'Activate selected spreadsheet';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const selector = document.getElementById('spreadsheet-selector');
+    if (selector) {
+        selector.addEventListener('change', updateActivateButtonState);
+        updateActivateButtonState();
+    }
+    
+    loadLanguageSettings();
+});
 </script>
 {% endblock %}
