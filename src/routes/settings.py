@@ -68,11 +68,12 @@ def validate_spreadsheet():
             )
 
         # Save to user's account
-        set_user_spreadsheet(spreadsheet_id, spreadsheet_url, spreadsheet_name)
+        user_spreadsheet = set_user_spreadsheet(spreadsheet_id, spreadsheet_url, spreadsheet_name)
 
         return jsonify(
             {
                 "success": True,
+                "id": user_spreadsheet.id,
                 "spreadsheet_id": spreadsheet_id,
                 "spreadsheet_name": spreadsheet_name,
                 "card_sets": [{"name": cs.name, "card_count": len(cs.cards)} for cs in card_sets],

@@ -41,10 +41,52 @@
                 {% endif %}
             {% endwith %}
 
+            <!-- Current Status -->
+            <div class="card settings-card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0 bi-file-spreadsheet">Switch Spreadsheet</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Spreadsheet selector dropdown -->
+                    {% if spreadsheets and spreadsheets|length > 1 %}
+                    <div class="mt-4">
+                        <div class="input-group">
+                            <select class="form-select" id="spreadsheet-selector">
+                                {% for spreadsheet in spreadsheets %}
+                                <option value="{{ spreadsheet.spreadsheet_id }}" 
+                                        {% if spreadsheet.is_active %}selected{% endif %}>
+                                    {{ spreadsheet.spreadsheet_name or spreadsheet.spreadsheet_id }}
+                                    {% if spreadsheet.is_active %} (Active){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="btn-group">
+                                <button class="btn btn-primary btn-sm" onclick="activateSpreadsheet()" 
+                                        id="activate-spreadsheet-btn">
+                                    <i class="bi bi-check-circle"></i> Activate
+                                </button>
+                                <button type="button" class="btn btn-outline-danger btn-sm"
+                                        onclick="confirmRemoveSpreadsheet()"
+                                        title="Remove selected spreadsheet">
+                                    <i class="bi bi-trash"></i> Remove
+                                </button>
+                            </div>
+                        </div>
+                        <div class="settings-info mt-2">
+                            <small>
+                                <i class="bi bi-info-circle"></i> 
+                                Select a spreadsheet from your list and click "Activate" to make it active.
+                            </small>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
             <!-- Language Settings -->
             <div class="card settings-card mb-4">
                 <div class="card-header">
-                    <h5 class="mb-0">🌐 Language Settings</h5>
+                    <h5 class="mb-0 bi-globe">Language Settings</h5>
                 </div>
                 <div class="card-body">
                     <div class="row">
@@ -92,72 +134,6 @@
                             <i class="bi bi-arrow-counterclockwise"></i> Reset
                         </button>
                     </div>
-                </div>
-            </div>
-
-            <!-- Current Status -->
-            <div class="card settings-card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">📋 Current Spreadsheet</h5>
-                </div>
-                <div class="card-body">
-                    {% if current_spreadsheet_id %}
-                        <div class="d-flex align-items-start gap-3">
-                            <div class="flex-grow-1">
-                                <div class="status-badge status-badge-success mb-3">
-                                    <i class="bi bi-check-circle-fill"></i> Spreadsheet Connected
-                                </div>
-                                <div class="mb-2">
-                                    <small class="text-muted d-block mb-1">Spreadsheet name:</small>
-                                    <div class="spreadsheet-id-display">
-                                        {{ current_spreadsheet_name }}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    {% else %}
-                        <div class="status-badge status-badge-warning">
-                            <i class="bi bi-exclamation-triangle-fill"></i> No Spreadsheet Linked
-                        </div>
-                        <p class="mt-3 mb-0 text-muted">
-                            <i class="bi bi-arrow-down"></i> Link a spreadsheet below to start learning
-                        </p>
-                    {% endif %}
-
-                    <!-- Spreadsheet selector dropdown -->
-                    {% if spreadsheets and spreadsheets|length > 1 %}
-                    <div class="mt-4 pt-3 border-top">
-                        <label for="spreadsheet-selector" class="form-label">Switch Spreadsheet:</label>
-                        <div class="input-group">
-                            <select class="form-select" id="spreadsheet-selector">
-                                {% for spreadsheet in spreadsheets %}
-                                <option value="{{ spreadsheet.spreadsheet_id }}" 
-                                        {% if spreadsheet.is_active %}selected{% endif %}>
-                                    {{ spreadsheet.spreadsheet_name or spreadsheet.spreadsheet_id }}
-                                    {% if spreadsheet.is_active %} (Active){% endif %}
-                                </option>
-                                {% endfor %}
-                            </select>
-                            <div class="btn-group">
-                                <button class="btn btn-primary btn-sm" onclick="activateSpreadsheet()" 
-                                        id="activate-spreadsheet-btn">
-                                    <i class="bi bi-check-circle"></i> Activate
-                                </button>
-                                <button type="button" class="btn btn-outline-danger btn-sm"
-                                        onclick="confirmRemoveSpreadsheet()"
-                                        title="Remove selected spreadsheet">
-                                    <i class="bi bi-trash"></i> Remove
-                                </button>
-                            </div>
-                        </div>
-                        <div class="settings-info mt-2">
-                            <small>
-                                <i class="bi bi-info-circle"></i> 
-                                Select a spreadsheet from your list and click "Activate" to make it active.
-                            </small>
-                        </div>
-                    </div>
-                    {% endif %}
                 </div>
             </div>
 
