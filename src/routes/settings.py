@@ -6,6 +6,7 @@ Handles user settings and spreadsheet configuration.
 
 from flask import Blueprint, jsonify, render_template, request
 
+from src.database import get_user_spreadsheets, set_active_spreadsheet, remove_user_spreadsheet
 from src.gsheet import extract_spreadsheet_id, read_all_card_sets, validate_spreadsheet_access
 from src.services.auth_manager import auth_manager
 from src.user_manager import get_current_user, set_user_spreadsheet
@@ -21,18 +22,22 @@ def settings():
     # Get current user and their active spreadsheet
     user = get_current_user()
     current_spreadsheet_id = None
+    current_spreadsheet_name = None
 
     if user:
         active_spreadsheet = user.get_active_spreadsheet()
         if active_spreadsheet:
             current_spreadsheet_id = active_spreadsheet.spreadsheet_id
             current_spreadsheet_name = active_spreadsheet.spreadsheet_name
+        
+        spreadsheets = get_user_spreadsheets(user.id)
 
     return render_template(
         "settings.html",
         user=user,
         current_spreadsheet_id=current_spreadsheet_id,
         current_spreadsheet_name=current_spreadsheet_name,
+        spreadsheets=spreadsheets
     )
 
 
@@ -63,11 +68,12 @@ def validate_spreadsheet():
             )
 
         # Save to user's account
-        set_user_spreadsheet(spreadsheet_id, spreadsheet_url, spreadsheet_name)
+        user_spreadsheet = set_user_spreadsheet(spreadsheet_id, spreadsheet_url, spreadsheet_name)
 
         return jsonify(
             {
                 "success": True,
+                "id": user_spreadsheet.id,
                 "spreadsheet_id": spreadsheet_id,
                 "spreadsheet_name": spreadsheet_name,
                 "card_sets": [{"name": cs.name, "card_count": len(cs.cards)} for cs in card_sets],
@@ -100,18 +106,53 @@ def set_spreadsheet():
         return jsonify({"success": False, "error": f"Error setting spreadsheet: {e!s}"})
 
 
-@settings_bp.route("/reset-spreadsheet", methods=["POST"])
+@settings_bp.route("/settings/activate-spreadsheet", methods=["POST"])
 @auth_manager.require_auth
-def reset_spreadsheet():
-    """Reset the user's spreadsheet to the default."""
-    try:
-        # Reset to None (no spreadsheet)
-        success = set_user_spreadsheet(None)
+def activate_spreadsheet():
+    """Activate a specific spreadsheet for the user."""
+    spreadsheet_id = request.json.get("spreadsheet_id", "").strip()
 
-        if success:
-            return jsonify({"success": True, "message": "Spreadsheet reset successfully"})
+    if not spreadsheet_id:
+        return jsonify({"success": False, "error": "Spreadsheet ID is required"})
+
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"success": False, "error": "User not found"})
+
+        # Set the spreadsheet as active
+        spreadsheet = set_active_spreadsheet(user.id, spreadsheet_id)
+
+        if spreadsheet:
+            return jsonify({"success": True, "message": "Spreadsheet activated successfully"})
         else:
-            return jsonify({"success": False, "error": "Failed to reset spreadsheet"})
+            return jsonify({"success": False, "error": "Spreadsheet not found in user's list"})
 
     except Exception as e:
-        return jsonify({"success": False, "error": f"Error resetting spreadsheet: {e!s}"})
+        return jsonify({"success": False, "error": f"Error activating spreadsheet: {e!s}"})
+
+
+@settings_bp.route("/settings/remove-spreadsheet", methods=["POST"])
+@auth_manager.require_auth
+def remove_spreadsheet():
+    """Remove a spreadsheet from user's list."""
+    spreadsheet_id = request.json.get("spreadsheet_id", "").strip()
+
+    if not spreadsheet_id:
+        return jsonify({"success": False, "error": "Spreadsheet ID is required"})
+
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"success": False, "error": "User not found"})
+
+        # Remove the spreadsheet
+        success = remove_user_spreadsheet(user.id, spreadsheet_id)
+
+        if success:
+            return jsonify({"success": True, "message": "Spreadsheet removed successfully"})
+        else:
+            return jsonify({"success": False, "error": "Spreadsheet not found in user's list"})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Error removing spreadsheet: {e!s}"})

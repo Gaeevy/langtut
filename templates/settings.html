@@ -41,10 +41,51 @@
                 {% endif %}
             {% endwith %}
 
+            {% if spreadsheets and spreadsheets|length > 0 %}
+            <!-- Current Status -->
+            <div class="card settings-card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0 bi-file-spreadsheet">Switch Spreadsheet</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Spreadsheet selector dropdown -->
+                    <div class="mt-0">
+                        <div class="input-group">
+                            <select class="form-select" id="spreadsheet-selector">
+                                {% for spreadsheet in spreadsheets %}
+                                <option value="{{ spreadsheet.spreadsheet_id }}" 
+                                        {% if spreadsheet.is_active %}selected{% endif %}>
+                                    {{ spreadsheet.spreadsheet_name or spreadsheet.spreadsheet_id }}
+                                    {% if spreadsheet.is_active %} (Active){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="btn-group">
+                                <button class="btn btn-primary btn-sm" onclick="activateSpreadsheet()" 
+                                        id="activate-spreadsheet-btn">
+                                    <i class="bi bi-check-circle"></i> Activate
+                                </button>
+                                <button type="button" class="btn btn-outline-danger btn-sm"
+                                        onclick="confirmRemoveSpreadsheet()"
+                                        title="Remove selected spreadsheet">
+                                    <i class="bi bi-trash"></i> Remove
+                                </button>
+                            </div>
+                        </div>
+                        <div class="settings-info mt-2">
+                            <small>
+                                <i class="bi bi-info-circle"></i> 
+                                Select a spreadsheet from your list and click "Activate" to make it active.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Language Settings -->
             <div class="card settings-card mb-4">
                 <div class="card-header">
-                    <h5 class="mb-0">🌐 Language Settings</h5>
+                    <h5 class="mb-0 bi-globe">Language Settings</h5>
                 </div>
                 <div class="card-body">
                     <div class="row">
@@ -94,44 +135,7 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Current Status -->
-            <div class="card settings-card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">📋 Current Spreadsheet</h5>
-                </div>
-                <div class="card-body">
-                    {% if current_spreadsheet_id %}
-                        <div class="d-flex align-items-start gap-3">
-                            <div class="flex-grow-1">
-                                <div class="status-badge status-badge-success mb-3">
-                                    <i class="bi bi-check-circle-fill"></i> Spreadsheet Connected
-                                </div>
-                                <div class="mb-2">
-                                    <small class="text-muted d-block mb-1">Spreadsheet name:</small>
-                                    <div class="spreadsheet-id-display">
-                                        {{ current_spreadsheet_name }}
-                                    </div>
-                                </div>
-                            </div>
-                            <div>
-                                <button type="button" class="btn btn-outline-danger btn-sm"
-                                        onclick="confirmResetSpreadsheet()"
-                                        title="Disconnect this spreadsheet">
-                                    <i class="bi bi-trash"></i> Remove
-                                </button>
-                            </div>
-                        </div>
-                    {% else %}
-                        <div class="status-badge status-badge-warning">
-                            <i class="bi bi-exclamation-triangle-fill"></i> No Spreadsheet Linked
-                        </div>
-                        <p class="mt-3 mb-0 text-muted">
-                            <i class="bi bi-arrow-down"></i> Link a spreadsheet below to start learning
-                        </p>
-                    {% endif %}
-                </div>
-            </div>
+            {% endif %}
 
             <!-- Spreadsheet ID input form -->
             <div class="card settings-card mb-4">
@@ -155,7 +159,7 @@
                         </div>
                         <div class="settings-info">
                             <small>
-                                <i class="bi bi-info-circle"></i>
+                                <i class="bi bi-info-circle"></i> 
                                 You can paste the full URL (e.g., https://docs.google.com/spreadsheets/d/...)
                                 or just the spreadsheet ID.
                             </small>
@@ -388,6 +392,82 @@ function setButtonLoading(buttonId, isLoading, originalText = null) {
     }
 }
 
+// Spreadsheet activation functionality
+function activateSpreadsheet() {
+    const selector = document.getElementById('spreadsheet-selector');
+    const selectedSpreadsheetId = selector.value;
+    const button = document.getElementById('activate-spreadsheet-btn');
+
+    if (!selectedSpreadsheetId) {
+        showToast('Please select a spreadsheet', 'warning');
+        return;
+    }
+
+    // Show loading state
+    setButtonLoading('activate-spreadsheet-btn', true);
+
+    fetch('/settings/activate-spreadsheet', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            spreadsheet_id: selectedSpreadsheetId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        setButtonLoading('activate-spreadsheet-btn', false, '<i class="bi bi-check-circle"></i> Activate');
+        
+        if (data.success) {
+            showToast('Spreadsheet activated successfully', 'success');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            showToast('Failed to activate spreadsheet: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        setButtonLoading('activate-spreadsheet-btn', false, '<i class="bi bi-check-circle"></i> Activate');
+        showToast('Error: ' + error.message, 'danger');
+    });
+}
+
+function confirmRemoveSpreadsheet() {
+    const selector = document.getElementById('spreadsheet-selector');
+    const selectedOption = selector.options[selector.selectedIndex];
+    const selectedSpreadsheetId = selector.value;
+    const selectedSpreadsheetName = selectedOption.text;
+
+    if (!selectedSpreadsheetId) {
+        showToast('Please select a spreadsheet to remove', 'warning');
+        return;
+    }
+
+    if (confirm(`Are you sure you want to remove "${selectedSpreadsheetName}" from your list? This will not delete the actual Google Sheet.`)) {
+        fetch('/settings/remove-spreadsheet', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                spreadsheet_id: selectedSpreadsheetId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Spreadsheet removed successfully', 'success');
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                showToast('Failed to remove spreadsheet: ' + data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            showToast('Error: ' + error.message, 'danger');
+        });
+    }
+}
+
 function validateSpreadsheet() {
     const spreadsheetId = document.getElementById('spreadsheet_id').value.trim();
     const previewDiv = document.getElementById('content-preview');
@@ -427,34 +507,6 @@ function validateSpreadsheet() {
         showToast('Error: ' + error.message, 'danger');
     });
 }
-
-function confirmResetSpreadsheet() {
-    if (confirm('Are you sure you want to disconnect this spreadsheet? You will need to link it again to continue learning.')) {
-        fetch('/reset-spreadsheet', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showToast('Spreadsheet disconnected successfully', 'success');
-                setTimeout(() => window.location.reload(), 1500);
-            } else {
-                showToast('Failed to disconnect: ' + data.error, 'danger');
-            }
-        })
-        .catch(error => {
-            showToast('Error: ' + error.message, 'danger');
-        });
-    }
-}
-
-// Load language settings when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    loadLanguageSettings();
-});
 
 function confirmSpreadsheet() {
     const spreadsheetId = document.getElementById('confirm-spreadsheet-id').value;
@@ -585,5 +637,31 @@ function hidePreview() {
 function resetSpreadsheet() {
     return true;
 }
+
+function updateActivateButtonState() {
+    const selector = document.getElementById('spreadsheet-selector');
+    const activateBtn = document.getElementById('activate-spreadsheet-btn');
+    const selectedOption = selector.options[selector.selectedIndex];
+    
+    if (selectedOption.text.includes('(Active)')) {
+        activateBtn.disabled = true;
+        activateBtn.classList.add('disabled');
+        activateBtn.title = 'This spreadsheet is already active';
+    } else {
+        activateBtn.disabled = false;
+        activateBtn.classList.remove('disabled');
+        activateBtn.title = 'Activate selected spreadsheet';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const selector = document.getElementById('spreadsheet-selector');
+    if (selector) {
+        selector.addEventListener('change', updateActivateButtonState);
+        updateActivateButtonState();
+    }
+    
+    loadLanguageSettings();
+});
 </script>
 {% endblock %}
