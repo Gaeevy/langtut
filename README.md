@@ -48,6 +48,9 @@ cd langtut
 # Install dependencies (uv will automatically create a virtual environment)
 uv sync
 
+# Initialize pre-commit hooks for code quality
+uv run pre-commit install
+
 # Configure secrets (credentials and encryption key)
 cp .secrets.toml.example .secrets.toml
 # Edit .secrets.toml and add your credentials:
@@ -119,6 +122,54 @@ Data Storage
 - **Type Hints:** Required on all function signatures
 - **Error Handling:** Comprehensive exception handling
 - **Testing:** Unit and integration tests with pytest
+
+### Pre-commit Hooks Setup
+The project uses automated code quality checks via pre-commit hooks. After cloning the repository:
+
+```bash
+# Install all dependencies including dev tools
+uv sync
+
+# Initialize pre-commit hooks (REQUIRED - only once per clone)
+uv run pre-commit install
+
+# Verify installation
+ls -la .git/hooks/pre-commit  # Should exist
+
+# Run hooks manually on all files
+uv run pre-commit run --all-files
+
+# Run hooks on specific files
+uv run pre-commit run --files src/routes/auth.py
+```
+
+**What the hooks check:**
+- **Ruff:** Fast Python linting and formatting (auto-fixes issues)
+- **File checks:** Trailing whitespace, JSON/YAML/TOML validation
+- **Python checks:** AST validation, docstring placement, debug statements
+- **Security:** Bandit security scanning, private key detection
+- **Branch Protection:** Blocks direct commits to `master` or `main` branches
+
+**Note:** Hooks run automatically on `git commit`. If checks fail, the commit is blocked until issues are fixed.
+
+**Branch Protection:** The hook prevents accidental commits to `master`/`main`. To work on the project:
+```bash
+# Create a feature branch
+git checkout -b feature/my-feature
+
+# Make changes and commit (hooks will run)
+git add .
+git commit -m "feat: add new feature"
+
+# Merge to master (or push and create PR)
+git checkout master
+git merge feature/my-feature
+```
+
+To bypass branch protection in emergencies (not recommended):
+```bash
+git commit --no-verify -m "emergency fix"
+```
 
 ### Development Workflow
 1. **Session Management:** Centralized with enumerated keys
