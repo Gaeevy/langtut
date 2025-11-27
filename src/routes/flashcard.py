@@ -44,7 +44,7 @@ def batch_update_session_cards():
         # Get session data
         cards_data = sm.get(sk.LEARNING_CARDS, [])
         active_tab = sm.get(sk.LEARNING_ACTIVE_TAB)
-        user = auth_manager.get_current_user()
+        user = auth_manager.user
         user_spreadsheet_id = user.get_active_spreadsheet_id() if user else None
 
         if not cards_data or not active_tab or not user_spreadsheet_id:
@@ -94,7 +94,7 @@ def index():
 
     # Check authentication status using AuthManager
     user_is_authenticated = auth_manager.is_authenticated()
-    user = auth_manager.get_current_user()
+    user = auth_manager.user
     user_spreadsheet_id = user.get_active_spreadsheet_id() if user else None
 
     logger.info(f"Authentication status: {user_is_authenticated}")
@@ -136,7 +136,7 @@ def start_learning(tab_name: str):
     logger.info(f"Remote addr: {request.remote_addr}")
 
     # Get user's active spreadsheet
-    user = auth_manager.get_current_user()
+    user = auth_manager.user
     user_spreadsheet_id = user.get_active_spreadsheet_id() if user else None
     logger.info(f"User spreadsheet ID: {user_spreadsheet_id}")
 
@@ -199,7 +199,7 @@ def start_review(tab_name: str):
     logger.info(f"Remote addr: {request.remote_addr}")
 
     # Get user's active spreadsheet
-    user = auth_manager.get_current_user()
+    user = auth_manager.user
     user_spreadsheet_id = user.get_active_spreadsheet_id() if user else None
     logger.info(f"User spreadsheet ID: {user_spreadsheet_id}")
 
@@ -311,7 +311,7 @@ def show_card(mode="study"):
             f"Showing review card {index + 1}/{len(cards)}: {current_card['word']} -> {current_card['translation']}"
         )
 
-        user = auth_manager.get_current_user()
+        user = auth_manager.user
         user_spreadsheet_id = user.get_active_spreadsheet_id() if user else None
         active_tab = sm.get(tab_key, "Sheet1")
         sheet_gid = sm.get(gid_key)
@@ -370,7 +370,7 @@ def show_card(mode="study"):
             f"Showing card {index + 1}/{len(cards)}: {current_card['word']} -> {current_card['translation']}"
         )
 
-    user = auth_manager.get_current_user()
+    user = auth_manager.user
     user_spreadsheet_id = user.get_active_spreadsheet_id() if user else None
     active_tab = sm.get(sk.LEARNING_ACTIVE_TAB, "Sheet1")
     # Use cached sheet GID instead of making API call
@@ -531,7 +531,7 @@ def show_feedback_with_mode(correct: str, mode: str = "study"):
     """Show feedback after answering a card or flip view in review mode."""
 
     # Get current user and spreadsheet ID
-    user = auth_manager.get_current_user()
+    user = auth_manager.user
     user_spreadsheet_id = user.get_active_spreadsheet_id() if user else None
 
     # Determine session keys based on mode

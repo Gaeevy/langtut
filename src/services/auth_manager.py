@@ -729,6 +729,26 @@ class AuthManager:
             return User.query.get(user_id)
         return None
 
+    @property
+    def user(self) -> User | None:
+        """Convenient property to get the current authenticated user.
+
+        This is a shorthand for get_current_user(). Use this in routes
+        protected by @require_auth where the user is guaranteed to exist.
+
+        Usage Examples:
+            # Inside protected route (RECOMMENDED)
+            @flashcard_bp.route('/learn')
+            @auth_manager.require_auth
+            def learn():
+                user = auth_manager.user  # Clean and simple
+                return render_template('card.html', user=user)
+
+        Returns:
+            User object if user_id in session, None otherwise
+        """
+        return self.get_current_user()
+
     # Session Methods
 
     def clear_auth_session(self) -> None:

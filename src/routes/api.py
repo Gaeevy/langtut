@@ -147,7 +147,7 @@ def get_card_set_for_listening(tab_name: str) -> dict[str, Any]:
             return jsonify({"success": False, "error": "Authentication required"}), 401
 
         # Get user's spreadsheet ID using enhanced model approach
-        user = auth_manager.get_current_user()
+        user = auth_manager.user
         if not user:
             logger.warning("No user found")
             return jsonify({"success": False, "error": "User not found"}), 401
@@ -219,7 +219,7 @@ def get_language_settings() -> dict[str, Any]:
 
     try:
         # Check authentication
-        user = auth_manager.get_current_user()
+        user = auth_manager.user
         if not user:
             logger.warning("User not authenticated")
             return jsonify({"success": False, "error": "Not authenticated"}), 401
@@ -261,7 +261,7 @@ def save_language_settings() -> dict[str, Any]:
 
     try:
         # Check authentication
-        user = auth_manager.get_current_user()
+        user = auth_manager.user
         if not user:
             logger.warning("User not authenticated")
             return jsonify({"success": False, "error": "Not authenticated"}), 401
