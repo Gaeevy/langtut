@@ -6,10 +6,10 @@ Handles user settings and spreadsheet configuration.
 
 from flask import Blueprint, jsonify, render_template, request
 
-from src.database import get_user_spreadsheets, set_active_spreadsheet, remove_user_spreadsheet
+from src.database import get_user_spreadsheets, remove_user_spreadsheet, set_active_spreadsheet
 from src.gsheet import extract_spreadsheet_id, read_all_card_sets, validate_spreadsheet_access
 from src.services.auth_manager import auth_manager
-from src.user_manager import get_current_user, set_user_spreadsheet
+from src.spreadsheet_manager import set_user_spreadsheet
 
 # Create blueprint
 settings_bp = Blueprint("settings", __name__)
@@ -20,7 +20,7 @@ settings_bp = Blueprint("settings", __name__)
 def settings():
     """Display user settings page."""
     # Get current user and their active spreadsheet
-    user = get_current_user()
+    user = auth_manager.get_current_user()
     current_spreadsheet_id = None
     current_spreadsheet_name = None
 
@@ -29,7 +29,7 @@ def settings():
         if active_spreadsheet:
             current_spreadsheet_id = active_spreadsheet.spreadsheet_id
             current_spreadsheet_name = active_spreadsheet.spreadsheet_name
-        
+
         spreadsheets = get_user_spreadsheets(user.id)
 
     return render_template(
@@ -37,7 +37,7 @@ def settings():
         user=user,
         current_spreadsheet_id=current_spreadsheet_id,
         current_spreadsheet_name=current_spreadsheet_name,
-        spreadsheets=spreadsheets
+        spreadsheets=spreadsheets,
     )
 
 
@@ -116,7 +116,7 @@ def activate_spreadsheet():
         return jsonify({"success": False, "error": "Spreadsheet ID is required"})
 
     try:
-        user = get_current_user()
+        user = auth_manager.get_current_user()
         if not user:
             return jsonify({"success": False, "error": "User not found"})
 
@@ -142,7 +142,7 @@ def remove_spreadsheet():
         return jsonify({"success": False, "error": "Spreadsheet ID is required"})
 
     try:
-        user = get_current_user()
+        user = auth_manager.get_current_user()
         if not user:
             return jsonify({"success": False, "error": "User not found"})
 

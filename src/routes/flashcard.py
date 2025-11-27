@@ -15,7 +15,7 @@ from src.models import Card
 from src.services.auth_manager import auth_manager
 from src.session_manager import SessionKeys as sk
 from src.session_manager import SessionManager as sm
-from src.user_manager import get_user_spreadsheet_id
+from src.spreadsheet_manager import get_user_spreadsheet_id
 from src.utils import format_timestamp, get_timestamp, parse_timestamp
 
 # Create logger
