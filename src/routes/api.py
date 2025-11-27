@@ -136,22 +136,14 @@ def speak_card_content() -> dict[str, Any]:
 
 
 @api_bp.route("/cards/<tab_name>")
+@auth_manager.require_auth_api
 def get_card_set_for_listening(tab_name: str) -> dict[str, Any]:
     """Get all cards from a card set for listening mode."""
     logger.info(f"Loading cards for listening mode: {tab_name}")
 
     try:
-        # Check authentication
-        if not auth_manager.is_authenticated():
-            logger.warning("User not authenticated")
-            return jsonify({"success": False, "error": "Authentication required"}), 401
-
         # Get user's spreadsheet ID using enhanced model approach
         user = auth_manager.user
-        if not user:
-            logger.warning("No user found")
-            return jsonify({"success": False, "error": "User not found"}), 401
-
         active_spreadsheet = user.get_active_spreadsheet()
         if not active_spreadsheet:
             logger.warning("No spreadsheet configured for user")
@@ -214,17 +206,12 @@ def get_card_set_for_listening(tab_name: str) -> dict[str, Any]:
 
 
 @api_bp.route("/language-settings", methods=["GET"])
+@auth_manager.require_auth_api
 def get_language_settings() -> dict[str, Any]:
     """Get current language settings for the user's active spreadsheet."""
 
     try:
-        # Check authentication
         user = auth_manager.user
-        if not user:
-            logger.warning("User not authenticated")
-            return jsonify({"success": False, "error": "Not authenticated"}), 401
-
-        # Get user's active spreadsheet
         active_spreadsheet = user.get_active_spreadsheet()
         if not active_spreadsheet:
             logger.warning(f"No active spreadsheet found for user {user.email}")
@@ -256,17 +243,12 @@ def get_language_settings() -> dict[str, Any]:
 
 
 @api_bp.route("/language-settings", methods=["POST"])
+@auth_manager.require_auth_api
 def save_language_settings() -> dict[str, Any]:
     """Save language settings for the user's active spreadsheet with Pydantic validation."""
 
     try:
-        # Check authentication
         user = auth_manager.user
-        if not user:
-            logger.warning("User not authenticated")
-            return jsonify({"success": False, "error": "Not authenticated"}), 401
-
-        # Get user's active spreadsheet
         active_spreadsheet = user.get_active_spreadsheet()
         if not active_spreadsheet:
             logger.warning(f"No active spreadsheet found for user {user.email}")

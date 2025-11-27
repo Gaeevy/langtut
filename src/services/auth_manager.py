@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import redirect, request, url_for
+from flask import jsonify, redirect, request, url_for
 from google.auth.transport.requests import Request
 from google.oauth2 import id_token
 from google.oauth2.credentials import Credentials
@@ -688,6 +688,52 @@ class AuthManager:
             if not self.is_authenticated():
                 logger.info(f"Unauthenticated access to {request.url}, redirecting to login")
                 return redirect(url_for("auth.auth"))
+            return f(*args, **kwargs)
+
+        return decorated_function
+
+    def require_auth_api(self, f):
+        """Decorator for API route protection - enforces authentication with JSON response.
+
+        This is an ACTIVE ENFORCER for API endpoints - returns JSON 401 if user is not
+        authenticated instead of redirecting to login page.
+
+        Responsibility: Policy enforcement for APIs (has side effects - returns JSON error)
+
+        How it works:
+        1. Checks if user is authenticated (calls is_authenticated())
+        2. If authenticated → Calls the wrapped function normally
+        3. If NOT authenticated → Returns JSON {"error": "Unauthorized", "success": False}, 401
+        4. Transparently handles token refresh (via is_authenticated())
+
+        This is the PRIMARY way to protect API routes that return JSON.
+
+        When to use:
+        - ✅ API routes that need authentication
+        - ✅ Routes that should return JSON errors (not HTML redirects)
+        - ❌ HTML routes (use @require_auth instead)
+
+        Usage Examples:
+            # Protecting API routes (RECOMMENDED)
+            @api_bp.route('/api/data')
+            @auth_manager.require_auth_api
+            def api_data():
+                # At this point, user is GUARANTEED to be authenticated
+                user = auth_manager.user  # Will never be None
+                return jsonify({"data": "...", "user": user.email})
+
+        Returns:
+            Decorated function that enforces authentication before execution
+
+        Side Effects:
+            Returns JSON 401 error if user is not authenticated
+        """
+
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not self.is_authenticated():
+                logger.info(f"Unauthenticated API access to {request.url}, returning 401")
+                return jsonify({"error": "Unauthorized", "success": False}), 401
             return f(*args, **kwargs)
 
         return decorated_function
