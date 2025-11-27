@@ -6,10 +6,8 @@ Handles user settings and spreadsheet configuration.
 
 from flask import Blueprint, jsonify, render_template, request
 
-from src.database import get_user_spreadsheets, remove_user_spreadsheet, set_active_spreadsheet
 from src.gsheet import extract_spreadsheet_id, read_all_card_sets, validate_spreadsheet_access
 from src.services.auth_manager import auth_manager
-from src.spreadsheet_manager import set_user_spreadsheet
 
 # Create blueprint
 settings_bp = Blueprint("settings", __name__)
@@ -30,7 +28,7 @@ def settings():
             current_spreadsheet_id = active_spreadsheet.spreadsheet_id
             current_spreadsheet_name = active_spreadsheet.spreadsheet_name
 
-        spreadsheets = get_user_spreadsheets(user.id)
+        spreadsheets = user.get_all_spreadsheets()
 
     return render_template(
         "settings.html",
@@ -68,7 +66,11 @@ def validate_spreadsheet():
             )
 
         # Save to user's account
-        user_spreadsheet = set_user_spreadsheet(spreadsheet_id, spreadsheet_url, spreadsheet_name)
+        user = auth_manager.get_current_user()
+        if not user:
+            return jsonify({"success": False, "error": "User not found"})
+
+        user_spreadsheet = user.add_spreadsheet(spreadsheet_id, spreadsheet_url, spreadsheet_name)
 
         return jsonify(
             {
@@ -94,10 +96,14 @@ def set_spreadsheet():
         return jsonify({"success": False, "error": "Spreadsheet ID is required"})
 
     try:
-        # Set the user's spreadsheet
-        success = set_user_spreadsheet(spreadsheet_id)
+        user = auth_manager.get_current_user()
+        if not user:
+            return jsonify({"success": False, "error": "User not found"})
 
-        if success:
+        # Add/update the user's spreadsheet
+        user_spreadsheet = user.add_spreadsheet(spreadsheet_id)
+
+        if user_spreadsheet:
             return jsonify({"success": True, "message": "Spreadsheet set successfully"})
         else:
             return jsonify({"success": False, "error": "Failed to set spreadsheet"})
@@ -121,7 +127,7 @@ def activate_spreadsheet():
             return jsonify({"success": False, "error": "User not found"})
 
         # Set the spreadsheet as active
-        spreadsheet = set_active_spreadsheet(user.id, spreadsheet_id)
+        spreadsheet = user.activate_spreadsheet(spreadsheet_id)
 
         if spreadsheet:
             return jsonify({"success": True, "message": "Spreadsheet activated successfully"})
@@ -147,7 +153,7 @@ def remove_spreadsheet():
             return jsonify({"success": False, "error": "User not found"})
 
         # Remove the spreadsheet
-        success = remove_user_spreadsheet(user.id, spreadsheet_id)
+        success = user.remove_spreadsheet(spreadsheet_id)
 
         if success:
             return jsonify({"success": True, "message": "Spreadsheet removed successfully"})

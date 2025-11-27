@@ -32,6 +32,129 @@ class User(db.Model):
         """Get the user's currently active spreadsheet"""
         return UserSpreadsheet.query.filter_by(user_id=self.id, is_active=True).first()
 
+    def get_active_spreadsheet_id(self):
+        """Get the ID of the user's active spreadsheet.
+
+        Returns:
+            Spreadsheet ID string if user has an active spreadsheet, None otherwise
+        """
+        active = self.get_active_spreadsheet()
+        return active.spreadsheet_id if active else None
+
+    def get_all_spreadsheets(self):
+        """Get all spreadsheets for this user, ordered by last used"""
+        return (
+            UserSpreadsheet.query.filter_by(user_id=self.id)
+            .order_by(UserSpreadsheet.last_used.desc())
+            .all()
+        )
+
+    def add_spreadsheet(
+        self, spreadsheet_id, spreadsheet_url=None, spreadsheet_name=None, make_active=True
+    ):
+        """Add a spreadsheet to user's account.
+
+        Args:
+            spreadsheet_id: Google Sheets spreadsheet ID
+            spreadsheet_url: Optional spreadsheet URL
+            spreadsheet_name: Optional spreadsheet name
+            make_active: Whether to set this as the active spreadsheet (default True)
+
+        Returns:
+            UserSpreadsheet object
+        """
+        # Check if spreadsheet already exists for this user
+        existing = UserSpreadsheet.query.filter_by(
+            user_id=self.id, spreadsheet_id=spreadsheet_id
+        ).first()
+
+        if existing:
+            # Update existing spreadsheet
+            existing.last_used = datetime.utcnow()
+            if spreadsheet_url:
+                existing.spreadsheet_url = spreadsheet_url
+            if spreadsheet_name:
+                existing.spreadsheet_name = spreadsheet_name
+            if make_active:
+                # Deactivate all other spreadsheets
+                UserSpreadsheet.query.filter_by(user_id=self.id, is_active=True).update(
+                    {"is_active": False}
+                )
+                existing.is_active = True
+            db.session.commit()
+            return existing
+
+        # Deactivate all other spreadsheets if this should be active
+        if make_active:
+            UserSpreadsheet.query.filter_by(user_id=self.id, is_active=True).update(
+                {"is_active": False}
+            )
+
+        # Create new spreadsheet with default properties
+        from src.models import UserSpreadsheetProperty
+
+        default_properties = UserSpreadsheetProperty.get_default()
+
+        new_spreadsheet = UserSpreadsheet(
+            user_id=self.id,
+            spreadsheet_id=spreadsheet_id,
+            spreadsheet_url=spreadsheet_url,
+            spreadsheet_name=spreadsheet_name,
+            is_active=make_active,
+            properties=default_properties.to_db_string(),
+        )
+
+        db.session.add(new_spreadsheet)
+        db.session.commit()
+        return new_spreadsheet
+
+    def activate_spreadsheet(self, spreadsheet_id):
+        """Set a specific spreadsheet as active for this user.
+
+        Args:
+            spreadsheet_id: Google Sheets spreadsheet ID to activate
+
+        Returns:
+            UserSpreadsheet object if found, None otherwise
+        """
+        # Deactivate all spreadsheets
+        UserSpreadsheet.query.filter_by(user_id=self.id, is_active=True).update(
+            {"is_active": False}
+        )
+
+        # Activate target spreadsheet
+        target_spreadsheet = UserSpreadsheet.query.filter_by(
+            user_id=self.id, spreadsheet_id=spreadsheet_id
+        ).first()
+
+        if target_spreadsheet:
+            target_spreadsheet.is_active = True
+            target_spreadsheet.last_used = datetime.utcnow()
+            db.session.commit()
+            return target_spreadsheet
+
+        return None
+
+    def remove_spreadsheet(self, spreadsheet_id):
+        """Remove a spreadsheet from user's account.
+
+        Args:
+            spreadsheet_id: Google Sheets spreadsheet ID to remove
+
+        Returns:
+            True if removed successfully, False if not found
+        """
+        spreadsheet = UserSpreadsheet.query.filter_by(
+            user_id=self.id, spreadsheet_id=spreadsheet_id
+        ).first()
+
+        if spreadsheet:
+            db.session.delete(spreadsheet)
+            db.session.commit()
+            return True
+
+        return False
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -219,123 +342,3 @@ def ensure_tables():
         # Tables don't exist, create them
         db.create_all()
         _tables_created = True
-
-
-def get_or_create_user(google_user_id, email=None, name=None):
-    """Get existing user or create new one"""
-    ensure_tables()
-
-    user = User.query.filter_by(google_user_id=google_user_id).first()
-
-    if not user:
-        user = User(google_user_id=google_user_id, email=email, name=name)
-        db.session.add(user)
-        db.session.commit()
-    else:
-        user.last_login = datetime.utcnow()
-        if email and user.email != email:
-            user.email = email
-        if name and user.name != name:
-            user.name = name
-        db.session.commit()
-
-    return user
-
-
-def add_user_spreadsheet(
-    user_id, spreadsheet_id, spreadsheet_url=None, spreadsheet_name=None, make_active=True
-):
-    """Add a spreadsheet to user's account"""
-    ensure_tables()
-
-    existing = UserSpreadsheet.query.filter_by(
-        user_id=user_id, spreadsheet_id=spreadsheet_id
-    ).first()
-
-    if existing:
-        existing.last_used = datetime.utcnow()
-        if spreadsheet_url:
-            existing.spreadsheet_url = spreadsheet_url
-        if spreadsheet_name:
-            existing.spreadsheet_name = spreadsheet_name
-        if make_active:
-            UserSpreadsheet.query.filter_by(user_id=user_id, is_active=True).update(
-                {"is_active": False}
-            )
-            existing.is_active = True
-        db.session.commit()
-        return existing
-
-    if make_active:
-        UserSpreadsheet.query.filter_by(user_id=user_id, is_active=True).update(
-            {"is_active": False}
-        )
-
-    # Create new spreadsheet with default properties
-    from src.models import UserSpreadsheetProperty
-
-    default_properties = UserSpreadsheetProperty.get_default()
-
-    new_spreadsheet = UserSpreadsheet(
-        user_id=user_id,
-        spreadsheet_id=spreadsheet_id,
-        spreadsheet_url=spreadsheet_url,
-        spreadsheet_name=spreadsheet_name,
-        is_active=make_active,
-        properties=default_properties.to_db_string(),  # Initialize with default properties
-    )
-
-    db.session.add(new_spreadsheet)
-    db.session.commit()
-    return new_spreadsheet
-
-
-def get_user_active_spreadsheet(user_id):
-    """Get user's currently active spreadsheet"""
-    ensure_tables()
-    return UserSpreadsheet.query.filter_by(user_id=user_id, is_active=True).first()
-
-
-def get_user_spreadsheets(user_id):
-    """Get all spreadsheets for a user"""
-    ensure_tables()
-    return (
-        UserSpreadsheet.query.filter_by(user_id=user_id)
-        .order_by(UserSpreadsheet.last_used.desc())
-        .all()
-    )
-
-
-def set_active_spreadsheet(user_id, spreadsheet_id):
-    """Set a specific spreadsheet as active for the user"""
-    ensure_tables()
-
-    UserSpreadsheet.query.filter_by(user_id=user_id, is_active=True).update({"is_active": False})
-
-    target_spreadsheet = UserSpreadsheet.query.filter_by(
-        user_id=user_id, spreadsheet_id=spreadsheet_id
-    ).first()
-
-    if target_spreadsheet:
-        target_spreadsheet.is_active = True
-        target_spreadsheet.last_used = datetime.utcnow()
-        db.session.commit()
-        return target_spreadsheet
-
-    return None
-
-
-def remove_user_spreadsheet(user_id, spreadsheet_id):
-    """Remove a spreadsheet from user's account"""
-    ensure_tables()
-
-    spreadsheet = UserSpreadsheet.query.filter_by(
-        user_id=user_id, spreadsheet_id=spreadsheet_id
-    ).first()
-
-    if spreadsheet:
-        db.session.delete(spreadsheet)
-        db.session.commit()
-        return True
-
-    return False

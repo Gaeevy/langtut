@@ -7,7 +7,7 @@ Handles the core flashcard learning functionality.
 import json
 import logging
 
-from flask import Blueprint, redirect, render_template, request, session, url_for
+from flask import Blueprint, redirect, render_template, request, url_for
 
 from src.config import config
 from src.gsheet import read_all_card_sets, read_card_set, update_spreadsheet
@@ -15,7 +15,6 @@ from src.models import Card
 from src.services.auth_manager import auth_manager
 from src.session_manager import SessionKeys as sk
 from src.session_manager import SessionManager as sm
-from src.spreadsheet_manager import get_user_spreadsheet_id
 from src.utils import format_timestamp, get_timestamp, parse_timestamp
 
 # Create logger
@@ -45,7 +44,8 @@ def batch_update_session_cards():
         # Get session data
         cards_data = sm.get(sk.LEARNING_CARDS, [])
         active_tab = sm.get(sk.LEARNING_ACTIVE_TAB)
-        user_spreadsheet_id = get_user_spreadsheet_id(session)
+        user = auth_manager.get_current_user()
+        user_spreadsheet_id = user.get_active_spreadsheet_id() if user else None
 
         if not cards_data or not active_tab or not user_spreadsheet_id:
             logger.warning("Missing session data for batch update")
@@ -94,7 +94,8 @@ def index():
 
     # Check authentication status using AuthManager
     user_is_authenticated = auth_manager.is_authenticated()
-    user_spreadsheet_id = get_user_spreadsheet_id(session)
+    user = auth_manager.get_current_user()
+    user_spreadsheet_id = user.get_active_spreadsheet_id() if user else None
 
     logger.info(f"Authentication status: {user_is_authenticated}")
     logger.info(f"User spreadsheet ID: {user_spreadsheet_id}")
@@ -135,7 +136,8 @@ def start_learning(tab_name: str):
     logger.info(f"Remote addr: {request.remote_addr}")
 
     # Get user's active spreadsheet
-    user_spreadsheet_id = get_user_spreadsheet_id(session)
+    user = auth_manager.get_current_user()
+    user_spreadsheet_id = user.get_active_spreadsheet_id() if user else None
     logger.info(f"User spreadsheet ID: {user_spreadsheet_id}")
 
     try:
@@ -197,7 +199,8 @@ def start_review(tab_name: str):
     logger.info(f"Remote addr: {request.remote_addr}")
 
     # Get user's active spreadsheet
-    user_spreadsheet_id = get_user_spreadsheet_id(session)
+    user = auth_manager.get_current_user()
+    user_spreadsheet_id = user.get_active_spreadsheet_id() if user else None
     logger.info(f"User spreadsheet ID: {user_spreadsheet_id}")
 
     try:
@@ -308,7 +311,8 @@ def show_card(mode="study"):
             f"Showing review card {index + 1}/{len(cards)}: {current_card['word']} -> {current_card['translation']}"
         )
 
-        user_spreadsheet_id = get_user_spreadsheet_id(session)
+        user = auth_manager.get_current_user()
+        user_spreadsheet_id = user.get_active_spreadsheet_id() if user else None
         active_tab = sm.get(tab_key, "Sheet1")
         sheet_gid = sm.get(gid_key)
 
@@ -366,7 +370,8 @@ def show_card(mode="study"):
             f"Showing card {index + 1}/{len(cards)}: {current_card['word']} -> {current_card['translation']}"
         )
 
-    user_spreadsheet_id = get_user_spreadsheet_id(session)
+    user = auth_manager.get_current_user()
+    user_spreadsheet_id = user.get_active_spreadsheet_id() if user else None
     active_tab = sm.get(sk.LEARNING_ACTIVE_TAB, "Sheet1")
     # Use cached sheet GID instead of making API call
     sheet_gid = sm.get(sk.LEARNING_SHEET_GID)
@@ -525,6 +530,10 @@ def show_feedback(correct: str):
 def show_feedback_with_mode(correct: str, mode: str = "study"):
     """Show feedback after answering a card or flip view in review mode."""
 
+    # Get current user and spreadsheet ID
+    user = auth_manager.get_current_user()
+    user_spreadsheet_id = user.get_active_spreadsheet_id() if user else None
+
     # Determine session keys based on mode
     if mode == "review":
         cards_key = sk.REVIEW_CARDS
@@ -558,7 +567,7 @@ def show_feedback_with_mode(correct: str, mode: str = "study"):
             card_index=index,
             level_change=None,
             mode=mode,
-            user_spreadsheet_id=get_user_spreadsheet_id(session),
+            user_spreadsheet_id=user_spreadsheet_id,
             active_tab=sm.get(tab_key, "Sheet1"),
             sheet_gid=sm.get(gid_key),
         )
@@ -590,7 +599,7 @@ def show_feedback_with_mode(correct: str, mode: str = "study"):
         card_index=index,
         level_change=level_change,
         mode=mode,
-        user_spreadsheet_id=get_user_spreadsheet_id(session),
+        user_spreadsheet_id=user_spreadsheet_id,
         active_tab=sm.get(sk.LEARNING_ACTIVE_TAB, "Sheet1"),
         # Use cached sheet GID instead of making API call
         sheet_gid=sm.get(sk.LEARNING_SHEET_GID),
