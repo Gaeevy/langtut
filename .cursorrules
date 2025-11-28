@@ -61,7 +61,7 @@ settings.toml              # Main configuration (non-sensitive)
 - **ALWAYS use uv** - Never use direct `python` commands
   - ✅ `uv run python -c "from src.config import config; print(config.DEBUG)"`
   - ✅ `uv run pytest`
-  - ✅ `uv run gunicorn --bind 0.0.0.0:8080 --reload app:app`
+  - ✅ `uv run gunicorn --bind 0.0.0.0:8080 --reload run:app`
   - ❌ `python app.py`
   - ❌ `python -m pytest`
 - **UV for all development tasks** - Testing, running, debugging (10-100x faster than poetry)
@@ -183,7 +183,7 @@ The application uses 6 main blueprints for route organization:
 ### Running the Application
 ```bash
 # Start development server (recommended)
-uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
+uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload run:app
 
 # Run tests
 uv run pytest
