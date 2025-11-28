@@ -18,7 +18,7 @@ cd langtut
 uv sync
 
 # Start development server
-uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
+uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload run:app
 ```
 
 ### Project Structure

@@ -4,7 +4,7 @@ Language Tutor Application
 This is the main entry point for the application.
 Optimized for Gunicorn deployment in all environments.
 
-Development: uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload app:app
+Development: uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload run:app
 Production:  Uses Railway's automatic Gunicorn deployment
 """
 
@@ -45,5 +45,5 @@ if config.environment == Environment.LOCAL:
 # Direct execution support (for debugging only)
 if __name__ == "__main__":
     logger.warning("🐛 Running Flask development server directly (debugging mode)")
-    logger.warning("⚠️  For production, use: uv run gunicorn --bind 0.0.0.0:8080 app:app")
+    logger.warning("⚠️  For production, use: uv run gunicorn --bind 0.0.0.0:8080 run:app")
     app.run(host="0.0.0.0", port=8080, debug=True)
