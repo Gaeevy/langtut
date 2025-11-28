@@ -13,7 +13,7 @@ import os
 from google.cloud import storage, texttospeech
 from google.oauth2 import service_account
 
-from src.config import config
+from app.config import config
 
 logger = logging.getLogger(__name__)
 

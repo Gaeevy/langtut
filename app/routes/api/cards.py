@@ -10,8 +10,8 @@ from typing import Any
 
 from flask import Blueprint, jsonify
 
-from src.gsheet import read_card_set
-from src.services.auth_manager import auth_manager
+from app.gsheet import read_card_set
+from app.services.auth_manager import auth_manager
 
 logger = logging.getLogger(__name__)
 

@@ -7,13 +7,13 @@ including session initialization, answer processing, and results calculation.
 import logging
 from dataclasses import dataclass
 
-from src.config import config
-from src.gsheet import read_card_set, update_spreadsheet
-from src.models import Card
-from src.services.auth_manager import auth_manager
-from src.session_manager import SessionKeys as sk
-from src.session_manager import SessionManager as sm
-from src.utils import parse_timestamp
+from app.config import config
+from app.gsheet import read_card_set, update_spreadsheet
+from app.models import Card
+from app.services.auth_manager import auth_manager
+from app.session_manager import SessionKeys as sk
+from app.session_manager import SessionManager as sm
+from app.utils import parse_timestamp
 
 from .card_session import CardSessionManager
 from .statistics import CardStatistics

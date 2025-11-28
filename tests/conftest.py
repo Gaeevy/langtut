@@ -3,8 +3,8 @@
 import pytest
 from flask import Flask
 
-from src.models import Card, Levels
-from src.routes import register_blueprints
+from app.models import Card, Levels
+from app.routes import register_blueprints
 
 
 @pytest.fixture

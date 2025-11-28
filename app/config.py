@@ -11,8 +11,8 @@ from enum import StrEnum
 from dynaconf import Dynaconf
 from pydantic_settings import BaseSettings
 
-from src.logging import setup_logging
-from src.utils import resolve_secrets_file_path
+from app.logging import setup_logging
+from app.utils import resolve_secrets_file_path
 
 
 class Environment(StrEnum):

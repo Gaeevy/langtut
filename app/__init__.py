@@ -9,11 +9,11 @@ import os
 
 from flask import Flask
 
+from app.config import config
+from app.logging import setup_request_logging
+from app.routes import register_blueprints
+from app.utils import ensure_utf8_encoding
 from flask_session import Session
-from src.config import config
-from src.logging import setup_request_logging
-from src.routes import register_blueprints
-from src.utils import ensure_utf8_encoding
 
 
 def configure_app(app: Flask) -> None:
@@ -71,7 +71,7 @@ def create_app() -> Flask:
     ensure_utf8_encoding()
 
     # Create Flask app with template and static folders
-    app = Flask(__name__, template_folder="../templates", static_folder="../static")
+    app = Flask(__name__)
 
     # Configure application settings
     configure_app(app)

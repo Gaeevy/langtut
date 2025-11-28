@@ -9,8 +9,8 @@ from typing import Any
 
 from flask import Blueprint, jsonify, request
 
-from src.config import config
-from src.services.tts import TTSService
+from app.config import config
+from app.services.tts import TTSService
 
 logger = logging.getLogger(__name__)
 

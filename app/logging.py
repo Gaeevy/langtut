@@ -11,8 +11,8 @@ import uuid
 
 from flask import g, request
 
-from src.session_manager import SessionKeys as sk
-from src.session_manager import SessionManager as sm
+from app.session_manager import SessionKeys as sk
+from app.session_manager import SessionManager as sm
 
 logger = logging.getLogger(__name__)
 

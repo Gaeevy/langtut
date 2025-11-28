@@ -140,7 +140,7 @@ ls -la .git/hooks/pre-commit  # Should exist
 uv run pre-commit run --all-files
 
 # Run hooks on specific files
-uv run pre-commit run --files src/routes/auth.py
+uv run pre-commit run --files app/routes/auth.py
 ```
 
 **What the hooks check:**

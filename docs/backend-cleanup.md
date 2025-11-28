@@ -169,7 +169,7 @@ def start_learning(tab_name: str):
 Add keys for user spreadsheet and listening mode state.
 
 ```python
-# src/session_manager.py
+# app/session_manager.py
 
 class SessionKeys(Enum):
     # ... existing keys ...
@@ -279,7 +279,7 @@ user_spreadsheet_id = get_user_spreadsheet_id()  # No parameter
 **Validation:**
 ```bash
 # Verify no direct session imports remain (except in session_manager.py)
-grep -r "from flask import.*session" src/routes/
+grep -r "from flask import.*session" app/routes/
 
 # Should only find session imports that are legitimate (like request handling)
 ```
@@ -291,7 +291,7 @@ grep -r "from flask import.*session" src/routes/
 When user changes spreadsheet, clear cache.
 
 ```python
-# src/user_manager.py
+# app/user_manager.py
 
 def set_user_spreadsheet(spreadsheet_id: str, spreadsheet_url: str | None = None,
                         spreadsheet_name: str | None = None):
@@ -368,9 +368,9 @@ accessible from JavaScript (listening mode, progress tracking, etc.)
 """
 
 from flask import Blueprint, jsonify, request
-from src.session_manager import SessionKeys as sk, SessionManager as sm
-from src.user_manager import is_authenticated
-from src.models import ListeningState, LearningProgress
+from app.session_manager import SessionKeys as sk, SessionManager as sm
+from app.user_manager import is_authenticated
+from app.models import ListeningState, LearningProgress
 import logging
 
 logger = logging.getLogger(__name__)
@@ -549,7 +549,7 @@ def sync_state():
 Update `src/models.py` with Pydantic models for state validation.
 
 ```python
-# src/models.py
+# app/models.py
 
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
@@ -605,7 +605,7 @@ class StateSyncResponse(BaseModel):
 Update `src/routes/__init__.py`:
 
 ```python
-# src/routes/__init__.py
+# app/routes/__init__.py
 
 from flask import Flask
 from .auth import auth_bp
@@ -685,11 +685,11 @@ Handles business logic for:
 from typing import List
 import logging
 
-from src.models import Card, CardSet
-from src.session_manager import SessionKeys as sk, SessionManager as sm
-from src.gsheet import read_card_set, update_spreadsheet
-from src.config import config
-from src.utils import format_timestamp, get_timestamp, parse_timestamp
+from app.models import Card, CardSet
+from app.session_manager import SessionKeys as sk, SessionManager as sm
+from app.gsheet import read_card_set, update_spreadsheet
+from app.config import config
+from app.utils import format_timestamp, get_timestamp, parse_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -930,7 +930,8 @@ def start_learning(tab_name: str):
 
 # flashcard.py - AFTER refactoring (clean routing)
 
-from src.services.learning_service import LearningService
+from app.services.learning_service import LearningService
+
 
 @flashcard_bp.route('/start/<tab_name>', methods=['POST'])
 def start_learning(tab_name: str):
@@ -1121,12 +1122,14 @@ class CardCache(db.Model):
 
 ```python
 # tests/test_session_manager.py
-from src.session_manager import SessionManager as sm, SessionKeys as sk
+from app.session_manager import SessionManager as sm, SessionKeys as sk
+
 
 def test_get_set_session():
     """Test basic get/set operations"""
     sm.set(sk.USER_ID, 123)
     assert sm.get(sk.USER_ID) == 123
+
 
 def test_clear_namespace():
     """Test namespace clearing"""
@@ -1141,13 +1144,15 @@ def test_clear_namespace():
 
 ```python
 # tests/test_learning_service.py
-from src.services.learning_service import LearningService
+from app.services.learning_service import LearningService
+
 
 def test_start_session(mock_spreadsheet):
     """Test learning session initialization"""
     result = LearningService.start_session('Common Words', 'sheet_123')
     assert result['card_count'] > 0
     assert result['tab_name'] == 'Common Words'
+
 
 def test_process_answer():
     """Test answer processing logic"""

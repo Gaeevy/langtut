@@ -1,7 +1,7 @@
 """Tests for CardStatistics service."""
 
-from src.models import Levels
-from src.services.learning.statistics import AnswerResult, CardStatistics, SessionStats
+from app.models import Levels
+from app.services.learning.statistics import AnswerResult, CardStatistics, SessionStats
 
 from .conftest import make_card
 

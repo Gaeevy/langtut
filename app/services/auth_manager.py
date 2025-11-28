@@ -15,10 +15,10 @@ from google.oauth2 import id_token
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 
-from src.config import Environment, config
-from src.database import RefreshToken, User, db
-from src.session_manager import SessionKeys as sk
-from src.session_manager import SessionManager as sm
+from app.config import Environment, config
+from app.database import RefreshToken, User, db
+from app.session_manager import SessionKeys as sk
+from app.session_manager import SessionManager as sm
 
 logger = logging.getLogger(__name__)
 
@@ -158,10 +158,10 @@ class AuthManager:
     -------------
     - google.oauth2.credentials (Credentials object)
     - google_auth_oauthlib.flow (OAuth flow)
-    - src.database (User, RefreshToken models)
-    - src.session_manager (SessionManager, SessionKeys)
-    - src.utils (encrypt_token, decrypt_token)
-    - src.config (OAuth configuration)
+    - app.database (User, RefreshToken models)
+    - app.session_manager (SessionManager, SessionKeys)
+    - app.utils (encrypt_token, decrypt_token)
+    - app.config (OAuth configuration)
 
     Notes:
     ------

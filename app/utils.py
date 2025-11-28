@@ -47,7 +47,7 @@ def parse_timestamp(timestamp_str):
     Returns:
         Datetime object or NEVER_SHOWN if parsing fails
     """
-    from src.models import NEVER_SHOWN
+    from app.models import NEVER_SHOWN
 
     if not timestamp_str:
         return NEVER_SHOWN
@@ -135,7 +135,7 @@ def get_encryption_key() -> bytes:
     Raises:
         ValueError: If ENCRYPTION_KEY is not configured
     """
-    from src.config import config
+    from app.config import config
 
     key = config.encryption_key
     if not key:

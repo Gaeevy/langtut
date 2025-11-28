@@ -8,8 +8,8 @@ import logging
 
 from flask import Blueprint, redirect, render_template, url_for
 
-from src.services.auth_manager import auth_manager
-from src.services.learning.review_service import ReviewService
+from app.services.auth_manager import auth_manager
+from app.services.learning.review_service import ReviewService
 
 logger = logging.getLogger(__name__)
 

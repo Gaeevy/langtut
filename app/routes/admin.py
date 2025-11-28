@@ -13,8 +13,8 @@ from typing import Any
 
 from flask import Blueprint, Response, jsonify, request
 
-from src.database import User, UserSpreadsheet, db
-from src.utils import format_timestamp
+from app.database import User, UserSpreadsheet, db
+from app.utils import format_timestamp
 
 # Create blueprint
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")

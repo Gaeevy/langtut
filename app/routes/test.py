@@ -9,9 +9,9 @@ from typing import Any
 
 from flask import Blueprint, jsonify, render_template
 
-from src.config import config
-from src.gsheet import read_all_card_sets
-from src.services.tts import TTSService
+from app.config import config
+from app.gsheet import read_all_card_sets
+from app.services.tts import TTSService
 
 # Create blueprint
 test_bp = Blueprint("test", __name__)
