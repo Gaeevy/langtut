@@ -29,7 +29,7 @@ This document outlines a comprehensive refactoring plan for the `src/routes/` mo
 | Phase 1: Service Layer Foundation | ✅ **COMPLETED** | 2025-11-28 | Created `CardSessionManager`, `CardStatistics` |
 | Phase 2: Learn Service + Routes | ✅ **COMPLETED** | 2025-11-28 | Created `LearnService`, `learn_bp`, `index_bp` |
 | Phase 3: Review Service + Routes | ✅ **COMPLETED** | 2025-11-28 | Created `ReviewService`, `review_bp` |
-| Phase 4: API Restructuring | 🔲 Pending | - | - |
+| Phase 4: API Restructuring | ✅ **COMPLETED** | 2025-11-28 | Modular `routes/api/` package |
 | Phase 5: Cleanup | 🔲 Pending | - | - |
 | Phase 6: Index Route Extraction | ✅ **COMPLETED** | 2025-11-28 | Moved to `index_bp` in Phase 2 |
 
@@ -53,6 +53,15 @@ This document outlines a comprehensive refactoring plan for the `src/routes/` mo
 - ✅ Updated `src/routes/__init__.py` - registered `review_bp`
 - ✅ Updated `src/routes/flashcard.py` - converted all remaining routes to redirects
 - ✅ Updated templates for review mode URLs (`review.start`, `review.card`, `review.flip`, `review.navigate`)
+
+### Phase 4 Details
+- ✅ Created `src/routes/api/` package directory
+- ✅ Created `src/routes/api/__init__.py` - Main API blueprint with nested registration
+- ✅ Created `src/routes/api/tts.py` - TTS routes (`/api/tts/status`, `/api/tts/speak`, `/api/tts/speak-card`)
+- ✅ Created `src/routes/api/cards.py` - Cards route (`/api/cards/<tab_name>`)
+- ✅ Created `src/routes/api/language.py` - Language settings routes (`/api/language-settings`, `/api/language-settings/validate`)
+- ✅ Deleted old monolithic `src/routes/api.py`
+- ✅ Updated `src/routes/__init__.py` - imports from new `api` package
 
 ---
 
@@ -1336,13 +1345,14 @@ Templates need minimal changes - mainly URL generation:
 4. ✅ Add legacy redirects
 5. ✅ Update templates
 
-### Phase 4: API Restructuring (Low Risk)
+### Phase 4: API Restructuring (Low Risk) ✅
 **Duration:** 1 day
+**Completed:** 2025-11-28
 
-1. Create `routes/api/` directory
-2. Split `api.py` into `tts.py`, `cards.py`, `language.py`
-3. Implement `LanguageSettingsService`
-4. Update API blueprint registration
+1. ✅ Create `routes/api/` directory structure
+2. ✅ Split `api.py` into `tts.py`, `cards.py`, `language.py`
+3. ✅ Update API blueprint registration (nested blueprints)
+4. ✅ Delete old monolithic `api.py`
 
 ### Phase 5: Cleanup (Low Risk)
 **Duration:** 1 day

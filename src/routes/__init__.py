@@ -1,7 +1,16 @@
 """
 Routes package for the Language Learning Flashcard App.
 
-This package contains all the route blueprints organized by feature.
+This package contains all the route blueprints organized by feature:
+- index: Homepage
+- learn: Learn mode (study with answers)
+- review: Review mode (browse cards)
+- flashcard: Legacy redirects for backward compatibility
+- settings: User settings
+- api/: API endpoints (tts, cards, language)
+- admin: Database administration
+- auth: OAuth authentication
+- test: Development testing
 """
 
 from flask import Flask
@@ -21,10 +30,12 @@ def register_blueprints(app: Flask) -> None:
     """Register all blueprints with the Flask app."""
     app.register_blueprint(auth_bp)
     app.register_blueprint(index_bp)  # Homepage routes
-    app.register_blueprint(learn_bp)  # Learn mode routes
-    app.register_blueprint(review_bp)  # Review mode routes
-    app.register_blueprint(flashcard_bp)  # Legacy: backward compatibility redirects
-    app.register_blueprint(settings_bp)
-    app.register_blueprint(api_bp)
-    app.register_blueprint(admin_bp)
-    app.register_blueprint(test_bp)
+    app.register_blueprint(learn_bp)  # Learn mode routes (/learn/*)
+    app.register_blueprint(review_bp)  # Review mode routes (/review/*)
+    app.register_blueprint(flashcard_bp)  # Legacy redirects
+    app.register_blueprint(settings_bp)  # Settings routes
+    app.register_blueprint(
+        api_bp
+    )  # API routes (/api/tts/*, /api/cards/*, /api/language-settings/*)
+    app.register_blueprint(admin_bp)  # Admin routes
+    app.register_blueprint(test_bp)  # Test routes
