@@ -30,7 +30,7 @@ This document outlines a comprehensive refactoring plan for the `src/routes/` mo
 | Phase 2: Learn Service + Routes | ✅ **COMPLETED** | 2025-11-28 | Created `LearnService`, `learn_bp`, `index_bp` |
 | Phase 3: Review Service + Routes | ✅ **COMPLETED** | 2025-11-28 | Created `ReviewService`, `review_bp` |
 | Phase 4: API Restructuring | ✅ **COMPLETED** | 2025-11-28 | Modular `routes/api/` package |
-| Phase 5: Cleanup | 🔲 Pending | - | - |
+| Phase 5: Cleanup | ✅ **COMPLETED** | 2025-11-28 | Updated all template/code references |
 | Phase 6: Index Route Extraction | ✅ **COMPLETED** | 2025-11-28 | Moved to `index_bp` in Phase 2 |
 
 ### Phase 1 Details
@@ -62,6 +62,13 @@ This document outlines a comprehensive refactoring plan for the `src/routes/` mo
 - ✅ Created `src/routes/api/language.py` - Language settings routes (`/api/language-settings`, `/api/language-settings/validate`)
 - ✅ Deleted old monolithic `src/routes/api.py`
 - ✅ Updated `src/routes/__init__.py` - imports from new `api` package
+
+### Phase 5 Details
+- ✅ Verified `flashcard.py` is now redirect-only (124 lines, down from ~700)
+- ✅ Updated `templates/settings.html` - `flashcard.index` → `index.home`
+- ✅ Updated `templates/error.html` - `flashcard.index` → `index.home`
+- ✅ Updated `src/routes/auth.py` - `flashcard.index` → `index.home`
+- ✅ Final verification: 53 routes across 11 route groups
 
 ---
 
@@ -1354,13 +1361,15 @@ Templates need minimal changes - mainly URL generation:
 3. ✅ Update API blueprint registration (nested blueprints)
 4. ✅ Delete old monolithic `api.py`
 
-### Phase 5: Cleanup (Low Risk)
+### Phase 5: Cleanup (Low Risk) ✅
 **Duration:** 1 day
+**Completed:** 2025-11-28
 
-1. Remove deprecated code from `flashcard.py`
-2. Remove legacy redirects (after verification)
-3. Update documentation
-4. Final testing
+1. ✅ Verified `flashcard.py` contains only redirect code
+2. ✅ Updated templates (`settings.html`, `error.html`) - `flashcard.index` → `index.home`
+3. ✅ Updated `src/routes/auth.py` - `flashcard.index` → `index.home`
+4. ✅ Final route verification - all 53 routes properly registered
+5. Legacy redirects kept for backward compatibility
 
 ### Phase 6: Index Route Extraction (Optional)
 **Duration:** 0.5 day

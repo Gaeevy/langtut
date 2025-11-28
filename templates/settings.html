@@ -53,7 +53,7 @@
                         <div class="input-group">
                             <select class="form-select" id="spreadsheet-selector">
                                 {% for spreadsheet in spreadsheets %}
-                                <option value="{{ spreadsheet.spreadsheet_id }}" 
+                                <option value="{{ spreadsheet.spreadsheet_id }}"
                                         {% if spreadsheet.is_active %}selected{% endif %}>
                                     {{ spreadsheet.spreadsheet_name or spreadsheet.spreadsheet_id }}
                                     {% if spreadsheet.is_active %} (Active){% endif %}
@@ -61,7 +61,7 @@
                                 {% endfor %}
                             </select>
                             <div class="btn-group">
-                                <button class="btn btn-primary btn-sm" onclick="activateSpreadsheet()" 
+                                <button class="btn btn-primary btn-sm" onclick="activateSpreadsheet()"
                                         id="activate-spreadsheet-btn">
                                     <i class="bi bi-check-circle"></i> Activate
                                 </button>
@@ -74,7 +74,7 @@
                         </div>
                         <div class="settings-info mt-2">
                             <small>
-                                <i class="bi bi-info-circle"></i> 
+                                <i class="bi bi-info-circle"></i>
                                 Select a spreadsheet from your list and click "Activate" to make it active.
                             </small>
                         </div>
@@ -159,7 +159,7 @@
                         </div>
                         <div class="settings-info">
                             <small>
-                                <i class="bi bi-info-circle"></i> 
+                                <i class="bi bi-info-circle"></i>
                                 You can paste the full URL (e.g., https://docs.google.com/spreadsheets/d/...)
                                 or just the spreadsheet ID.
                             </small>
@@ -198,7 +198,7 @@
 
             <!-- Back button -->
             <div class="mt-4">
-                <a href="{{ url_for('flashcard.index') }}" class="btn btn-outline-primary">
+                <a href="{{ url_for('index.home') }}" class="btn btn-outline-primary">
                     ← Back to Learning
                 </a>
             </div>
@@ -418,7 +418,7 @@ function activateSpreadsheet() {
     .then(response => response.json())
     .then(data => {
         setButtonLoading('activate-spreadsheet-btn', false, '<i class="bi bi-check-circle"></i> Activate');
-        
+
         if (data.success) {
             showToast('Spreadsheet activated successfully', 'success');
             setTimeout(() => window.location.reload(), 1500);
@@ -642,7 +642,7 @@ function updateActivateButtonState() {
     const selector = document.getElementById('spreadsheet-selector');
     const activateBtn = document.getElementById('activate-spreadsheet-btn');
     const selectedOption = selector.options[selector.selectedIndex];
-    
+
     if (selectedOption.text.includes('(Active)')) {
         activateBtn.disabled = true;
         activateBtn.classList.add('disabled');
@@ -660,7 +660,7 @@ document.addEventListener('DOMContentLoaded', function() {
         selector.addEventListener('change', updateActivateButtonState);
         updateActivateButtonState();
     }
-    
+
     loadLanguageSettings();
 });
 </script>

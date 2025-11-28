@@ -42,7 +42,7 @@ def oauth2callback():
         user = auth_manager.handle_callback(authorization_response, request.host)
 
         logger.info(f"User {user.email} authenticated successfully")
-        return redirect(url_for("flashcard.index"))
+        return redirect(url_for("index.home"))
 
     except Exception as e:
         logger.error(f"Error handling OAuth callback: {e}")
@@ -53,4 +53,4 @@ def oauth2callback():
 def clear_credentials():
     """Logout user and clear credentials."""
     auth_manager.logout()
-    return redirect(url_for("flashcard.index"))
+    return redirect(url_for("index.home"))
