@@ -7,7 +7,7 @@ all cards without answering - simpler than learn mode.
 import logging
 from dataclasses import dataclass
 
-from src.gsheet import read_card_set
+from app.gsheet import read_card_set
 
 from .card_session import CardSessionManager
 

@@ -7,8 +7,8 @@ extracted from route handlers to enable unit testing and reuse.
 import logging
 from dataclasses import dataclass
 
-from src.models import Card
-from src.utils import get_timestamp
+from app.models import Card
+from app.utils import get_timestamp
 
 logger = logging.getLogger(__name__)
 

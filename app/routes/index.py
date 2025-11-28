@@ -7,10 +7,10 @@ import logging
 
 from flask import Blueprint, render_template, request
 
-from src.gsheet import read_all_card_sets
-from src.services.auth_manager import auth_manager
-from src.session_manager import SessionKeys as sk
-from src.session_manager import SessionManager as sm
+from app.gsheet import read_all_card_sets
+from app.services.auth_manager import auth_manager
+from app.session_manager import SessionKeys as sk
+from app.session_manager import SessionManager as sm
 
 logger = logging.getLogger(__name__)
 

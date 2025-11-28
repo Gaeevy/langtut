@@ -12,10 +12,10 @@ import gspread
 from gspread.spreadsheet import Spreadsheet
 from gspread.worksheet import Worksheet
 
-from src.config import config
-from src.models import NEVER_SHOWN, Card, CardSet, Levels
-from src.services.auth_manager import auth_manager
-from src.utils import format_timestamp, parse_timestamp
+from app.config import config
+from app.models import NEVER_SHOWN, Card, CardSet, Levels
+from app.services.auth_manager import auth_manager
+from app.utils import format_timestamp, parse_timestamp
 
 # Create logger
 logger = logging.getLogger(__name__)

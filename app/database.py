@@ -91,7 +91,7 @@ class User(db.Model):
             )
 
         # Create new spreadsheet with default properties
-        from src.models import UserSpreadsheetProperty
+        from app.models import UserSpreadsheetProperty
 
         default_properties = UserSpreadsheetProperty.get_default()
 
@@ -196,7 +196,7 @@ class RefreshToken(db.Model):
         Args:
             token: Plain text refresh token from Google OAuth
         """
-        from src.utils import encrypt_token
+        from app.utils import encrypt_token
 
         self.token_encrypted = encrypt_token(token)
 
@@ -209,7 +209,7 @@ class RefreshToken(db.Model):
         Raises:
             ValueError: If token cannot be decrypted (corrupted or wrong key)
         """
-        from src.utils import decrypt_token
+        from app.utils import decrypt_token
 
         return decrypt_token(self.token_encrypted)
 
@@ -222,7 +222,7 @@ class RefreshToken(db.Model):
         Args:
             new_token: New plain text refresh token from Google
         """
-        from src.utils import encrypt_token
+        from app.utils import encrypt_token
 
         self.token_encrypted = encrypt_token(new_token)
         self.last_rotated = datetime.utcnow()
@@ -264,13 +264,13 @@ class UserSpreadsheet(db.Model):
 
     def get_properties(self):
         """Get UserSpreadsheetProperty object from JSON string."""
-        from src.models import UserSpreadsheetProperty
+        from app.models import UserSpreadsheetProperty
 
         return UserSpreadsheetProperty.from_db_string(self.properties)
 
     def set_properties(self, properties):
         """Set properties from UserSpreadsheetProperty object."""
-        from src.models import UserSpreadsheetProperty
+        from app.models import UserSpreadsheetProperty
 
         if isinstance(properties, UserSpreadsheetProperty):
             self.properties = properties.to_db_string()
@@ -313,7 +313,7 @@ _tables_created = False
 
 def init_database(app):
     """Initialize database with Flask app"""
-    from src.config import config
+    from app.config import config
 
     # Get database path from config
     database_path = Path(config.database_path).resolve()

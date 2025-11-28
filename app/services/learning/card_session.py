@@ -7,10 +7,10 @@ abstracting the complexity of session key management and card serialization.
 import logging
 from dataclasses import dataclass
 
-from src.models import Card
-from src.session_manager import SessionKeys as sk
-from src.session_manager import SessionManager as sm
-from src.utils import format_timestamp, parse_timestamp
+from app.models import Card
+from app.session_manager import SessionKeys as sk
+from app.session_manager import SessionManager as sm
+from app.utils import format_timestamp, parse_timestamp
 
 logger = logging.getLogger(__name__)
 

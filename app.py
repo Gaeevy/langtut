@@ -11,9 +11,9 @@ Production:  Uses Railway's automatic Gunicorn deployment
 import os
 from pathlib import Path
 
-from src import create_app
-from src.config import Environment, config, logger
-from src.database import ensure_tables, init_database
+from app import create_app
+from app.config import Environment, config, logger
+from app.database import ensure_tables, init_database
 
 # Log startup information
 logger.info("=== LANGUAGE TUTOR STARTUP ===")

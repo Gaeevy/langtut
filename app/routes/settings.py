@@ -6,8 +6,8 @@ Handles user settings and spreadsheet configuration.
 
 from flask import Blueprint, jsonify, render_template, request
 
-from src.gsheet import extract_spreadsheet_id, read_all_card_sets, validate_spreadsheet_access
-from src.services.auth_manager import auth_manager
+from app.gsheet import extract_spreadsheet_id, read_all_card_sets, validate_spreadsheet_access
+from app.services.auth_manager import auth_manager
 
 # Create blueprint
 settings_bp = Blueprint("settings", __name__)

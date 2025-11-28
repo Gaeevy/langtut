@@ -342,8 +342,8 @@ Encapsulates session state management for card-based learning.
 
 from dataclasses import dataclass
 from typing import Optional
-from src.models import Card
-from src.session_manager import SessionManager as sm, SessionKeys as sk
+from app.models import Card
+from app.session_manager import SessionManager as sm, SessionKeys as sk
 
 
 @dataclass
@@ -431,7 +431,7 @@ class CardSessionManager:
     @staticmethod
     def _serialize_card(card: Card) -> dict:
         """Serialize Card object for session storage."""
-        from src.utils import format_timestamp
+        from app.utils import format_timestamp
         card_dict = card.model_dump()
         card_dict["last_shown"] = format_timestamp(card.last_shown)
         return card_dict
@@ -444,8 +444,8 @@ Card statistics and level progression logic.
 ```python
 """Card statistics and level progression logic."""
 
-from src.models import Card, Levels
-from src.utils import get_timestamp
+from app.models import Card, Levels
+from app.utils import get_timestamp
 
 
 class CardStatistics:
@@ -509,10 +509,10 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
-from src.gsheet import read_card_set, update_spreadsheet
-from src.models import Card
-from src.config import config
-from src.session_manager import SessionManager as sm, SessionKeys as sk
+from app.gsheet import read_card_set, update_spreadsheet
+from app.models import Card
+from app.config import config
+from app.session_manager import SessionManager as sm, SessionKeys as sk
 
 from .card_session import CardSessionManager
 from .statistics import CardStatistics
@@ -546,9 +546,9 @@ class LearnService:
         self.stats = CardStatistics()
 
     def start_session(
-        self,
-        tab_name: str,
-        spreadsheet_id: str
+            self,
+            tab_name: str,
+            spreadsheet_id: str
     ) -> LearnSessionResult:
         """Start a new study session."""
         try:
@@ -691,15 +691,15 @@ class LearnService:
         }
 
     def _record_answer(
-        self,
-        card: dict,
-        user_answer: str,
-        is_correct: bool,
-        is_review: bool,
-        card_index: int
+            self,
+            card: dict,
+            user_answer: str,
+            is_correct: bool,
+            is_review: bool,
+            card_index: int
     ) -> None:
         """Record answer in session history."""
-        from src.utils import get_timestamp
+        from app.utils import get_timestamp
 
         answers = sm.get(sk.LEARNING_ANSWERS, [])
         answers.append({
@@ -738,7 +738,7 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
-from src.gsheet import read_card_set
+from app.gsheet import read_card_set
 from .card_session import CardSessionManager
 
 logger = logging.getLogger(__name__)
@@ -768,9 +768,9 @@ class ReviewService:
         self.session = CardSessionManager("review")
 
     def start_session(
-        self,
-        tab_name: str,
-        spreadsheet_id: str
+            self,
+            tab_name: str,
+            spreadsheet_id: str
     ) -> ReviewSessionResult:
         """Start a new review session with ALL cards."""
         try:
@@ -827,7 +827,7 @@ class ReviewService:
         else:
             return False
 
-        from src.session_manager import SessionManager as sm
+        from app.session_manager import SessionManager as sm
         sm.set(self.session.index_key, new_index)
         return True
 
@@ -845,8 +845,8 @@ class ReviewService:
 
 import logging
 from pydantic import ValidationError
-from src.models import SpreadsheetLanguages
-from src.database import db
+from app.models import SpreadsheetLanguages
+from app.database import db
 
 logger = logging.getLogger(__name__)
 
@@ -892,8 +892,8 @@ class LanguageSettingsService:
 
     @staticmethod
     def save_settings(
-        spreadsheet,
-        new_settings: SpreadsheetLanguages
+            spreadsheet,
+            new_settings: SpreadsheetLanguages
     ) -> tuple[bool, str]:
         """Save language settings to spreadsheet.
 
@@ -935,8 +935,8 @@ class LanguageSettingsService:
 
 from flask import Blueprint, redirect, render_template, request, url_for
 
-from src.services.auth_manager import auth_manager
-from src.services.learning.learn_service import LearnService
+from app.services.auth_manager import auth_manager
+from app.services.learning.learn_service import LearnService
 
 learn_bp = Blueprint("learn", __name__, url_prefix="/learn")
 
@@ -1011,7 +1011,7 @@ def feedback(correct: str):
         return redirect(url_for("index.home"))
 
     # Get level change from session
-    from src.session_manager import SessionManager as sm, SessionKeys as sk
+    from app.session_manager import SessionManager as sm, SessionKeys as sk
     level_change = sm.get(sk.LEARNING_LAST_LEVEL_CHANGE)
     if level_change:
         sm.remove(sk.LEARNING_LAST_LEVEL_CHANGE)
@@ -1064,8 +1064,8 @@ def end_early():
 
 from flask import Blueprint, redirect, render_template, url_for
 
-from src.services.auth_manager import auth_manager
-from src.services.learning.review_service import ReviewService
+from app.services.auth_manager import auth_manager
+from app.services.learning.review_service import ReviewService
 
 review_bp = Blueprint("review", __name__, url_prefix="/review")
 
@@ -1156,8 +1156,8 @@ api_bp.register_blueprint(language_bp)
 
 from flask import Blueprint, jsonify, request
 
-from src.config import config
-from src.tts_service import TTSService
+from app.config import config
+from app.tts_service import TTSService
 
 tts_bp = Blueprint("tts", __name__, url_prefix="/tts")
 tts_service = TTSService()
@@ -1188,8 +1188,8 @@ def speak_card():
 
 from flask import Blueprint, jsonify, request
 
-from src.services.auth_manager import auth_manager
-from src.services.spreadsheet.language_settings import LanguageSettingsService
+from app.services.auth_manager import auth_manager
+from app.services.spreadsheet.language_settings import LanguageSettingsService
 
 language_bp = Blueprint("language", __name__, url_prefix="/language-settings")
 

@@ -10,9 +10,9 @@ from typing import Any
 from flask import Blueprint, jsonify, request
 from pydantic import ValidationError
 
-from src.database import db
-from src.models import SpreadsheetLanguages
-from src.services.auth_manager import auth_manager
+from app.database import db
+from app.models import SpreadsheetLanguages
+from app.services.auth_manager import auth_manager
 
 logger = logging.getLogger(__name__)
 

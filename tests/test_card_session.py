@@ -1,7 +1,7 @@
 """Tests for CardSessionManager service."""
 
-from src.models import Levels
-from src.services.learning.card_session import CardSessionManager
+from app.models import Levels
+from app.services.learning.card_session import CardSessionManager
 
 from .conftest import make_card
 

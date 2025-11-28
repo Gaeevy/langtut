@@ -84,8 +84,9 @@ LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id
 
 ### Session Management
 Always use SessionManager instead of direct session access:
+
 ```python
-from src.session_manager import SessionManager as sm, SessionKeys as sk
+from app.session_manager import SessionManager as sm, SessionKeys as sk
 
 # Get value
 user_id = sm.get(sk.USER_ID, default_value)
@@ -95,7 +96,7 @@ sm.set(sk.AUTH_STATE, value)
 
 # Check existence
 if sm.has(sk.AUTH_CREDENTIALS):
-    # ...
+# ...
 
 # Clear namespace
 sm.clear_namespace('auth')
@@ -103,8 +104,9 @@ sm.clear_namespace('auth')
 
 ### Database Operations
 Use SQLAlchemy ORM, never raw SQL:
+
 ```python
-from src.database import db, User, UserSpreadsheet
+from app.database import db, User, UserSpreadsheet
 
 # Create
 user = User(email='test@example.com')
@@ -146,7 +148,7 @@ def endpoint_function() -> Dict[str, Any]:
 uv run pytest
 
 # Run with coverage
-uv run pytest --cov=src
+uv run pytest --cov=app
 
 # Run specific test file
 uv run pytest tests/test_specific.py
@@ -156,10 +158,12 @@ uv run pytest -v -s
 ```
 
 ### Test Structure
+
 ```python
 import pytest
-from src import create_app
-from src.database import db
+from app import create_app
+from app.database import db
+
 
 @pytest.fixture
 def app():
@@ -168,10 +172,12 @@ def app():
     app.config['TESTING'] = True
     return app
 
+
 @pytest.fixture
 def client(app):
     """Create test client."""
     return app.test_client()
+
 
 def test_endpoint(client):
     """Test API endpoint."""
@@ -302,8 +308,10 @@ SELECT * FROM users LIMIT 5;       # Query users
 ```
 
 ### Authentication
+
 ```python
-from src.user_manager import is_authenticated, get_current_user
+from app.user_manager import is_authenticated, get_current_user
+
 
 @api_bp.route('/protected', methods=['POST'])
 def protected_endpoint():

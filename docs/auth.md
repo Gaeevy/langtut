@@ -416,7 +416,7 @@ class RefreshToken(db.Model):
         Args:
             token: Plain text refresh token from Google OAuth
         """
-        from src.utils import encrypt_token
+        from app.utils import encrypt_token
         self.token_encrypted = encrypt_token(token)
 
     def get_decrypted_token(self) -> str:
@@ -428,7 +428,7 @@ class RefreshToken(db.Model):
         Raises:
             ValueError: If token cannot be decrypted (corrupted or wrong key)
         """
-        from src.utils import decrypt_token
+        from app.utils import decrypt_token
         return decrypt_token(self.token_encrypted)
 
     def rotate_token(self, new_token: str) -> None:
@@ -440,7 +440,7 @@ class RefreshToken(db.Model):
         Args:
             new_token: New plain text refresh token from Google
         """
-        from src.utils import encrypt_token
+        from app.utils import encrypt_token
         self.token_encrypted = encrypt_token(new_token)
         self.last_rotated = datetime.utcnow()
         self.last_used = datetime.utcnow()
@@ -458,7 +458,8 @@ class RefreshToken(db.Model):
 ```python
 # In utils.py
 from cryptography.fernet import Fernet
-from src.config import config
+from app.config import config
+
 
 def get_encryption_key() -> bytes:
     """Get encryption key from config."""
@@ -468,10 +469,12 @@ def get_encryption_key() -> bytes:
         raise ValueError("ENCRYPTION_KEY not configured")
     return key.encode()
 
+
 def encrypt_token(token: str) -> str:
     """Encrypt token using Fernet symmetric encryption."""
     f = Fernet(get_encryption_key())
     return f.encrypt(token.encode()).decode()
+
 
 def decrypt_token(encrypted_token: str) -> str:
     """Decrypt token using Fernet symmetric encryption."""
@@ -647,10 +650,10 @@ class AuthManager:
     -------------
     - google.oauth2.credentials (Credentials object)
     - google_auth_oauthlib.flow (OAuth flow)
-    - src.database (User, RefreshToken models)
-    - src.session_manager (SessionManager, SessionKeys)
-    - src.utils (encrypt_token, decrypt_token)
-    - src.config (OAuth configuration)
+    - app.database (User, RefreshToken models)
+    - app.session_manager (SessionManager, SessionKeys)
+    - app.utils (encrypt_token, decrypt_token)
+    - app.config (OAuth configuration)
 
     Notes:
     ------
@@ -669,7 +672,8 @@ class AuthManager:
 
 ```python
 # In routes
-from src.services.auth_manager import auth_manager
+from app.services.auth_manager import auth_manager
+
 
 @flashcard_bp.route('/learn')
 @auth_manager.require_auth
@@ -677,6 +681,7 @@ def learn():
     """Protected route - auto-redirects if not authenticated."""
     user = auth_manager.get_current_user()
     return render_template('card.html', user=user)
+
 
 # In service layer
 def read_spreadsheet():
