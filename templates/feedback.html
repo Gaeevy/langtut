@@ -40,13 +40,13 @@
     {% if mode == 'review' %}
     <div class="review-navigation mb-3">
         <div class="d-flex justify-content-between align-items-center">
-            <a href="{{ url_for('flashcard.navigate_review', direction='prev') }}" class="btn btn-secondary btn-sm nav-arrow-btn">
+            <a href="{{ url_for('flashcard.navigate_review', direction='prev') }}" class="btn btn-secondary btn-sm nav-arrow-btn" id="nav-prev">
                 <i class="bi bi-arrow-left"></i>
             </a>
             <div class="text-center">
                 <small class="text-muted">Click card to flip back</small>
             </div>
-            <a href="{{ url_for('flashcard.navigate_review', direction='next') }}" class="btn btn-secondary btn-sm nav-arrow-btn">
+            <a href="{{ url_for('flashcard.navigate_review', direction='next') }}" class="btn btn-secondary btn-sm nav-arrow-btn" id="nav-next">
                 <i class="bi bi-arrow-right"></i>
             </a>
         </div>
@@ -95,16 +95,16 @@
                     {% endif %}
                 </div>
 
-                <!-- Difficulty rating for correct answers - only for study mode -->
+                <!-- Difficulty rating for correct answers - only for learn mode -->
                 {% if correct and not reviewing and mode != 'review' %}
                 <div class="difficulty-rating mt-4">
                     <p class="small text-muted mb-2">How was this card?</p>
                     <div class="btn-group" role="group">
-                        <a href="{{ url_for('flashcard.rate_difficulty', card_index=card_index, difficulty='easy') }}"
+                        <a href="{{ url_for('learn.rate_difficulty', card_index=card_index, difficulty='easy') }}"
                            class="btn btn-success btn-sm">
                             😊 Easy
                         </a>
-                        <a href="{{ url_for('flashcard.rate_difficulty', card_index=card_index, difficulty='difficult') }}"
+                        <a href="{{ url_for('learn.rate_difficulty', card_index=card_index, difficulty='difficult') }}"
                            class="btn btn-warning btn-sm">
                             😰 Difficult
                         </a>
@@ -115,15 +115,15 @@
         </div>
     </div>
 
-    <!-- Next card button - only for study mode -->
+    <!-- Next card button - only for learn mode -->
     {% if mode != 'review' %}
     <div class="d-grid gap-2 mt-3">
-        <a href="{{ url_for('flashcard.next_card') }}" class="btn btn-primary">Next Card</a>
+        <a href="{{ url_for('learn.next_card') }}" class="btn btn-primary">Next Card</a>
     </div>
     {% else %}
     <!-- Review mode - back to home -->
     <div class="text-center mt-3">
-        <a href="{{ url_for('flashcard.index') }}" class="btn btn-secondary btn-sm">
+        <a href="{{ url_for('index.home') }}" class="btn btn-secondary btn-sm">
             <i class="bi bi-house"></i> Back to Home
         </a>
     </div>
@@ -318,12 +318,12 @@ a.btn:hover {
 
 <script>
     // Mode for JavaScript functionality
-    window.cardMode = {{ mode|tojson if mode else '"study"' }};
+    window.cardMode = {{ mode|tojson if mode else '"learn"' }};
 
     // Card flipping functionality for review mode (flip back to face)
     function flipCard() {
         if (window.cardMode === 'review') {
-            window.location.href = '{{ url_for("flashcard.show_card", mode=mode) }}';
+            window.location.href = '{{ url_for("flashcard.show_card", mode="review") }}';
         }
     }
 
@@ -333,11 +333,11 @@ a.btn:hover {
             switch(event.key) {
                 case 'ArrowLeft':
                     event.preventDefault();
-                    window.location.href = '{{ url_for("flashcard.navigate_review", direction="prev") }}';
+                    document.getElementById('nav-prev').click();
                     break;
                 case 'ArrowRight':
                     event.preventDefault();
-                    window.location.href = '{{ url_for("flashcard.navigate_review", direction="next") }}';
+                    document.getElementById('nav-next').click();
                     break;
                 case ' ':
                     event.preventDefault();
@@ -357,8 +357,8 @@ a.btn:hover {
         var levelChange = cardData.levelChange;
         var mode = cardData.mode;
 
-        // Level progression animation - only for study mode
-        if (mode === 'study' && levelChange) {
+        // Level progression animation - only for learn mode
+        if (mode === 'learn' && levelChange) {
             console.log('Level change detected:', levelChange);
 
             // Find level dots

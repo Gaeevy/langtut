@@ -1,9 +1,10 @@
 """Learning services package.
 
-Provides business logic services for study and review modes.
+Provides business logic services for learn and review modes.
 """
 
 from .card_session import CardSessionManager
+from .learn_service import LearnService
 from .statistics import CardStatistics
 
-__all__ = ["CardSessionManager", "CardStatistics"]
+__all__ = ["CardSessionManager", "CardStatistics", "LearnService"]

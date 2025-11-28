@@ -27,16 +27,25 @@ This document outlines a comprehensive refactoring plan for the `src/routes/` mo
 | Phase | Status | Completed Date | Notes |
 |-------|--------|----------------|-------|
 | Phase 1: Service Layer Foundation | ✅ **COMPLETED** | 2025-11-28 | Created `CardSessionManager`, `CardStatistics` |
-| Phase 2: Learn Service + Routes | 🔲 Pending | - | - |
+| Phase 2: Learn Service + Routes | ✅ **COMPLETED** | 2025-11-28 | Created `LearnService`, `learn_bp`, `index_bp` |
 | Phase 3: Review Service + Routes | 🔲 Pending | - | - |
 | Phase 4: API Restructuring | 🔲 Pending | - | - |
 | Phase 5: Cleanup | 🔲 Pending | - | - |
-| Phase 6: Index Route Extraction | 🔲 Pending | - | - |
+| Phase 6: Index Route Extraction | ✅ **COMPLETED** | 2025-11-28 | Moved to `index_bp` in Phase 2 |
 
 ### Phase 1 Details
 - ✅ Created `src/services/learning/__init__.py`
 - ✅ Created `src/services/learning/card_session.py` - `CardSessionManager` class
 - ✅ Created `src/services/learning/statistics.py` - `CardStatistics`, `LevelChange`, `AnswerResult`, `SessionStats`
+
+### Phase 2 Details
+- ✅ Created `src/services/learning/learn_service.py` - `LearnService` class with full session lifecycle
+- ✅ Created `src/routes/index.py` - `index_bp` for homepage
+- ✅ Created `src/routes/learn.py` - `learn_bp` for learn mode routes
+- ✅ Updated `src/routes/__init__.py` - registered new blueprints
+- ✅ Updated `src/routes/flashcard.py` - converted to legacy redirects
+- ✅ Updated templates (`index.html`, `card.html`, `feedback.html`, `results.html`) to use new URLs
+- ✅ Changed URL structure from `/study/` to `/learn/` as decided
 
 ---
 

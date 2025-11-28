@@ -28,13 +28,13 @@
 {% if mode == 'review' %}
 <div class="review-navigation mb-3">
     <div class="d-flex justify-content-between align-items-center">
-        <a href="{{ url_for('flashcard.navigate_review', direction='prev') }}" class="btn btn-secondary btn-sm nav-arrow-btn">
+        <a href="{{ url_for('flashcard.navigate_review', direction='prev') }}" class="btn btn-secondary btn-sm nav-arrow-btn" id="nav-prev">
             <i class="bi bi-arrow-left"></i>
         </a>
         <div class="text-center">
             <small class="text-muted">Click card to flip</small>
         </div>
-        <a href="{{ url_for('flashcard.navigate_review', direction='next') }}" class="btn btn-secondary btn-sm nav-arrow-btn">
+        <a href="{{ url_for('flashcard.navigate_review', direction='next') }}" class="btn btn-secondary btn-sm nav-arrow-btn" id="nav-next">
             <i class="bi bi-arrow-right"></i>
         </a>
     </div>
@@ -81,9 +81,9 @@
     </div>
 </div>
 
-<!-- Answer form - only for study mode -->
+<!-- Answer form - only for learn mode -->
 {% if mode != 'review' %}
-<form action="{{ url_for('flashcard.process_answer') }}" method="post">
+<form action="{{ url_for('learn.answer') }}" method="post">
     <div class="mb-3">
         <input type="text" name="user_answer" class="form-control form-control-lg"
                placeholder="Type your answer..." autocomplete="off" required>
@@ -94,7 +94,7 @@
 </form>
 
 <div class="text-center mt-3">
-    <a href="{{ url_for('flashcard.end_session_early') }}" class="btn btn-outline-secondary btn-sm"
+    <a href="{{ url_for('learn.end_early') }}" class="btn btn-outline-secondary btn-sm"
        onclick="return confirm('Are you sure you want to end the session? Your progress so far will be saved.');">
         End Session Early
     </a>
@@ -102,7 +102,7 @@
 {% else %}
 <!-- Review mode - back to index -->
 <div class="text-center mt-3">
-    <a href="{{ url_for('flashcard.index') }}" class="btn btn-secondary btn-sm">
+    <a href="{{ url_for('index.home') }}" class="btn btn-secondary btn-sm">
         <i class="bi bi-house"></i> Back to Home
     </a>
 </div>
@@ -336,7 +336,7 @@ a.btn:hover {
     };
 
     // Mode for JavaScript functionality
-    window.cardMode = {{ mode|tojson if mode else '"study"' }};
+    window.cardMode = {{ mode|tojson if mode else '"learn"' }};
 
     // Track prefetch attempts to prevent duplicates
     let prefetchAttempted = false;
@@ -344,7 +344,7 @@ a.btn:hover {
     // Card flipping functionality for review mode
     function flipCard() {
         if (window.cardMode === 'review') {
-            window.location.href = '{{ url_for("flashcard.show_feedback_with_mode", correct="yes", mode=mode) }}';
+            window.location.href = '{{ url_for("flashcard.show_feedback_with_mode", correct="yes", mode="review") }}';
         }
     }
 
@@ -354,11 +354,11 @@ a.btn:hover {
             switch(event.key) {
                 case 'ArrowLeft':
                     event.preventDefault();
-                    window.location.href = '{{ url_for("flashcard.navigate_review", direction="prev") }}';
+                    document.getElementById('nav-prev').click();
                     break;
                 case 'ArrowRight':
                     event.preventDefault();
-                    window.location.href = '{{ url_for("flashcard.navigate_review", direction="next") }}';
+                    document.getElementById('nav-next').click();
                     break;
                 case ' ':
                     event.preventDefault();
@@ -406,8 +406,8 @@ a.btn:hover {
 
     // Initialize when page loads
     document.addEventListener('DOMContentLoaded', function() {
-        // Focus answer input for study mode
-        if (window.cardMode === 'study') {
+        // Focus answer input for learn mode
+        if (window.cardMode === 'learn') {
             const answerInput = document.querySelector('input[name="user_answer"]');
             if (answerInput) {
                 answerInput.focus();
