@@ -1,0 +1,288 @@
+/**
+ * Unified Button System
+ * Extracted from inline styles in templates
+ */
+
+/* ==========================================================================
+   Base Button Styles
+   ========================================================================== */
+
+.btn {
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+/* Button icons */
+.btn i {
+    margin-right: 0.4rem;
+}
+
+.btn i:only-child {
+    margin-right: 0;
+}
+
+/* Link buttons */
+a.btn {
+    text-decoration: none !important;
+}
+
+a.btn:hover {
+    text-decoration: none !important;
+}
+
+/* ==========================================================================
+   Button Sizes
+   ========================================================================== */
+
+.btn-sm {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+    min-width: 60px;
+}
+
+.btn-lg {
+    padding: 0.75rem 1.5rem;
+    font-size: 1.1rem;
+    min-width: 120px;
+}
+
+/* ==========================================================================
+   Primary Buttons
+   ========================================================================== */
+
+.btn-primary {
+    background-color: rgba(79, 172, 254, 0.12) !important;
+    border-color: rgba(79, 172, 254, 0.4) !important;
+    color: #1976d2 !important;
+    border-width: 1.5px !important;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background-color: rgba(79, 172, 254, 0.2) !important;
+    border-color: rgba(79, 172, 254, 0.6) !important;
+    color: #1565c0 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(79, 172, 254, 0.2);
+}
+
+/* ==========================================================================
+   Secondary Buttons
+   ========================================================================== */
+
+.btn-secondary,
+.btn-outline-secondary {
+    background-color: rgba(108, 117, 125, 0.05) !important;
+    border-color: rgba(108, 117, 125, 0.3) !important;
+    color: #6c757d !important;
+    border-width: 1.5px !important;
+}
+
+.btn-secondary:hover,
+.btn-outline-secondary:hover {
+    background-color: rgba(108, 117, 125, 0.1) !important;
+    border-color: rgba(108, 117, 125, 0.4) !important;
+    color: #495057 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(108, 117, 125, 0.15);
+}
+
+/* ==========================================================================
+   Success Buttons (Easy rating)
+   ========================================================================== */
+
+.btn-success,
+.btn-outline-success {
+    background-color: rgba(72, 187, 120, 0.06) !important;
+    border-color: rgba(72, 187, 120, 0.35) !important;
+    color: #388e3c !important;
+    border-width: 1.5px !important;
+}
+
+.btn-success:hover,
+.btn-outline-success:hover {
+    background-color: rgba(72, 187, 120, 0.12) !important;
+    border-color: rgba(72, 187, 120, 0.5) !important;
+    color: #2e7d32 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(72, 187, 120, 0.2);
+}
+
+/* ==========================================================================
+   Warning Buttons (Difficult rating)
+   ========================================================================== */
+
+.btn-warning,
+.btn-outline-warning {
+    background-color: rgba(255, 183, 77, 0.06) !important;
+    border-color: rgba(255, 183, 77, 0.35) !important;
+    color: #f57c00 !important;
+    border-width: 1.5px !important;
+}
+
+.btn-warning:hover,
+.btn-outline-warning:hover {
+    background-color: rgba(255, 183, 77, 0.12) !important;
+    border-color: rgba(255, 183, 77, 0.5) !important;
+    color: #ef6c00 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(255, 183, 77, 0.2);
+}
+
+/* ==========================================================================
+   Danger Buttons
+   ========================================================================== */
+
+.btn-danger,
+.btn-outline-danger {
+    background-color: rgba(239, 83, 80, 0.1) !important;
+    border-color: #ef5350 !important;
+    color: #c62828 !important;
+    border-width: 1.5px !important;
+}
+
+.btn-danger:hover,
+.btn-outline-danger:hover {
+    background-color: rgba(239, 83, 80, 0.2) !important;
+    border-color: #f44336 !important;
+    color: #b71c1c !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(239, 83, 80, 0.3);
+}
+
+/* ==========================================================================
+   TTS/Sound Buttons (very subtle)
+   ========================================================================== */
+
+.tts-speak-btn,
+#speak-card-btn,
+button[title*="pronunciation"] {
+    background-color: rgba(108, 117, 125, 0.03) !important;
+    border-color: rgba(108, 117, 125, 0.25) !important;
+    color: #8495a7 !important;
+    border-width: 1.5px !important;
+    box-shadow: none !important;
+}
+
+.tts-speak-btn:hover,
+#speak-card-btn:hover,
+button[title*="pronunciation"]:hover {
+    background-color: rgba(108, 117, 125, 0.08) !important;
+    border-color: rgba(108, 117, 125, 0.35) !important;
+    color: #6c757d !important;
+    transform: translateY(-1px);
+    box-shadow: 0 1px 4px rgba(108, 117, 125, 0.1) !important;
+}
+
+/* ==========================================================================
+   Navigation Arrow Buttons
+   ========================================================================== */
+
+.nav-arrow-btn,
+.review-navigation .btn {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    min-width: 40px !important;
+}
+
+.nav-arrow-btn:hover,
+.review-navigation .btn:hover {
+    transform: scale(1.1) !important;
+}
+
+/* ==========================================================================
+   Pastel Action Buttons (Study/Listen/Review)
+   ========================================================================== */
+
+.study-btn,
+.listen-btn,
+.review-btn {
+    min-width: 85px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border-width: 1.5px !important;
+}
+
+/* Study - Purple pastel */
+.pastel-study {
+    background-color: rgba(138, 43, 226, 0.05) !important;
+    border-color: #b19cd9 !important;
+    color: #6a4c93 !important;
+}
+
+.pastel-study:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(138, 43, 226, 0.25);
+    background-color: rgba(138, 43, 226, 0.1) !important;
+    border-color: #9c27b0 !important;
+    color: #6a4c93 !important;
+    text-decoration: none;
+}
+
+/* Listen - Green pastel */
+.pastel-listen {
+    background-color: rgba(72, 187, 120, 0.05) !important;
+    border-color: #81c784 !important;
+    color: #388e3c !important;
+}
+
+.pastel-listen:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(72, 187, 120, 0.25);
+    background-color: rgba(72, 187, 120, 0.1) !important;
+    border-color: #4caf50 !important;
+    color: #2e7d32 !important;
+    text-decoration: none;
+}
+
+/* Review - Coral pastel */
+.pastel-review {
+    background-color: rgba(255, 154, 158, 0.05) !important;
+    border-color: #ffab91 !important;
+    color: #d84315 !important;
+}
+
+.pastel-review:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 154, 158, 0.25);
+    background-color: rgba(255, 154, 158, 0.1) !important;
+    border-color: #ff7043 !important;
+    color: #bf360c !important;
+    text-decoration: none;
+}
+
+/* ==========================================================================
+   Listening Modal Buttons
+   ========================================================================== */
+
+#unlockAudioBtn,
+#startListeningBtn,
+#pauseResumeBtn {
+    background-color: rgba(79, 172, 254, 0.12) !important;
+    border-color: rgba(79, 172, 254, 0.4) !important;
+    color: #1976d2 !important;
+    border-width: 1.5px !important;
+}
+
+#unlockAudioBtn:hover,
+#startListeningBtn:hover,
+#pauseResumeBtn:hover {
+    background-color: rgba(79, 172, 254, 0.2) !important;
+    border-color: rgba(79, 172, 254, 0.6) !important;
+    color: #1565c0 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(79, 172, 254, 0.2);
+}

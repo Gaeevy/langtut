@@ -11,7 +11,7 @@ from flask import Blueprint, jsonify, render_template
 
 from src.config import config
 from src.gsheet import read_all_card_sets
-from src.tts_service import TTSService
+from src.services.tts import TTSService
 
 # Create blueprint
 test_bp = Blueprint("test", __name__)

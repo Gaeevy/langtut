@@ -15,12 +15,11 @@ from google.oauth2 import service_account
 
 from src.config import config
 
-# Create logger
 logger = logging.getLogger(__name__)
 
 
 class TTSService:
-    """Google Cloud Text-to-Speech service wrapper with GCS caching"""
+    """Google Cloud Text-to-Speech service wrapper with GCS caching."""
 
     def __init__(self):
         self.tts_client = None
@@ -30,7 +29,7 @@ class TTSService:
         self._initialize_clients()
 
     def _initialize_clients(self):
-        """Initialize the Google Cloud TTS and Storage clients"""
+        """Initialize the Google Cloud TTS and Storage clients."""
         if not self.enabled:
             logger.info("TTS is disabled in configuration")
             return
@@ -102,7 +101,7 @@ class TTSService:
             self.credential_source = "none"
 
     def is_available(self) -> bool:
-        """Check if TTS service is available"""
+        """Check if TTS service is available."""
         return self.enabled and self.tts_client is not None
 
     def generate_speech(self, text: str, voice_name: str | None = None) -> bytes | None:
@@ -180,7 +179,7 @@ class TTSService:
     def get_gcs_path(
         self, spreadsheet_id: str, sheet_gid: int, text: str, voice_name: str | None = None
     ) -> str:
-        """Generate GCS path for audio file using spreadsheet_id/sheet_gid/text_hash structure.
+        """Generate GCS path for audio file.
 
         Args:
             spreadsheet_id: Google Sheets spreadsheet ID
@@ -339,7 +338,7 @@ class TTSService:
             return []
 
     def get_credential_info(self) -> dict:
-        """Get information about which credentials are being used"""
+        """Get information about which credentials are being used."""
         service_account_file = config.google_cloud_service_account_file_path
         return {
             "source": getattr(self, "credential_source", "unknown"),
@@ -357,10 +356,10 @@ tts_service = TTSService()
 
 
 def is_tts_available() -> bool:
-    """Check if TTS service is available"""
+    """Check if TTS service is available."""
     return tts_service.is_available()
 
 
 def get_portuguese_voices() -> list:
-    """Get available Portuguese voices"""
+    """Get available Portuguese voices."""
     return tts_service.get_available_voices()

@@ -1,0 +1,154 @@
+/**
+ * Component Styles
+ * Cards, badges, progress bars, modals
+ */
+
+/* ==========================================================================
+   Card Components
+   ========================================================================== */
+
+.card {
+    border: 1px solid #f0f0f0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: all 0.2s ease;
+    background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(248,249,250,0.9) 100%);
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+/* Language card styling */
+.language-card {
+    transition: all 0.2s ease;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background: linear-gradient(135deg,
+        rgba(255,255,255,0.95) 0%,
+        rgba(248,250,252,0.95) 50%,
+        rgba(243,246,251,0.95) 100%);
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.language-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+/* Card typography */
+.card-translation-main {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.card-word-main {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #2c3e50;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.card-example {
+    font-size: 1.1rem;
+    line-height: 1.5;
+    color: #495057;
+    font-style: italic;
+}
+
+.card-example-translation {
+    font-size: 0.95rem;
+    opacity: 0.75;
+    font-style: italic;
+}
+
+/* ==========================================================================
+   Badge Components
+   ========================================================================== */
+
+.badge {
+    margin-right: 6px;
+    margin-bottom: 4px;
+    font-size: 0.75rem;
+    padding: 0.4em 0.7em;
+    border-radius: 8px;
+}
+
+/* Pastel badge colors */
+.pastel-badge-blue {
+    background-color: rgba(79, 172, 254, 0.15) !important;
+    color: #1565c0 !important;
+    border: 1px solid rgba(79, 172, 254, 0.3);
+    font-weight: 500;
+}
+
+.pastel-badge-purple {
+    background-color: rgba(156, 39, 176, 0.15) !important;
+    color: #6a1b9a !important;
+    border: 1px solid rgba(156, 39, 176, 0.3);
+    font-weight: 500;
+}
+
+.pastel-badge-coral {
+    background-color: rgba(255, 112, 67, 0.15) !important;
+    color: #d84315 !important;
+    border: 1px solid rgba(255, 112, 67, 0.3);
+    font-weight: 500;
+}
+
+/* ==========================================================================
+   Progress Bar Components
+   ========================================================================== */
+
+.progress {
+    border-radius: 8px;
+    background-color: rgba(0,0,0,0.05) !important;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Pastel progress bar colors */
+.pastel-progress-study {
+    background-color: #7c4dff !important;
+    background-image: linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent) !important;
+}
+
+.pastel-progress-warning {
+    background-color: #ffb74d !important;
+    background-image: linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent) !important;
+}
+
+.pastel-progress-review {
+    background-color: #81c784 !important;
+    background-image: linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent) !important;
+}
+
+/* ==========================================================================
+   Form Components
+   ========================================================================== */
+
+.form-control-lg {
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.1);
+    background-color: rgba(255,255,255,0.9);
+    transition: all 0.2s ease;
+}
+
+.form-control-lg:focus {
+    border-color: rgba(79, 172, 254, 0.5);
+    box-shadow: 0 0 0 0.2rem rgba(79, 172, 254, 0.1);
+    background-color: rgba(255,255,255,1);
+}
+
+/* ==========================================================================
+   Review Navigation
+   ========================================================================== */
+
+.review-navigation {
+    margin-bottom: 1rem;
+}
+
+.review-navigation .d-flex {
+    gap: 1rem;
+}
