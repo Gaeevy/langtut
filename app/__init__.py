@@ -71,7 +71,7 @@ def create_app() -> Flask:
     ensure_utf8_encoding()
 
     # Create Flask app with template and static folders
-    app = Flask(__name__, template_folder="../templates", static_folder="../static")
+    app = Flask(__name__)
 
     # Configure application settings
     configure_app(app)
