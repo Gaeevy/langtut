@@ -28,7 +28,7 @@
                                 data-tab-name="{{ tab.name }}" data-card-count="{{ tab.card_count }}">
                             <i class="bi bi-volume-up"></i> Listen
                         </button>
-                        <a href="{{ url_for('flashcard.start_review', tab_name=tab.name) }}" class="btn btn-outline-primary btn-sm review-btn pastel-review">
+                        <a href="{{ url_for('review.start', tab_name=tab.name) }}" class="btn btn-outline-primary btn-sm review-btn pastel-review">
                             <i class="bi bi-eye"></i> Review
                         </a>
                     </div>

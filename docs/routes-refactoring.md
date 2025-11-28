@@ -28,7 +28,7 @@ This document outlines a comprehensive refactoring plan for the `src/routes/` mo
 |-------|--------|----------------|-------|
 | Phase 1: Service Layer Foundation | ✅ **COMPLETED** | 2025-11-28 | Created `CardSessionManager`, `CardStatistics` |
 | Phase 2: Learn Service + Routes | ✅ **COMPLETED** | 2025-11-28 | Created `LearnService`, `learn_bp`, `index_bp` |
-| Phase 3: Review Service + Routes | 🔲 Pending | - | - |
+| Phase 3: Review Service + Routes | ✅ **COMPLETED** | 2025-11-28 | Created `ReviewService`, `review_bp` |
 | Phase 4: API Restructuring | 🔲 Pending | - | - |
 | Phase 5: Cleanup | 🔲 Pending | - | - |
 | Phase 6: Index Route Extraction | ✅ **COMPLETED** | 2025-11-28 | Moved to `index_bp` in Phase 2 |
@@ -46,6 +46,13 @@ This document outlines a comprehensive refactoring plan for the `src/routes/` mo
 - ✅ Updated `src/routes/flashcard.py` - converted to legacy redirects
 - ✅ Updated templates (`index.html`, `card.html`, `feedback.html`, `results.html`) to use new URLs
 - ✅ Changed URL structure from `/study/` to `/learn/` as decided
+
+### Phase 3 Details
+- ✅ Created `src/services/learning/review_service.py` - `ReviewService` class for card browsing
+- ✅ Created `src/routes/review.py` - `review_bp` for review mode routes
+- ✅ Updated `src/routes/__init__.py` - registered `review_bp`
+- ✅ Updated `src/routes/flashcard.py` - converted all remaining routes to redirects
+- ✅ Updated templates for review mode URLs (`review.start`, `review.card`, `review.flip`, `review.navigate`)
 
 ---
 
@@ -1319,14 +1326,15 @@ Templates need minimal changes - mainly URL generation:
 5. Update templates to use new URLs
 6. Integration testing
 
-### Phase 3: Review Service (Low Risk)
+### Phase 3: Review Service (Low Risk) ✅
 **Duration:** 1 day
+**Completed:** 2025-11-28
 
-1. Implement `ReviewService` class
-2. Create `routes/review.py` with new routes
-3. Register new blueprint
-4. Add legacy redirects
-5. Update templates
+1. ✅ Implement `ReviewService` class
+2. ✅ Create `routes/review.py` with new routes
+3. ✅ Register new blueprint
+4. ✅ Add legacy redirects
+5. ✅ Update templates
 
 ### Phase 4: API Restructuring (Low Risk)
 **Duration:** 1 day
