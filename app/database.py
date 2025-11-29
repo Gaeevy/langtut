@@ -135,6 +135,27 @@ class User(db.Model):
 
         return None
 
+    def rename_spreadsheet(self, spreadsheet_id, new_name):
+        """Rename a spreadsheet for user's account.
+
+        Args:
+            spreadsheet_id: Google Sheets spreadsheet ID to remove
+            new_name: New name for spreadsheet
+
+        Returns:
+            True if renamed successfully, False if not found
+        """
+        target_spreadsheet = UserSpreadsheet.query.filter_by(
+            user_id=self.id, spreadsheet_id=spreadsheet_id
+        ).first()
+
+        if target_spreadsheet:
+            target_spreadsheet.spreadsheet_name = new_name
+            db.session.commit()
+            return True
+
+        return False
+
     def remove_spreadsheet(self, spreadsheet_id):
         """Remove a spreadsheet from user's account.
 

@@ -65,6 +65,12 @@
                                         id="activate-spreadsheet-btn">
                                     <i class="bi bi-check-circle"></i> Activate
                                 </button>
+                                <button type="button" class="btn btn-outline-warning btn-sm"
+                                        onclick="renameSpreadsheet()"
+                                        title="Rename selected spreadsheet"
+                                        id="rename-spreadsheet-btn">
+                                    <i class="bi bi-pencil"></i> Rename
+                                </button>
                                 <button type="button" class="btn btn-outline-danger btn-sm"
                                         onclick="confirmRemoveSpreadsheet()"
                                         title="Remove selected spreadsheet">
@@ -77,6 +83,34 @@
                                 <i class="bi bi-info-circle"></i>
                                 Select a spreadsheet from your list and click "Activate" to make it active.
                             </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rename Modal -->
+            <div class="modal fade" id="renameModal" tabindex="-1" aria-labelledby="renameModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="renameModalLabel">Rename Spreadsheet</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="new-spreadsheet-name" class="form-label">New Name:</label>
+                                <input type="text" class="form-control" id="new-spreadsheet-name"
+                                    placeholder="Enter new name for spreadsheet">
+                            </div>
+                            <div class="form-text">
+                                This only changes the display name in the app, not the actual Google Sheet name.
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" onclick="confirmRenameSpreadsheet()" id="confirm-rename-btn">
+                                <i class="bi bi-check-circle"></i> Rename
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -634,13 +668,83 @@ function hidePreview() {
     }, 300);
 }
 
-function resetSpreadsheet() {
-    return true;
+// Spreadsheet rename functionality
+function renameSpreadsheet() {
+    const selector = document.getElementById('spreadsheet-selector');
+    const selectedOption = selector.options[selector.selectedIndex];
+    const selectedSpreadsheetId = selector.value;
+    const selectedSpreadsheetName = selectedOption.text.replace(' (Active)', '').trim();
+
+    if (!selectedSpreadsheetId) {
+        showToast('Please select a spreadsheet to rename', 'warning');
+        return;
+    }
+
+    // Set current name in modal input
+    document.getElementById('new-spreadsheet-name').value = selectedSpreadsheetName;
+
+    // Store current spreadsheet ID for the modal
+    document.getElementById('new-spreadsheet-name').dataset.spreadsheetId = selectedSpreadsheetId;
+
+    // Show modal
+    const renameModal = new bootstrap.Modal(document.getElementById('renameModal'));
+    renameModal.show();
+}
+
+function confirmRenameSpreadsheet() {
+    const newNameInput = document.getElementById('new-spreadsheet-name');
+    const newName = newNameInput.value.trim();
+    const spreadsheetId = newNameInput.dataset.spreadsheetId;
+    const confirmBtn = document.getElementById('confirm-rename-btn');
+
+    if (!newName) {
+        showToast('Please enter a name', 'warning');
+        return;
+    }
+
+    if (!spreadsheetId) {
+        showToast('Spreadsheet not found', 'danger');
+        return;
+    }
+
+    // Show loading state
+    setButtonLoading('confirm-rename-btn', true);
+
+    fetch('/settings/rename-spreadsheet', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            spreadsheet_id: spreadsheetId,
+            new_name: newName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        setButtonLoading('confirm-rename-btn', false, '<i class="bi bi-check-circle"></i> Rename');
+
+        if (data.success) {
+            // Close modal
+            const renameModal = bootstrap.Modal.getInstance(document.getElementById('renameModal'));
+            renameModal.hide();
+
+            showToast('Spreadsheet renamed successfully', 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast('Failed to rename spreadsheet: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        setButtonLoading('confirm-rename-btn', false, '<i class="bi bi-check-circle"></i> Rename');
+        showToast('Error: ' + error.message, 'danger');
+    });
 }
 
 function updateActivateButtonState() {
     const selector = document.getElementById('spreadsheet-selector');
     const activateBtn = document.getElementById('activate-spreadsheet-btn');
+    const renameBtn = document.getElementById('rename-spreadsheet-btn');
     const selectedOption = selector.options[selector.selectedIndex];
 
     if (selectedOption.text.includes('(Active)')) {
@@ -651,6 +755,16 @@ function updateActivateButtonState() {
         activateBtn.disabled = false;
         activateBtn.classList.remove('disabled');
         activateBtn.title = 'Activate selected spreadsheet';
+    }
+
+    // Rename button is always enabled if spreadsheet is selected
+    renameBtn.disabled = !selector.value;
+    if (!selector.value) {
+        renameBtn.classList.add('disabled');
+        renameBtn.title = 'Please select a spreadsheet';
+    } else {
+        renameBtn.classList.remove('disabled');
+        renameBtn.title = 'Rename selected spreadsheet';
     }
 }
 
