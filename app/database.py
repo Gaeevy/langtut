@@ -73,7 +73,7 @@ class User(db.Model):
             existing.last_used = datetime.utcnow()
             if spreadsheet_url:
                 existing.spreadsheet_url = spreadsheet_url
-            if spreadsheet_name:
+            if not existing.spreadsheet_name:
                 existing.spreadsheet_name = spreadsheet_name
             if make_active:
                 # Deactivate all other spreadsheets

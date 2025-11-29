@@ -66,7 +66,7 @@
                                     <i class="bi bi-check-circle"></i> Activate
                                 </button>
                                 <button type="button" class="btn btn-outline-warning btn-sm"
-                                        onclick="renameSpreadsheet()"
+                                        onclick="showRenameCard()"
                                         title="Rename selected spreadsheet"
                                         id="rename-spreadsheet-btn">
                                     <i class="bi bi-pencil"></i> Rename
@@ -88,30 +88,27 @@
                 </div>
             </div>
 
-            <!-- Rename Modal -->
-            <div class="modal fade" id="renameModal" tabindex="-1" aria-labelledby="renameModalLabel" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="renameModalLabel">Rename Spreadsheet</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="mb-3">
-                                <label for="new-spreadsheet-name" class="form-label">New Name:</label>
-                                <input type="text" class="form-control" id="new-spreadsheet-name"
-                                    placeholder="Enter new name for spreadsheet">
-                            </div>
-                            <div class="form-text">
-                                This only changes the display name in the app, not the actual Google Sheet name.
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="button" class="btn btn-primary" onclick="confirmRenameSpreadsheet()" id="confirm-rename-btn">
-                                <i class="bi bi-check-circle"></i> Rename
-                            </button>
-                        </div>
+            <!-- Rename Spreadsheet Card -->
+            <div id="rename-card" class="card settings-card mb-4" style="display: none;">
+                <div class="card-header">
+                    <h5 class="mb-0 bi-pencil">Rename Spreadsheet</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="new-spreadsheet-name" class="form-label">New Name:</label>
+                        <input type="text" class="form-control" id="new-spreadsheet-name"
+                            placeholder="Enter new name for spreadsheet">
+                    </div>
+                    <div class="form-text mb-3">
+                        This only changes the display name in the app, not the actual Google Sheet name.
+                    </div>
+                    <div class="settings-btn-group">
+                        <button type="button" class="btn btn-primary" onclick="confirmRenameSpreadsheet()" id="confirm-rename-btn">
+                            <i class="bi bi-check-circle"></i> Rename
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="hideRenameCard()">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </button>
                     </div>
                 </div>
             </div>
@@ -124,7 +121,7 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-4">
-                            <label for="original-language" class="form-label">Learning From:</label>
+                            <label for="original-language" class="form-label">Native:</label>
                             <select class="form-select" id="original-language">
                                 <option value="ru">Russian (Русский)</option>
                                 <option value="en">English</option>
@@ -135,7 +132,7 @@
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label for="target-language" class="form-label">Learning To:</label>
+                            <label for="target-language" class="form-label">Studied:</label>
                             <select class="form-select" id="target-language">
                                 <option value="pt">Portuguese (Português)</option>
                                 <option value="en">English</option>
@@ -147,7 +144,7 @@
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label for="hint-language" class="form-label">Interface Language:</label>
+                            <label for="hint-language" class="form-label">Hint:</label>
                             <select class="form-select" id="hint-language">
                                 <option value="en">English</option>
                                 <option value="pt">Portuguese (Português)</option>
@@ -669,26 +666,28 @@ function hidePreview() {
 }
 
 // Spreadsheet rename functionality
-function renameSpreadsheet() {
+function showRenameCard() {
     const selector = document.getElementById('spreadsheet-selector');
     const selectedOption = selector.options[selector.selectedIndex];
-    const selectedSpreadsheetId = selector.value;
     const selectedSpreadsheetName = selectedOption.text.replace(' (Active)', '').trim();
 
-    if (!selectedSpreadsheetId) {
+    if (!selector.value) {
         showToast('Please select a spreadsheet to rename', 'warning');
         return;
     }
 
-    // Set current name in modal input
+    // Set current name in input
     document.getElementById('new-spreadsheet-name').value = selectedSpreadsheetName;
 
-    // Store current spreadsheet ID for the modal
-    document.getElementById('new-spreadsheet-name').dataset.spreadsheetId = selectedSpreadsheetId;
+    // Store current spreadsheet ID
+    document.getElementById('new-spreadsheet-name').dataset.spreadsheetId = selector.value;
 
-    // Show modal
-    const renameModal = new bootstrap.Modal(document.getElementById('renameModal'));
-    renameModal.show();
+    // Show rename card
+    document.getElementById('rename-card').style.display = 'block';
+}
+
+function hideRenameCard() {
+    document.getElementById('rename-card').style.display = 'none';
 }
 
 function confirmRenameSpreadsheet() {
@@ -725,10 +724,8 @@ function confirmRenameSpreadsheet() {
         setButtonLoading('confirm-rename-btn', false, '<i class="bi bi-check-circle"></i> Rename');
 
         if (data.success) {
-            // Close modal
-            const renameModal = bootstrap.Modal.getInstance(document.getElementById('renameModal'));
-            renameModal.hide();
-
+            // Hide rename card
+            hideRenameCard();
             showToast('Spreadsheet renamed successfully', 'success');
             setTimeout(() => window.location.reload(), 1000);
         } else {
@@ -756,7 +753,6 @@ function updateActivateButtonState() {
         activateBtn.classList.remove('disabled');
         activateBtn.title = 'Activate selected spreadsheet';
     }
-
     // Rename button is always enabled if spreadsheet is selected
     renameBtn.disabled = !selector.value;
     if (!selector.value) {
