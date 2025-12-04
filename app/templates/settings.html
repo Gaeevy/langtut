@@ -65,6 +65,12 @@
                                         id="activate-spreadsheet-btn">
                                     <i class="bi bi-check-circle"></i> Activate
                                 </button>
+                                <button type="button" class="btn btn-outline-warning btn-sm"
+                                        onclick="showRenameCard()"
+                                        title="Rename selected spreadsheet"
+                                        id="rename-spreadsheet-btn">
+                                    <i class="bi bi-pencil"></i> Rename
+                                </button>
                                 <button type="button" class="btn btn-outline-danger btn-sm"
                                         onclick="confirmRemoveSpreadsheet()"
                                         title="Remove selected spreadsheet">
@@ -82,6 +88,31 @@
                 </div>
             </div>
 
+            <!-- Rename Spreadsheet Card -->
+            <div id="rename-card" class="card settings-card mb-4" style="display: none;">
+                <div class="card-header">
+                    <h5 class="mb-0 bi-pencil">Rename Spreadsheet</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="new-spreadsheet-name" class="form-label">New Name:</label>
+                        <input type="text" class="form-control" id="new-spreadsheet-name"
+                            placeholder="Enter new name for spreadsheet">
+                    </div>
+                    <div class="form-text mb-3">
+                        This only changes the display name in the app, not the actual Google Sheet name.
+                    </div>
+                    <div class="settings-btn-group">
+                        <button type="button" class="btn btn-primary" onclick="confirmRenameSpreadsheet()" id="confirm-rename-btn">
+                            <i class="bi bi-check-circle"></i> Rename
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="hideRenameCard()">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Language Settings -->
             <div class="card settings-card mb-4">
                 <div class="card-header">
@@ -90,7 +121,7 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-4">
-                            <label for="original-language" class="form-label">Learning From:</label>
+                            <label for="original-language" class="form-label">Native:</label>
                             <select class="form-select" id="original-language">
                                 <option value="ru">Russian (Русский)</option>
                                 <option value="en">English</option>
@@ -101,7 +132,7 @@
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label for="target-language" class="form-label">Learning To:</label>
+                            <label for="target-language" class="form-label">Studied:</label>
                             <select class="form-select" id="target-language">
                                 <option value="pt">Portuguese (Português)</option>
                                 <option value="en">English</option>
@@ -113,7 +144,7 @@
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label for="hint-language" class="form-label">Interface Language:</label>
+                            <label for="hint-language" class="form-label">Hint:</label>
                             <select class="form-select" id="hint-language">
                                 <option value="en">English</option>
                                 <option value="pt">Portuguese (Português)</option>
@@ -634,13 +665,83 @@ function hidePreview() {
     }, 300);
 }
 
-function resetSpreadsheet() {
-    return true;
+// Spreadsheet rename functionality
+function showRenameCard() {
+    const selector = document.getElementById('spreadsheet-selector');
+    const selectedOption = selector.options[selector.selectedIndex];
+    const selectedSpreadsheetName = selectedOption.text.replace(' (Active)', '').trim();
+
+    if (!selector.value) {
+        showToast('Please select a spreadsheet to rename', 'warning');
+        return;
+    }
+
+    // Set current name in input
+    document.getElementById('new-spreadsheet-name').value = selectedSpreadsheetName;
+
+    // Store current spreadsheet ID
+    document.getElementById('new-spreadsheet-name').dataset.spreadsheetId = selector.value;
+
+    // Show rename card
+    document.getElementById('rename-card').style.display = 'block';
+}
+
+function hideRenameCard() {
+    document.getElementById('rename-card').style.display = 'none';
+}
+
+function confirmRenameSpreadsheet() {
+    const newNameInput = document.getElementById('new-spreadsheet-name');
+    const newName = newNameInput.value.trim();
+    const spreadsheetId = newNameInput.dataset.spreadsheetId;
+    const confirmBtn = document.getElementById('confirm-rename-btn');
+
+    if (!newName) {
+        showToast('Please enter a name', 'warning');
+        return;
+    }
+
+    if (!spreadsheetId) {
+        showToast('Spreadsheet not found', 'danger');
+        return;
+    }
+
+    // Show loading state
+    setButtonLoading('confirm-rename-btn', true);
+
+    fetch('/settings/rename-spreadsheet', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            spreadsheet_id: spreadsheetId,
+            new_name: newName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        setButtonLoading('confirm-rename-btn', false, '<i class="bi bi-check-circle"></i> Rename');
+
+        if (data.success) {
+            // Hide rename card
+            hideRenameCard();
+            showToast('Spreadsheet renamed successfully', 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast('Failed to rename spreadsheet: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        setButtonLoading('confirm-rename-btn', false, '<i class="bi bi-check-circle"></i> Rename');
+        showToast('Error: ' + error.message, 'danger');
+    });
 }
 
 function updateActivateButtonState() {
     const selector = document.getElementById('spreadsheet-selector');
     const activateBtn = document.getElementById('activate-spreadsheet-btn');
+    const renameBtn = document.getElementById('rename-spreadsheet-btn');
     const selectedOption = selector.options[selector.selectedIndex];
 
     if (selectedOption.text.includes('(Active)')) {
@@ -652,6 +753,15 @@ function updateActivateButtonState() {
         activateBtn.classList.remove('disabled');
         activateBtn.title = 'Activate selected spreadsheet';
     }
+    // Rename button is always enabled if spreadsheet is selected
+    renameBtn.disabled = !selector.value;
+    if (!selector.value) {
+        renameBtn.classList.add('disabled');
+        renameBtn.title = 'Please select a spreadsheet';
+    } else {
+        renameBtn.classList.remove('disabled');
+        renameBtn.title = 'Rename selected spreadsheet';
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -659,6 +769,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (selector) {
         selector.addEventListener('change', updateActivateButtonState);
         updateActivateButtonState();
+        hideRenameCard();
     }
 
     loadLanguageSettings();

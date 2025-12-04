@@ -127,6 +127,34 @@ def activate_spreadsheet():
         return jsonify({"success": False, "error": f"Error activating spreadsheet: {e!s}"})
 
 
+@settings_bp.route("/settings/rename-spreadsheet", methods=["POST"])
+@auth_manager.require_auth
+def rename_spreadsheet():
+    """Rename a spreadsheet in user's list."""
+    spreadsheet_id = request.json.get("spreadsheet_id", "").strip()
+    new_name = request.json.get("new_name", "").strip()
+
+    if not spreadsheet_id:
+        return jsonify({"success": False, "error": "Spreadsheet ID is required"})
+
+    if not new_name:
+        return jsonify({"success": False, "error": "New name is required"})
+
+    try:
+        user = auth_manager.user
+
+        # Remove the spreadsheet
+        success = user.rename_spreadsheet(spreadsheet_id, new_name)
+
+        if success:
+            return jsonify({"success": True, "message": "Spreadsheet renammed successfully"})
+        else:
+            return jsonify({"success": False, "error": "Spreadsheet not found in user's list"})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Error renaming spreadsheet: {e!s}"})
+
+
 @settings_bp.route("/settings/remove-spreadsheet", methods=["POST"])
 @auth_manager.require_auth
 def remove_spreadsheet():
