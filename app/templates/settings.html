@@ -769,6 +769,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (selector) {
         selector.addEventListener('change', updateActivateButtonState);
         updateActivateButtonState();
+        hideRenameCard();
     }
 
     loadLanguageSettings();
