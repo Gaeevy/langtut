@@ -8,8 +8,10 @@ import logging
 
 from flask import Blueprint, redirect, render_template, url_for
 
+from app.database import UserSpreadsheet, db
 from app.services.auth_manager import auth_manager
 from app.services.learning.review_service import ReviewService
+from app.session_manager import SessionKeys, SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +23,6 @@ review_bp = Blueprint("review", __name__, url_prefix="/review")
 @auth_manager.require_auth
 def start(tab_name: str):
     """Start a review session with ALL cards from the specified tab."""
-    logger.info(f"Starting review session: {tab_name}")
-
     user = auth_manager.user
     spreadsheet_id = user.get_active_spreadsheet_id()
 
@@ -32,6 +32,18 @@ def start(tab_name: str):
     if not result.success:
         logger.warning(f"Failed to start review session: {result.error}")
         return redirect(url_for("index.home"))
+
+    # Set target language in session
+    user_spreadsheet = (
+        db.session.query(UserSpreadsheet).filter_by(id=user.get_active_spreadsheet_id()).first()
+    )
+
+    if user_spreadsheet:
+        language_settings = user_spreadsheet.get_language_settings()
+        target_lang = language_settings.get("target", "pt")  # Default to pt
+
+        sm = SessionManager()
+        sm.set(SessionKeys.TARGET_LANGUAGE, target_lang)
 
     logger.info(f"Review session started with {result.card_count} cards")
     return redirect(url_for("review.card"))

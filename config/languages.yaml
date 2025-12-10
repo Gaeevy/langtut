@@ -1,0 +1,8 @@
+languages:
+  pt:
+    code: "pt-PT"
+    voice: "pt-PT-Standard-A"
+
+  en:
+    code: "en-US"
+    voice: "en-US-Standard-A"

@@ -37,37 +37,17 @@ function toggleEquivalent() {
  * Simplified TTS prefetching functionality
  */
 async function prefetchCardTTS() {
-    // Prevent duplicate prefetching
-    if (prefetchAttempted) {
+    if (!window.ttsManager || !window.ttsManager.isEnabled()) {
         return;
     }
 
-    // Check if TTS manager is available
-    if (typeof window.ttsManager === 'undefined') {
-        return;
-    }
-
-    // Check if we have data to prefetch
-    if (!window.cardData || (!window.cardData.word && !window.cardData.example)) {
-        return;
-    }
-
-    // Set flag to prevent duplicate attempts
-    prefetchAttempted = true;
-
-    try {
-        // Trigger TTS generation (cache only, no autoplay)
-        await window.ttsManager.speakCard(
-            window.cardData.word,
-            window.cardData.example,
-            null, // voice name
-            false, // autoplay = false (just cache)
-            window.cardContext.spreadsheetId,
-            window.cardContext.sheetGid
-        );
-    } catch (error) {
-        console.error('💥 Prefetch error:', error);
-    }
+    await window.ttsManager.speakCard(
+        window.cardData.word,
+        window.cardData.example,
+        false,  // autoplay = false (just prefetch)
+        window.cardContext.spreadsheetId,
+        window.cardContext.sheetGid
+    );
 }
 
 /**
@@ -117,3 +97,14 @@ function initCardPage() {
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', initCardPage);
+
+// Play button handler
+document.querySelector('.play-button')?.addEventListener('click', async () => {
+    await window.ttsManager.speakCard(
+        window.cardData.word,
+        window.cardData.example,
+        true,  // autoplay = true
+        window.cardContext.spreadsheetId,
+        window.cardContext.sheetGid
+    );
+});
