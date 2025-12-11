@@ -70,6 +70,7 @@ class TTSManager {
 
         // Check cache first
         if (this.audioCache.has(cacheKey)) {
+            console.log('✅ Play audio from cashe');
             return this.audioCache.get(cacheKey);
         }
 
@@ -153,7 +154,7 @@ class TTSManager {
         try {
             localStorage.setItem('tts_cache', JSON.stringify([...this.audioCache]));
         } catch (e) {
-            console.warn('Failed to save TTS cache:', e);
+            console.warn('⚠️ Failed to save TTS cache:', e);
         }
     }
 
@@ -322,14 +323,6 @@ class TTSManager {
         }
     }
 
-    saveCache() {
-        try {
-            sessionStorage.setItem('tts_cache', JSON.stringify([...this.audioCache]));
-        } catch (error) {
-            console.warn('⚠️ Cache save failed:', error);
-        }
-    }
-
     getCacheKey(text, voice = 'default') {
         return `${text}_${voice}`;
     }
@@ -340,77 +333,6 @@ class TTSManager {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
         return this.isAvailable;
-    }
-
-    async fetchCardAudio(word, example, voice, autoplay, spreadsheetId, sheetGid) {
-        try {
-            const body = { word, example, voice_name: voice };
-            if (spreadsheetId && sheetGid !== null) {
-                body.spreadsheet_id = spreadsheetId;
-                body.sheet_gid = sheetGid;
-            }
-
-            const response = await fetch('/api/tts/speak-card', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-
-            const data = await response.json();
-
-            if (data.success && data.audio) {
-                // Cache audio
-                if (data.audio.word) {
-                    this.audioCache.set(this.getCacheKey(word, voice), data.audio.word.audio_base64);
-                }
-                if (data.audio.example) {
-                    this.audioCache.set(this.getCacheKey(example, voice), data.audio.example.audio_base64);
-                }
-
-                this.saveCache();
-
-                // Play if requested
-                if (autoplay) {
-                    await this.playCardAudio(data.audio);
-                }
-
-                return data.audio;
-            } else {
-                console.error('❌ TTS API failed:', data.error);
-                return false;
-            }
-        } catch (error) {
-            console.error('💥 TTS request error:', error);
-            return false;
-        }
-    }
-
-    async playCardAudio(audioData, delay = 1000) {
-        try {
-            // Play word first
-            if (audioData.word) {
-                await this.playAudio(audioData.word.audio_base64);
-
-                // Wait for completion + delay
-                if (this.currentAudio) {
-                    await new Promise(resolve => {
-                        this.currentAudio.addEventListener('ended', () => {
-                            setTimeout(resolve, delay);
-                        });
-                    });
-                }
-            }
-
-            // Play example
-            if (audioData.example) {
-                await this.playAudio(audioData.example.audio_base64);
-            }
-
-            return true;
-        } catch (error) {
-            console.error('💥 Card audio error:', error);
-            return false;
-        }
     }
 
     stopCurrentAudio() {
