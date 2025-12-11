@@ -8,7 +8,6 @@ import logging
 
 from flask import Blueprint, redirect, render_template, url_for
 
-from app.database import UserSpreadsheet, db
 from app.services.auth_manager import auth_manager
 from app.services.learning.review_service import ReviewService
 from app.session_manager import SessionKeys, SessionManager
@@ -34,9 +33,7 @@ def start(tab_name: str):
         return redirect(url_for("index.home"))
 
     # Set target language in session
-    user_spreadsheet = (
-        db.session.query(UserSpreadsheet).filter_by(id=user.get_active_spreadsheet_id()).first()
-    )
+    user_spreadsheet = user.get_active_spreadsheet()
 
     if user_spreadsheet:
         language_settings = user_spreadsheet.get_language_settings()

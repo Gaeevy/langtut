@@ -132,6 +132,9 @@ class TTSManager {
         });
     }
 
+    checkAudioUnlock() {
+    }
+
     restoreCache() {
         // Load from localStorage
         const cached = localStorage.getItem('tts_cache');
@@ -178,18 +181,6 @@ class TTSManager {
 
         // Desktop browsers (no unlock needed)
         return 'desktop';
-    }
-
-    async init() {
-        // Check TTS service availability
-        try {
-            const response = await fetch('/api/tts/status');
-            const data = await response.json();
-            this.isAvailable = data.available;
-            console.log(`📡 TTS service available: ${this.isAvailable}`);
-        } catch (error) {
-            console.error('❌ TTS init failed:', error);
-        }
     }
 
     /**

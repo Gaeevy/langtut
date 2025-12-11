@@ -9,7 +9,8 @@ from flask import Blueprint, jsonify, request
 from app.services.tts import TTSService
 from app.session_manager import SessionKeys, SessionManager
 
-tts_bp = Blueprint("tts", __name__)
+# Create blueprint (will be nested under /api/)
+tts_bp = Blueprint("tts", __name__, url_prefix="/tts")
 
 
 @tts_bp.route("/status", methods=["GET"])
