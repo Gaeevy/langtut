@@ -70,7 +70,7 @@ function setupTTS(cardData) {
     if (window.ttsManager.isUnlocked()) {
         console.log('✅ Audio unlocked - auto-playing card audio');
         setTimeout(() => {
-            window.ttsManager.speakCard(word, example, null, true, spreadsheetId, sheetGid);
+            window.ttsManager.speakCard(word, example, true, spreadsheetId, sheetGid);
         }, 300);
     } else {
         console.log('⚠️ Audio not unlocked - skipping auto-play');
@@ -84,7 +84,7 @@ function setupTTS(cardData) {
                 console.log('🔓 Unlocking audio from button click...');
                 await window.ttsManager.unlockAudio();
             }
-            window.ttsManager.speakCard(word, example, null, true, spreadsheetId, sheetGid);
+            window.ttsManager.speakCard(word, example, true, spreadsheetId, sheetGid);
         });
     }
 }

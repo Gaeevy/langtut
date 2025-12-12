@@ -37,7 +37,7 @@ function toggleEquivalent() {
  * Simplified TTS prefetching functionality
  */
 async function prefetchCardTTS() {
-    if (!window.ttsManager || !window.ttsManager.isEnabled()) {
+    if (!window.ttsManager || !window.ttsManager.enabled) {
         return;
     }
 
