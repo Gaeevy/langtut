@@ -11,13 +11,10 @@ from flask import Blueprint, jsonify, render_template
 
 from app.config import config
 from app.gsheet import read_all_card_sets
-from app.services.tts import TTSService
+from app.services.tts import tts_service
 
 # Create blueprint
 test_bp = Blueprint("test", __name__)
-
-# Initialize TTS service for testing
-tts_service = TTSService()
 
 
 @test_bp.route("/test")

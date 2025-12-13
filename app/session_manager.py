@@ -42,6 +42,9 @@ class SessionKeys(Enum):
     REVIEW_ACTIVE_TAB = "review.active_tab"
     REVIEW_SHEET_GID = "review.sheet_gid"
 
+    # TTS namespace
+    TARGET_LANGUAGE = "tts.target_language"
+
     # Test namespace - Development and debugging
     TEST_SESSION = "test.session"
 

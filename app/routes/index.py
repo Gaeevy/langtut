@@ -46,6 +46,15 @@ def home():
         logger.info("No spreadsheet configured, showing setup screen")
         return render_template("setup.html", is_authenticated=user_is_authenticated)
 
+    # Set target language in session
+    user_spreadsheet = user.get_active_spreadsheet()
+
+    if user_spreadsheet:
+        language_settings = user_spreadsheet.get_language_settings()
+        target_lang = language_settings.get("target", "pt")  # Default to pt
+
+        sm.set(sk.TARGET_LANGUAGE, target_lang)
+
     # Normal app flow with user's spreadsheet
     try:
         card_sets = read_all_card_sets(user_spreadsheet_id)

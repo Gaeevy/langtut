@@ -4,40 +4,198 @@
  */
 class TTSManager {
     constructor() {
-        this.isAvailable = true;
-        this.audioCache = new Map();
+        this.enabled = false;
+        this.audioUnlocked = false;
+        this.browser = this.detectBrowser();
+        this.primedAudioForChromeIOS = null;
         this.currentAudio = null;
+
+        // Simplified cache (text-only keys)
+        this.audioCache = new Map();
         this.pendingRequests = new Map();
 
-        // Mobile audio management - unified approach
-        this.audioUnlocked = false;  // Changed from userInteracted
-        this.primedAudioForChromeIOS = null;
-        this.browserType = this.detectBrowser();  // Detect browser once
-
-        console.log(`🎵 TTSManager initialized for: ${this.browserType}`);
-
-        // Desktop browsers don't need unlock - set synchronously!
-        if (this.browserType === 'desktop') {
+        // Desktop browsers auto-unlocked
+        if (this.browser === 'desktop') {
             this.audioUnlocked = true;
-            console.log('🖥️ Desktop browser - audio unlocked by default');
+            console.log('Desktop browser - audio unlocked');
         }
 
-        // Check if already unlocked in this session (synchronously)
+        // Check if already unlocked in this session
         try {
             const storedUnlock = sessionStorage.getItem('tts_audio_unlocked');
             if (storedUnlock === 'true') {
                 this.audioUnlocked = true;
-                console.log('💾 Audio unlock state restored from session');
+                console.log('Audio unlock restored from session');
             }
         } catch (error) {
-            console.warn('⚠️ Could not access sessionStorage:', error);
+            console.warn('Could not access sessionStorage:', error);
         }
 
-        // Restore cache from sessionStorage
+        // Restore cache
         this.restoreCache();
 
-        // Check TTS availability (async, but not blocking)
+        // Check TTS service availability (async)
         this.init();
+    }
+
+    async init() {
+        try {
+            const response = await fetch('/api/tts/status');
+            const data = await response.json();
+            this.enabled = data.available;
+            console.log(`TTS service available: ${this.enabled}`);
+        } catch (error) {
+            console.error('TTS init failed:', error);
+            this.enabled = false;
+        }
+    }
+
+    getCacheKey(text) {
+        return text.trim();
+    }
+
+    async speakCard(word, example, autoplay = false, spreadsheetId = null, sheetGid = null) {
+        /**
+         * Generate and play audio for word + example.
+         * Calls /speak twice (once for word, once for example).
+         */
+        if (!this.enabled) {
+            return null;
+        }
+
+        console.log(`🎯 speakCard(autoplay=${autoplay}) - word: "${word}", example: "${example}"`);
+
+        // Fetch both audios (with caching)
+        const wordAudio = await this.fetchAudio(word, spreadsheetId, sheetGid);
+        const exampleAudio = await this.fetchAudio(example, spreadsheetId, sheetGid);
+
+        // Play if autoplay enabled
+        if (autoplay && wordAudio && exampleAudio) {
+            console.log('▶️ Playing audio (word + example)');
+            await this.playAudio(wordAudio);
+            await this.playAudio(exampleAudio);
+            console.log('✅ Playback complete');
+        }
+
+        return {
+            word: { text: word, audio_base64: wordAudio },
+            example: { text: example, audio_base64: exampleAudio }
+        };
+    }
+
+    async fetchAudio(text, spreadsheetId = null, sheetGid = null) {
+        /**
+         * Fetch audio from /api/tts/speak.
+         * Caches in localStorage by text only.
+         */
+        const cacheKey = this.getCacheKey(text);
+
+        // Check cache first
+        if (this.audioCache.has(cacheKey)) {
+            console.log(`💾 Cache hit: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
+            return this.audioCache.get(cacheKey);
+        }
+
+        // Check if already pending
+        if (this.pendingRequests.has(cacheKey)) {
+            console.log(`⏳ Already fetching: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
+            return this.pendingRequests.get(cacheKey);
+        }
+
+        // Build request
+        const requestBody = { text };
+        if (spreadsheetId) requestBody.spreadsheet_id = spreadsheetId;
+        if (sheetGid) requestBody.sheet_gid = sheetGid;
+
+        console.log(`🌐 Fetching from API: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
+
+        // Fetch from API
+        const promise = fetch('/api/tts/speak', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Cache it
+                console.log(`✅ Cached: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
+                this.audioCache.set(cacheKey, data.audio_base64);
+                this.saveCache();
+                return data.audio_base64;
+            } else {
+                console.error('❌ TTS failed:', data.error);
+                return null;
+            }
+        })
+        .catch(error => {
+            console.error('❌ TTS request failed:', error);
+            return null;
+        })
+        .finally(() => {
+            this.pendingRequests.delete(cacheKey);
+        });
+
+        this.pendingRequests.set(cacheKey, promise);
+        return promise;
+    }
+
+    async playAudio(audioBase64) {
+        if (!audioBase64) {
+            console.warn('⚠️ playAudio called with no audio data');
+            return;
+        }
+
+        // Stop previous audio if playing
+        this.stopCurrentAudio();
+
+        // Ensure audio unlocked
+        if (!this.audioUnlocked) {
+            console.log('🔓 Audio not unlocked, attempting unlock...');
+            await this.unlockAudio();
+        }
+
+        // Create and track audio element
+        const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+        this.currentAudio = audio;
+
+        console.log('🔊 Starting audio playback');
+
+        return new Promise((resolve, reject) => {
+            audio.onended = () => {
+                console.log('✅ Audio playback ended');
+                this.currentAudio = null;
+                resolve();
+            };
+            audio.onerror = (error) => {
+                console.error('❌ Audio playback error:', error);
+                this.currentAudio = null;
+                reject(error);
+            };
+            audio.play().catch(reject);
+        });
+    }
+
+    restoreCache() {
+        // Load from localStorage
+        const cached = localStorage.getItem('tts_cache');
+        if (cached) {
+            try {
+                this.audioCache = new Map(JSON.parse(cached));
+            } catch (e) {
+                console.warn('Failed to restore TTS cache:', e);
+                this.audioCache = new Map();
+            }
+        }
+    }
+
+    saveCache() {
+        // Save to localStorage
+        try {
+            localStorage.setItem('tts_cache', JSON.stringify([...this.audioCache]));
+        } catch (e) {
+            console.warn('⚠️ Failed to save TTS cache:', e);
+        }
     }
 
     /**
@@ -66,24 +224,16 @@ class TTSManager {
         return 'desktop';
     }
 
-    async init() {
-        // Check TTS service availability
-        try {
-            const response = await fetch('/api/tts/status');
-            const data = await response.json();
-            this.isAvailable = data.available;
-            console.log(`📡 TTS service available: ${this.isAvailable}`);
-        } catch (error) {
-            console.error('❌ TTS init failed:', error);
-        }
-    }
-
     /**
      * Check if audio has been unlocked for playback
      * @returns {boolean} True if audio can be played
      */
     isUnlocked() {
         return this.audioUnlocked;
+    }
+
+    isEnabled() {
+        return this.enabled;
     }
 
     /**
@@ -97,12 +247,12 @@ class TTSManager {
             return true;
         }
 
-        console.log(`🔓 Attempting to unlock audio for: ${this.browserType}`);
+        console.log(`🔓 Attempting to unlock audio for: ${this.browser}`);
 
         try {
             let success = false;
 
-            switch (this.browserType) {
+            switch (this.browser) {
                 case 'chrome-ios':
                     success = await this.unlockChromeIOS();
                     break;
@@ -217,283 +367,12 @@ class TTSManager {
         }
     }
 
-    restoreCache() {
-        try {
-            const cached = sessionStorage.getItem('tts_cache');
-            if (cached) {
-                this.audioCache = new Map(JSON.parse(cached));
-                console.log(`💾 Restored ${this.audioCache.size} cached items`);
-            }
-        } catch (error) {
-            console.warn('⚠️ Cache restore failed:', error);
-        }
-    }
-
-    saveCache() {
-        try {
-            sessionStorage.setItem('tts_cache', JSON.stringify([...this.audioCache]));
-        } catch (error) {
-            console.warn('⚠️ Cache save failed:', error);
-        }
-    }
-
-    getCacheKey(text, voice = 'default') {
-        return `${text}_${voice}`;
-    }
-
     async waitForService(maxWait = 5000) {
         const start = Date.now();
-        while (!this.isAvailable && Date.now() - start < maxWait) {
+        while (!this.enabled && Date.now() - start < maxWait) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
-        return this.isAvailable;
-    }
-
-    async speakCard(word, example, voice = null, autoplay = false, spreadsheetId = null, sheetGid = null) {
-        // Wait for service if needed
-        if (!this.isAvailable && !await this.waitForService()) {
-            console.warn('⚠️ TTS service unavailable');
-            return false;
-        }
-
-        // Check cache
-        const wordKey = word ? this.getCacheKey(word, voice) : null;
-        const exampleKey = example ? this.getCacheKey(example, voice) : null;
-
-        const wordCached = !word || this.audioCache.has(wordKey);
-        const exampleCached = !example || this.audioCache.has(exampleKey);
-
-        if (wordCached && exampleCached) {
-            console.log(`🎯 Cache hit: "${word || ''}" + "${example || ''}"`);
-
-            // Always return audio data structure, whether from cache or API
-            const audioData = {};
-            if (word) audioData.word = { audio_base64: this.audioCache.get(wordKey) };
-            if (example) audioData.example = { audio_base64: this.audioCache.get(exampleKey) };
-
-            if (autoplay) {
-                await this.playCardAudio(audioData);
-            }
-
-            return audioData; // Return actual audio data, not true
-        }
-
-        // Check for pending request
-        const pendingKey = `${word || ''}_${example || ''}_${voice || 'default'}`;
-        if (this.pendingRequests.has(pendingKey)) {
-            return this.pendingRequests.get(pendingKey);
-        }
-
-        console.log(`📡 Fetching: "${word || ''}" + "${example || ''}"`);
-
-        // Create API request
-        const requestPromise = this.fetchCardAudio(word, example, voice, autoplay, spreadsheetId, sheetGid);
-        this.pendingRequests.set(pendingKey, requestPromise);
-
-        requestPromise.finally(() => this.pendingRequests.delete(pendingKey));
-
-        return requestPromise;
-    }
-
-    async fetchCardAudio(word, example, voice, autoplay, spreadsheetId, sheetGid) {
-        try {
-            const body = { word, example, voice_name: voice };
-            if (spreadsheetId && sheetGid !== null) {
-                body.spreadsheet_id = spreadsheetId;
-                body.sheet_gid = sheetGid;
-            }
-
-            const response = await fetch('/api/tts/speak-card', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-
-            const data = await response.json();
-
-            if (data.success && data.audio) {
-                // Cache audio
-                if (data.audio.word) {
-                    this.audioCache.set(this.getCacheKey(word, voice), data.audio.word.audio_base64);
-                }
-                if (data.audio.example) {
-                    this.audioCache.set(this.getCacheKey(example, voice), data.audio.example.audio_base64);
-                }
-
-                this.saveCache();
-
-                // Play if requested
-                if (autoplay) {
-                    await this.playCardAudio(data.audio);
-                }
-
-                return data.audio;
-            } else {
-                console.error('❌ TTS API failed:', data.error);
-                return false;
-            }
-        } catch (error) {
-            console.error('💥 TTS request error:', error);
-            return false;
-        }
-    }
-
-    async playAudio(audioBase64) {
-        try {
-            // Check if audio is unlocked before attempting playback
-            if (!this.audioUnlocked) {
-                console.warn('⚠️ Audio not unlocked - playback may be blocked');
-                // Throw NotAllowedError-like error to trigger fallback handling
-                const error = new Error('Audio playback not allowed - user interaction required');
-                error.name = 'NotAllowedError';
-                throw error;
-            }
-
-            // Only stop current audio, not ALL audio (too aggressive)
-            this.stopCurrentAudio();
-
-            // Log base64 preview for debugging
-            const base64Preview = audioBase64.substring(0, 10);
-            console.log(`🔊 Starting audio playback... [${base64Preview}...]`);
-
-            // For Chrome iOS: Use primed Audio element if available
-            let audio;
-            if (this.primedAudioForChromeIOS) {
-                console.log('📱 Using primed Chrome iOS audio element');
-                audio = this.primedAudioForChromeIOS;
-
-                // Make sure primed audio is stopped before reusing
-                if (!audio.paused) {
-                    audio.pause();
-                    audio.currentTime = 0;
-                }
-
-                // Remove any existing event listeners to prevent conflicts
-                audio.onended = null;
-                audio.onerror = null;
-                audio.oncanplaythrough = null;
-
-                // Reuse the primed element but update its source
-                audio.src = `data:audio/mp3;base64,${audioBase64}`;
-            } else {
-                console.log('🖥️ Creating new audio element');
-                // Create new audio element for other browsers
-                audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
-            }
-
-            this.currentAudio = audio;
-
-            // Wait for audio to be ready
-            await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => reject(new Error('Audio load timeout')), 10000);
-
-                audio.addEventListener('canplaythrough', () => {
-                    console.log(`📻 Audio ready to play [${base64Preview}...]`);
-                    clearTimeout(timeout);
-                    resolve();
-                }, { once: true });
-
-                audio.addEventListener('error', () => {
-                    clearTimeout(timeout);
-                    reject(new Error('Load failed'));
-                });
-
-                // Only call load() if not using primed audio (it's already loaded)
-                if (!this.primedAudioForChromeIOS) {
-                    audio.load();
-                } else {
-                    // For primed audio, trigger load event quickly
-                    setTimeout(() => {
-                        clearTimeout(timeout);
-                        resolve();
-                    }, 100);
-                }
-            });
-
-            console.log(`▶️ Playing audio... [${base64Preview}...]`);
-            await audio.play();
-            console.log(`🎵 Audio play() started, waiting for completion... [${base64Preview}...]`);
-
-            // CRITICAL FIX: Wait for audio to actually finish playing
-            return new Promise((resolve, reject) => {
-                let finished = false;
-
-                const finishAudio = () => {
-                    if (!finished) {
-                        finished = true;
-                        console.log(`✅ Audio playback completed [${base64Preview}...]`);
-                        // Only clear current audio if this is still the active one
-                        if (this.currentAudio === audio) {
-                            this.currentAudio = null;
-                        }
-                        resolve(true);
-                    }
-                };
-
-                // Listen for natural completion
-                audio.addEventListener('ended', finishAudio, { once: true });
-
-                // Handle errors
-                audio.addEventListener('error', (e) => {
-                    console.error(`💥 Audio error during playback [${base64Preview}...]:`, e);
-                    if (!finished) {
-                        finished = true;
-                        if (this.currentAudio === audio) {
-                            this.currentAudio = null;
-                        }
-                        reject(new Error('Audio playback failed'));
-                    }
-                }, { once: true });
-
-                // Fallback timeout (in case audio doesn't fire ended event)
-                setTimeout(() => {
-                    if (!finished) {
-                        console.log(`⏰ Audio timeout, assuming completed [${base64Preview}...]`);
-                        finishAudio();
-                    }
-                }, 15000); // 15 second timeout for long audio
-            });
-
-        } catch (error) {
-            console.error('💥 Playback error:', error);
-
-            if (error.name === 'NotAllowedError') {
-                console.warn('🚫 Audio blocked by browser - user interaction required');
-                // Don't show alert - let the UI handle it gracefully
-                // The calling code should check isUnlocked() before calling playAudio()
-            }
-
-            // Return false to indicate playback failed
-            return false;
-        }
-    }
-
-    async playCardAudio(audioData, delay = 1000) {
-        try {
-            // Play word first
-            if (audioData.word) {
-                await this.playAudio(audioData.word.audio_base64);
-
-                // Wait for completion + delay
-                if (this.currentAudio) {
-                    await new Promise(resolve => {
-                        this.currentAudio.addEventListener('ended', () => {
-                            setTimeout(resolve, delay);
-                        });
-                    });
-                }
-            }
-
-            // Play example
-            if (audioData.example) {
-                await this.playAudio(audioData.example.audio_base64);
-            }
-
-            return true;
-        } catch (error) {
-            console.error('💥 Card audio error:', error);
-            return false;
-        }
+        return this.enabled;
     }
 
     stopCurrentAudio() {
@@ -568,74 +447,10 @@ class TTSManager {
         // Just ensure clean audio state
     }
 
-    // Enhanced speak method for individual text (restored for listening mode)
-    async speak(text, voice = null) {
-        if (!text || !text.trim()) {
-            console.warn('No text provided for TTS');
-            return false;
-        }
-
-        const trimmedText = text.trim();
-        const cacheKey = this.getCacheKey(trimmedText, voice);
-
-        // Check cache first
-        if (this.audioCache.has(cacheKey)) {
-            console.log(`🎯 Individual text cache hit: "${trimmedText}"`);
-            return this.playAudio(this.audioCache.get(cacheKey));
-        }
-
-        // Check for pending request
-        if (this.pendingRequests.has(cacheKey)) {
-            return this.pendingRequests.get(cacheKey);
-        }
-
-        console.log(`📡 Fetching individual text: "${trimmedText}"`);
-
-        // Create API request for individual text
-        const requestPromise = this.fetchIndividualText(trimmedText, voice);
-        this.pendingRequests.set(cacheKey, requestPromise);
-
-        requestPromise.finally(() => this.pendingRequests.delete(cacheKey));
-
-        return requestPromise;
-    }
-
-    async fetchIndividualText(text, voice) {
-        try {
-            const response = await fetch('/api/tts/speak', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    text: text,
-                    voice_name: voice
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.success && data.audio_base64) {
-                // Cache the audio
-                const cacheKey = this.getCacheKey(text, voice);
-                this.audioCache.set(cacheKey, data.audio_base64);
-                this.saveCache();
-
-                // Play the audio
-                await this.playAudio(data.audio_base64);
-                return true;
-            } else {
-                console.error('❌ Individual text TTS failed:', data.error);
-                return false;
-            }
-        } catch (error) {
-            console.error('💥 Individual text TTS request error:', error);
-            return false;
-        }
-    }
-
     clearCache() {
         this.audioCache.clear();
         this.pendingRequests.clear();
-        sessionStorage.removeItem('tts_cache');
+        localStorage.removeItem('tts_cache');
         console.log('🗑️ Cache cleared');
     }
 

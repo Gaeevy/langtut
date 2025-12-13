@@ -15,8 +15,6 @@ api_version = "v4"
 
 # Google TTS
 tts_enabled = true
-tts_language_code = "pt-PT"
-tts_voice_name = "pt-PT-Standard-A"
 tts_audio_encoding = "MP3"
 gcs_audio_bucket = "langtut-tts"
 

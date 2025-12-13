@@ -10,6 +10,7 @@ from flask import Blueprint, redirect, render_template, request, url_for
 
 from app.services.auth_manager import auth_manager
 from app.services.learning.learn_service import LearnService
+from app.session_manager import SessionKeys, SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +21,7 @@ learn_bp = Blueprint("learn", __name__, url_prefix="/learn")
 @learn_bp.route("/start/<tab_name>", methods=["POST"])
 @auth_manager.require_auth
 def start(tab_name: str):
-    """Start a learn session with cards from the specified tab."""
-    logger.info(f"Starting learn session: {tab_name}")
-
+    """Start learning session."""
     user = auth_manager.user
     spreadsheet_id = user.get_active_spreadsheet_id()
 
@@ -32,6 +31,16 @@ def start(tab_name: str):
     if not result.success:
         logger.warning(f"Failed to start learn session: {result.error}")
         return redirect(url_for("index.home"))
+
+    # Set target language in session
+    user_spreadsheet = user.get_active_spreadsheet()
+
+    if user_spreadsheet:
+        language_settings = user_spreadsheet.get_language_settings()
+        target_lang = language_settings.get("target", "pt")  # Default to pt
+
+        sm = SessionManager()
+        sm.set(SessionKeys.TARGET_LANGUAGE, target_lang)
 
     logger.info(f"Learn session started with {result.card_count} cards")
     return redirect(url_for("learn.card"))

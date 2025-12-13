@@ -738,7 +738,7 @@ function confirmRenameSpreadsheet() {
     });
 }
 
-function updateActivateButtonState() {
+function updateSpreadSheetState() {
     const selector = document.getElementById('spreadsheet-selector');
     const activateBtn = document.getElementById('activate-spreadsheet-btn');
     const renameBtn = document.getElementById('rename-spreadsheet-btn');
@@ -762,13 +762,15 @@ function updateActivateButtonState() {
         renameBtn.classList.remove('disabled');
         renameBtn.title = 'Rename selected spreadsheet';
     }
+    // Hide rename card when selection changes
+    hideRenameCard();
 }
 
 document.addEventListener('DOMContentLoaded', function() {
     const selector = document.getElementById('spreadsheet-selector');
     if (selector) {
-        selector.addEventListener('change', updateActivateButtonState);
-        updateActivateButtonState();
+        selector.addEventListener('change', updateSpreadSheetState);
+        updateSpreadSheetState();
         hideRenameCard();
     }
 

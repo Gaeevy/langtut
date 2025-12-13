@@ -101,8 +101,6 @@ class Config(BaseSettings):
 
     # Google TTS
     tts_enabled: bool = _settings["tts_enabled"]
-    tts_language_code: str = _settings["tts_language_code"]
-    tts_voice_name: str = _settings["tts_voice_name"]
     tts_audio_encoding: str = _settings["tts_audio_encoding"]
     gcs_audio_bucket: str = _settings["gcs_audio_bucket"]
 
