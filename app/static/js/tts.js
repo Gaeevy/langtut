@@ -8,11 +8,33 @@ class TTSManager {
         this.audioUnlocked = false;
         this.browser = this.detectBrowser();
         this.primedAudioForChromeIOS = null;
+        this.currentAudio = null;
 
-        // Simplified cache (text-only keys, localStorage)
+        // Simplified cache (text-only keys)
         this.audioCache = new Map();
         this.pendingRequests = new Map();
 
+        // Desktop browsers auto-unlocked
+        if (this.browser === 'desktop') {
+            this.audioUnlocked = true;
+            console.log('Desktop browser - audio unlocked');
+        }
+
+        // Check if already unlocked in this session
+        try {
+            const storedUnlock = sessionStorage.getItem('tts_audio_unlocked');
+            if (storedUnlock === 'true') {
+                this.audioUnlocked = true;
+                console.log('Audio unlock restored from session');
+            }
+        } catch (error) {
+            console.warn('Could not access sessionStorage:', error);
+        }
+
+        // Restore cache
+        this.restoreCache();
+
+        // Check TTS service availability (async)
         this.init();
     }
 
@@ -21,11 +43,7 @@ class TTSManager {
             const response = await fetch('/api/tts/status');
             const data = await response.json();
             this.enabled = data.available;
-
-            if (this.enabled) {
-                this.restoreCache();
-                this.checkAudioUnlock();
-            }
+            console.log(`TTS service available: ${this.enabled}`);
         } catch (error) {
             console.error('TTS init failed:', error);
             this.enabled = false;
@@ -119,21 +137,29 @@ class TTSManager {
             return;
         }
 
+        // Stop previous audio if playing
+        this.stopCurrentAudio();
+
         // Ensure audio unlocked
         if (!this.audioUnlocked) {
             await this.unlockAudio();
         }
 
+        // Create and track audio element
         const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+        this.currentAudio = audio;
 
         return new Promise((resolve, reject) => {
-            audio.onended = resolve;
-            audio.onerror = reject;
+            audio.onended = () => {
+                this.currentAudio = null;
+                resolve();
+            };
+            audio.onerror = (error) => {
+                this.currentAudio = null;
+                reject(error);
+            };
             audio.play().catch(reject);
         });
-    }
-
-    checkAudioUnlock() {
     }
 
     restoreCache() {
@@ -192,6 +218,10 @@ class TTSManager {
         return this.audioUnlocked;
     }
 
+    isEnabled() {
+        return this.enabled;
+    }
+
     /**
      * Unlock audio for mobile browsers
      * MUST be called during a user gesture (click, touch, etc.)
@@ -203,12 +233,12 @@ class TTSManager {
             return true;
         }
 
-        console.log(`🔓 Attempting to unlock audio for: ${this.browserType}`);
+        console.log(`🔓 Attempting to unlock audio for: ${this.browser}`);
 
         try {
             let success = false;
 
-            switch (this.browserType) {
+            switch (this.browser) {
                 case 'chrome-ios':
                     success = await this.unlockChromeIOS();
                     break;
@@ -323,16 +353,12 @@ class TTSManager {
         }
     }
 
-    getCacheKey(text, voice = 'default') {
-        return `${text}_${voice}`;
-    }
-
     async waitForService(maxWait = 5000) {
         const start = Date.now();
-        while (!this.isAvailable && Date.now() - start < maxWait) {
+        while (!this.enabled && Date.now() - start < maxWait) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
-        return this.isAvailable;
+        return this.enabled;
     }
 
     stopCurrentAudio() {
@@ -407,74 +433,10 @@ class TTSManager {
         // Just ensure clean audio state
     }
 
-    // Enhanced speak method for individual text (restored for listening mode)
-    async speak(text, voice = null) {
-        if (!text || !text.trim()) {
-            console.warn('No text provided for TTS');
-            return false;
-        }
-
-        const trimmedText = text.trim();
-        const cacheKey = this.getCacheKey(trimmedText, voice);
-
-        // Check cache first
-        if (this.audioCache.has(cacheKey)) {
-            console.log(`🎯 Individual text cache hit: "${trimmedText}"`);
-            return this.playAudio(this.audioCache.get(cacheKey));
-        }
-
-        // Check for pending request
-        if (this.pendingRequests.has(cacheKey)) {
-            return this.pendingRequests.get(cacheKey);
-        }
-
-        console.log(`📡 Fetching individual text: "${trimmedText}"`);
-
-        // Create API request for individual text
-        const requestPromise = this.fetchIndividualText(trimmedText, voice);
-        this.pendingRequests.set(cacheKey, requestPromise);
-
-        requestPromise.finally(() => this.pendingRequests.delete(cacheKey));
-
-        return requestPromise;
-    }
-
-    async fetchIndividualText(text, voice) {
-        try {
-            const response = await fetch('/api/tts/speak', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    text: text,
-                    voice_name: voice
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.success && data.audio_base64) {
-                // Cache the audio
-                const cacheKey = this.getCacheKey(text, voice);
-                this.audioCache.set(cacheKey, data.audio_base64);
-                this.saveCache();
-
-                // Play the audio
-                await this.playAudio(data.audio_base64);
-                return true;
-            } else {
-                console.error('❌ Individual text TTS failed:', data.error);
-                return false;
-            }
-        } catch (error) {
-            console.error('💥 Individual text TTS request error:', error);
-            return false;
-        }
-    }
-
     clearCache() {
         this.audioCache.clear();
         this.pendingRequests.clear();
-        sessionStorage.removeItem('tts_cache');
+        localStorage.removeItem('tts_cache');
         console.log('🗑️ Cache cleared');
     }
 

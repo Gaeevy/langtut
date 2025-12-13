@@ -6,7 +6,7 @@ Handles all text-to-speech related endpoints.
 
 from flask import Blueprint, jsonify, request
 
-from app.services.tts import TTSService
+from app.services.tts import tts_service
 from app.session_manager import SessionKeys, SessionManager
 
 # Create blueprint (will be nested under /api/)
@@ -16,7 +16,6 @@ tts_bp = Blueprint("tts", __name__, url_prefix="/tts")
 @tts_bp.route("/status", methods=["GET"])
 def status():
     """Get TTS availability status."""
-    service = TTSService()
     sm = SessionManager()
     target_lang = sm.get(SessionKeys.TARGET_LANGUAGE)
 
@@ -26,10 +25,9 @@ def status():
     try:
         return jsonify(
             {
-                "available": service.enabled,
-                "language": service.language_code,
-                "voice": service.voice_name,
-                "target_language": target_lang,
+                "available": tts_service.enabled,
+                "language": tts_service.language_code,
+                "voice": tts_service.voice_name,
             }
         )
     except ValueError as e:
@@ -65,10 +63,8 @@ def speak():
     spreadsheet_id = data.get("spreadsheet_id")
     sheet_gid = data.get("sheet_gid")
 
-    service = TTSService()
-
     try:
-        audio_base64 = service.text_to_speech(
+        audio_base64 = tts_service.text_to_speech(
             text=text, spreadsheet_id=spreadsheet_id, sheet_gid=sheet_gid
         )
 

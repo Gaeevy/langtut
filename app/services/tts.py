@@ -11,7 +11,6 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import ClassVar
 
 import yaml
 from google.cloud import storage, texttospeech
@@ -40,41 +39,37 @@ class LanguageVoiceConfig:
 class TTSService:
     """Text-to-speech service using Google Cloud TTS API."""
 
-    # Class-level language configurations (loaded once)
-    _languages: ClassVar[dict[str, LanguageVoiceConfig]] = {}
-
     def __init__(self):
         """Initialize TTS service and load language configurations."""
         self.tts_client = None
         self.storage_client = None
         self.bucket = None
         self.enabled = config.tts_enabled
+        self._languages = self._load_languages()
 
         if self.enabled:
             self._initialize_clients()
-            self._load_languages()
 
-    def _load_languages(self) -> None:
-        """Load languages.yaml into class-level dict (once)."""
-        if TTSService._languages:
-            return  # Already loaded
-
+    def _load_languages(self) -> dict[str, LanguageVoiceConfig]:
+        """Load languages.yaml"""
         config_path = Path(__file__).parent.parent.parent / "config" / "languages.yaml"
 
         if not config_path.exists():
             logger.warning(f"languages.yaml not found at {config_path}")
-            return
+            return {}
 
         try:
             with open(config_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
 
+            languages_parsed = {}
             for lang_key, lang_data in data.get("languages", {}).items():
-                TTSService._languages[lang_key] = LanguageVoiceConfig(
+                languages_parsed[lang_key] = LanguageVoiceConfig(
                     code=lang_data["code"], voice=lang_data["voice"]
                 )
+            logger.info(f"Loaded {len(languages_parsed)} TTS languages")
 
-            logger.info(f"Loaded {len(TTSService._languages)} TTS languages")
+            return languages_parsed
 
         except Exception as e:
             logger.error(f"Failed to load languages.yaml: {e}")
@@ -96,7 +91,7 @@ class TTSService:
         if not target_lang:
             raise ValueError("No target language in session")
 
-        lang_config = TTSService._languages.get(target_lang)
+        lang_config = self._languages.get(target_lang)
 
         if not lang_config:
             raise ValueError(f"Language '{target_lang}' not supported")
@@ -120,7 +115,7 @@ class TTSService:
         if not target_lang:
             raise ValueError("No target language in session")
 
-        lang_config = TTSService._languages.get(target_lang)
+        lang_config = self._languages.get(target_lang)
 
         if not lang_config:
             raise ValueError(f"Language '{target_lang}' not supported")
@@ -277,3 +272,6 @@ class TTSService:
         except Exception as e:
             logger.error(f"Failed to fetch voices: {e}")
             return []
+
+
+tts_service = TTSService()
