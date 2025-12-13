@@ -63,14 +63,18 @@ class TTSManager {
             return null;
         }
 
+        console.log(`🎯 speakCard(autoplay=${autoplay}) - word: "${word}", example: "${example}"`);
+
         // Fetch both audios (with caching)
         const wordAudio = await this.fetchAudio(word, spreadsheetId, sheetGid);
         const exampleAudio = await this.fetchAudio(example, spreadsheetId, sheetGid);
 
         // Play if autoplay enabled
         if (autoplay && wordAudio && exampleAudio) {
+            console.log('▶️ Playing audio (word + example)');
             await this.playAudio(wordAudio);
             await this.playAudio(exampleAudio);
+            console.log('✅ Playback complete');
         }
 
         return {
@@ -88,12 +92,13 @@ class TTSManager {
 
         // Check cache first
         if (this.audioCache.has(cacheKey)) {
-            console.log('✅ Play audio from cashe');
+            console.log(`💾 Cache hit: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
             return this.audioCache.get(cacheKey);
         }
 
         // Check if already pending
         if (this.pendingRequests.has(cacheKey)) {
+            console.log(`⏳ Already fetching: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
             return this.pendingRequests.get(cacheKey);
         }
 
@@ -101,6 +106,8 @@ class TTSManager {
         const requestBody = { text };
         if (spreadsheetId) requestBody.spreadsheet_id = spreadsheetId;
         if (sheetGid) requestBody.sheet_gid = sheetGid;
+
+        console.log(`🌐 Fetching from API: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
 
         // Fetch from API
         const promise = fetch('/api/tts/speak', {
@@ -112,16 +119,17 @@ class TTSManager {
         .then(data => {
             if (data.success) {
                 // Cache it
+                console.log(`✅ Cached: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
                 this.audioCache.set(cacheKey, data.audio_base64);
                 this.saveCache();
                 return data.audio_base64;
             } else {
-                console.error('TTS failed:', data.error);
+                console.error('❌ TTS failed:', data.error);
                 return null;
             }
         })
         .catch(error => {
-            console.error('TTS request failed:', error);
+            console.error('❌ TTS request failed:', error);
             return null;
         })
         .finally(() => {
@@ -134,6 +142,7 @@ class TTSManager {
 
     async playAudio(audioBase64) {
         if (!audioBase64) {
+            console.warn('⚠️ playAudio called with no audio data');
             return;
         }
 
@@ -142,6 +151,7 @@ class TTSManager {
 
         // Ensure audio unlocked
         if (!this.audioUnlocked) {
+            console.log('🔓 Audio not unlocked, attempting unlock...');
             await this.unlockAudio();
         }
 
@@ -149,12 +159,16 @@ class TTSManager {
         const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
         this.currentAudio = audio;
 
+        console.log('🔊 Starting audio playback');
+
         return new Promise((resolve, reject) => {
             audio.onended = () => {
+                console.log('✅ Audio playback ended');
                 this.currentAudio = null;
                 resolve();
             };
             audio.onerror = (error) => {
+                console.error('❌ Audio playback error:', error);
                 this.currentAudio = null;
                 reject(error);
             };

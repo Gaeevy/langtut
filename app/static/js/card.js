@@ -34,13 +34,22 @@ function toggleEquivalent() {
 }
 
 /**
- * Simplified TTS prefetching functionality
+ * TTS prefetching for current card
  */
 async function prefetchCardTTS() {
-    if (!window.ttsManager || !window.ttsManager.enabled) {
+    if (!window.ttsManager) {
+        console.log('⏭️ Skipping prefetch - TTS manager not available');
         return;
     }
 
+    // Wait for TTS service to be ready (fixes race condition)
+    const ready = await window.ttsManager.waitForService();
+    if (!ready) {
+        console.log('⏭️ Skipping prefetch - TTS service not available');
+        return;
+    }
+
+    console.log('🔄 Prefetching TTS for current card...');
     await window.ttsManager.speakCard(
         window.cardData.word,
         window.cardData.example,
@@ -48,6 +57,7 @@ async function prefetchCardTTS() {
         window.cardContext.spreadsheetId,
         window.cardContext.sheetGid
     );
+    console.log('✅ Prefetch complete');
 }
 
 /**
@@ -100,6 +110,7 @@ document.addEventListener('DOMContentLoaded', initCardPage);
 
 // Play button handler
 document.querySelector('.play-button')?.addEventListener('click', async () => {
+    console.log('🎵 Play button clicked');
     await window.ttsManager.speakCard(
         window.cardData.word,
         window.cardData.example,
