@@ -3,7 +3,13 @@
  * Phase 1: Unified Mobile Unlock Architecture
  */
 class TTSManager {
+    static #instance = null;
+
     constructor() {
+        if (TTSManager.#instance) {
+            return TTSManager.#instance;
+        }
+
         this.enabled = false;
         this.audioUnlocked = false;
         this.browser = this.detectBrowser();
@@ -13,6 +19,9 @@ class TTSManager {
         // Simplified cache (text-only keys)
         this.audioCache = new Map();
         this.pendingRequests = new Map();
+
+        // Сохраняем экземпляр
+        TTSManager.#instance = this;
 
         // Desktop browsers auto-unlocked
         if (this.browser === 'desktop') {
@@ -36,6 +45,15 @@ class TTSManager {
 
         // Check TTS service availability (async)
         this.init();
+
+        return this;
+    }
+
+    static getInstance() {
+        if (!TTSManager.#instance) {
+            TTSManager.#instance = new TTSManager();
+        }
+        return TTSManager.#instance;
     }
 
     async init() {
@@ -48,6 +66,12 @@ class TTSManager {
             console.error('TTS init failed:', error);
             this.enabled = false;
         }
+    }
+
+    cleanupForPageUnload() {
+        this.saveCache();
+        this.stopAllAudio();
+        console.log('🧹 TTSManager cleanup for page unload');
     }
 
     getCacheKey(text) {
@@ -473,4 +497,4 @@ class TTSManager {
 }
 
 // Global instance
-window.ttsManager = new TTSManager();
+window.ttsManager = TTSManager.getInstance();

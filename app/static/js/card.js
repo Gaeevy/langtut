@@ -119,3 +119,9 @@ document.querySelector('.play-button')?.addEventListener('click', async () => {
         window.cardContext.sheetGid
     );
 });
+
+window.addEventListener('beforeunload', () => {
+    if (window.ttsManager) {
+        window.ttsManager.cleanupForPageUnload();
+    }
+});
