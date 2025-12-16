@@ -127,10 +127,10 @@ def feedback(correct: str):
 def rate_difficulty(card_index: int, difficulty: str):
     """Rate the difficulty of a card (for future spaced repetition)."""
     logger.info(f"Card {card_index} rated as {difficulty}")
-    return redirect(url_for("learn.next"))
+    return redirect(url_for("learn.next_card"))
 
 
-@learn_bp.route("/next")
+@learn_bp.route("/next_card")
 @auth_manager.require_auth
 def next_card():
     """Move to the next card in the session."""

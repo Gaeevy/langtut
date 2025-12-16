@@ -612,7 +612,6 @@ class ListeningManager {
             const audioData = await window.ttsManager.speakCard(
                 card.word,
                 card.example,
-                null, // voice name
                 false, // autoplay = false (we'll control playback manually)
                 spreadsheetId,
                 this.sheetGid
@@ -729,7 +728,6 @@ class ListeningManager {
         window.ttsManager.speakCard(
             nextCard.word,
             nextCard.example,
-            null, // voice name
             false, // autoplay = false (just cache)
             spreadsheetId,
             this.sheetGid
@@ -1067,3 +1065,9 @@ window.debugListening = () => {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = ListeningManager;
 }
+
+window.addEventListener('beforeunload', () => {
+    if (window.ttsManager) {
+        window.ttsManager.cleanupForPageUnload();
+    }
+});
