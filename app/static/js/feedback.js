@@ -61,7 +61,7 @@ function animateLevelChange(currentLevel, levelChange) {
 /**
  * Setup TTS auto-play and button handlers
  */
-async function setupTTS(cardData) {
+function setupTTS(cardData) {
     if (!window.ttsManager) return;
 
     const { word, example, spreadsheetId, sheetGid } = cardData;
