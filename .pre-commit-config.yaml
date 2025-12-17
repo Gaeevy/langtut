@@ -4,7 +4,7 @@
 repos:
   # Ruff - Fast Python linter and formatter
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.0
+    rev: v0.14.9
     hooks:
       # Linter
       - id: ruff
@@ -18,7 +18,7 @@ repos:
 
   # Basic file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       # File formatting
       - id: trailing-whitespace
@@ -60,9 +60,23 @@ repos:
         name: protect master branch
         args: ['--branch', 'master', '--branch', 'main']
 
+  # Custom local hooks
+  - repo: local
+    hooks:
+      # Prevent any changes to master/main (commits, merges, rebases)
+      - id: protect-master-from-all-changes
+        name: block all changes to master/main
+        entry: bash -c 'branch=$(git branch --show-current); if [ "$branch" = "master" ] || [ "$branch" = "main" ]; then echo "ERROR - Direct changes to $branch are not allowed! Create a feature branch instead."; exit 1; fi'
+        language: system
+        stages:
+          - pre-commit
+          - pre-merge-commit
+        pass_filenames: false
+        always_run: true
+
   # Security checks
   - repo: https://github.com/PyCQA/bandit
-    rev: '1.8.5'
+    rev: '1.9.2'
     hooks:
       - id: bandit
         name: bandit security check

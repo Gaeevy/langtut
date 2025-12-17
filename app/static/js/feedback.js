@@ -69,8 +69,14 @@ function setupTTS(cardData) {
     // Auto-play if audio is unlocked
     if (window.ttsManager.isUnlocked()) {
         console.log('✅ Audio unlocked - auto-playing card audio');
-        setTimeout(() => {
-            window.ttsManager.speakCard(word, example, true, spreadsheetId, sheetGid);
+        setTimeout(async () => {
+            // Wait for TTS service to be ready
+            const ready = await window.ttsManager.waitForService();
+            if (ready) {
+                window.ttsManager.speakCard(word, example, true, spreadsheetId, sheetGid);
+            } else {
+                console.log('⚠️ TTS service not available - skipping auto-play');
+            }
         }, 300);
     } else {
         console.log('⚠️ Audio not unlocked - skipping auto-play');
@@ -84,7 +90,13 @@ function setupTTS(cardData) {
                 console.log('🔓 Unlocking audio from button click...');
                 await window.ttsManager.unlockAudio();
             }
-            window.ttsManager.speakCard(word, example, true, spreadsheetId, sheetGid);
+            // Wait for TTS service to be ready
+            const ready = await window.ttsManager.waitForService();
+            if (ready) {
+                window.ttsManager.speakCard(word, example, true, spreadsheetId, sheetGid);
+            } else {
+                console.log('⚠️ TTS service not available');
+            }
         });
     }
 }
