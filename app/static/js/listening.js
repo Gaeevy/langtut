@@ -608,6 +608,12 @@ class ListeningManager {
                 return;
             }
 
+            // Wait for TTS service to be ready
+            const ready = await window.ttsManager.waitForService();
+            if (!ready) {
+                throw new Error('TTS service not available');
+            }
+
             // Load both word and example audio, then play them in sequence
             const audioData = await window.ttsManager.speakCard(
                 card.word,
