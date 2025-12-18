@@ -99,8 +99,8 @@ class ListeningManager {
             source.start();
 
             // Also unlock existing TTSManager if available
-            if (window.ttsManager && !window.ttsManager.userInteracted) {
-                window.ttsManager.userInteracted = true;
+            if (window.ttsManager) {
+                await window.ttsManager.unlockAudio();
             }
 
             this.audioUnlocked = true;
@@ -129,10 +129,10 @@ class ListeningManager {
             // Just loading the audio during user interaction unlocks it for Chrome iOS
             touchedAudio.load();
 
-            // Store for TTSManager to reuse
+            // Store for TTSManager to reuse and unlock it
             if (window.ttsManager) {
                 window.ttsManager.primedAudioForChromeIOS = touchedAudio;
-                window.ttsManager.userInteracted = true;
+                await window.ttsManager.unlockAudio();
             }
 
             this.audioUnlocked = true;
@@ -141,9 +141,9 @@ class ListeningManager {
         } catch (error) {
             console.error('Chrome iOS audio unlock failed:', error);
 
-            // Fallback: Just set the flag anyway
+            // Fallback: Just unlock anyway
             if (window.ttsManager) {
-                window.ttsManager.userInteracted = true;
+                await window.ttsManager.unlockAudio();
             }
 
             this.audioUnlocked = true;
@@ -642,9 +642,17 @@ class ListeningManager {
 
             // Play word first
             console.log(`🎤 Playing word: "${card.word}" (token: ${operationToken})`);
+            if (!audioData.word.audio_base64) {
+                throw new Error('Word audio data is missing');
+            }
             const wordBase64Preview = audioData.word.audio_base64.substring(0, 10);
             console.log(`🎵 Word audio: [${wordBase64Preview}...]`);
-            await window.ttsManager.playAudio(audioData.word.audio_base64);
+            try {
+                await window.ttsManager.playAudio(audioData.word.audio_base64);
+            } catch (error) {
+                console.error('❌ Error playing word audio:', error);
+                throw new Error(`Failed to play word audio: ${error.message}`);
+            }
 
             // Check token/session again after word
             if (operationToken !== this.currentOperationToken) {
@@ -673,9 +681,17 @@ class ListeningManager {
 
             // Play example
             console.log(`🎤 Playing example: "${card.example}" (token: ${operationToken})`);
+            if (!audioData.example.audio_base64) {
+                throw new Error('Example audio data is missing');
+            }
             const exampleBase64Preview = audioData.example.audio_base64.substring(0, 10);
             console.log(`🎵 Example audio: [${exampleBase64Preview}...]`);
-            await window.ttsManager.playAudio(audioData.example.audio_base64);
+            try {
+                await window.ttsManager.playAudio(audioData.example.audio_base64);
+            } catch (error) {
+                console.error('❌ Error playing example audio:', error);
+                throw new Error(`Failed to play example audio: ${error.message}`);
+            }
 
             // Final token check
             if (operationToken === this.currentOperationToken) {

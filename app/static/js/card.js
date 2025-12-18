@@ -111,6 +111,10 @@ document.addEventListener('DOMContentLoaded', initCardPage);
 // Play button handler
 document.querySelector('.play-button')?.addEventListener('click', async () => {
     console.log('🎵 Play button clicked');
+    // Unlock audio during user gesture if needed
+    if (!window.ttsManager.isUnlocked()) {
+        await window.ttsManager.unlockAudio();
+    }
     await window.ttsManager.speakCard(
         window.cardData.word,
         window.cardData.example,

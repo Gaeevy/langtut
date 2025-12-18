@@ -179,8 +179,26 @@ class TTSManager {
             await this.unlockAudio();
         }
 
-        // Create and track audio element
-        const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+        // REUSE existing audio element for mobile browsers (iOS restriction fix)
+        // On iOS, creating new Audio elements for each playback can trigger restrictions
+        let audio;
+        if (this.browser === 'chrome-ios' && this.primedAudioForChromeIOS) {
+            // Reuse the primed audio element for Chrome iOS
+            audio = this.primedAudioForChromeIOS;
+            console.log('🔄 Reusing primed audio element for Chrome iOS');
+        } else if (this.browser !== 'desktop' && this.currentAudio) {
+            // Reuse current audio element for other mobile browsers
+            audio = this.currentAudio;
+            console.log('🔄 Reusing existing audio element for mobile');
+        } else {
+            // Create new audio element for desktop or first mobile playback
+            audio = new Audio();
+            console.log('🆕 Creating new audio element');
+        }
+
+        // Set the source and track audio element
+        audio.src = `data:audio/mp3;base64,${audioBase64}`;
+        audio.load(); // Load the new source
         this.currentAudio = audio;
 
         console.log('🔊 Starting audio playback');
@@ -188,12 +206,14 @@ class TTSManager {
         return new Promise((resolve, reject) => {
             audio.onended = () => {
                 console.log('✅ Audio playback ended');
-                this.currentAudio = null;
+                // Don't clear currentAudio on mobile - we'll reuse it
+                if (this.browser === 'desktop') {
+                    this.currentAudio = null;
+                }
                 resolve();
             };
             audio.onerror = (error) => {
                 console.error('❌ Audio playback error:', error);
-                this.currentAudio = null;
                 reject(error);
             };
             audio.play().catch(reject);
