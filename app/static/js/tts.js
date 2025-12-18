@@ -173,10 +173,11 @@ class TTSManager {
         // Stop previous audio if playing
         this.stopCurrentAudio();
 
-        // Ensure audio unlocked
+        // CRITICAL: Do NOT attempt to unlock here - it must happen during user interaction
+        // If audio is not unlocked, playback may fail on mobile
         if (!this.audioUnlocked) {
-            console.log('🔓 Audio not unlocked, attempting unlock...');
-            await this.unlockAudio();
+            console.warn('⚠️ Audio not unlocked - playback may fail on mobile browsers');
+            console.warn('💡 Unlock audio during a user interaction (click/touch) before calling playAudio()');
         }
 
         // Create and track audio element
