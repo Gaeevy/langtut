@@ -99,8 +99,8 @@ class ListeningManager {
             source.start();
 
             // Also unlock existing TTSManager if available
-            if (window.ttsManager && !window.ttsManager.userInteracted) {
-                window.ttsManager.userInteracted = true;
+            if (window.ttsManager && !window.ttsManager.audioUnlocked) {
+                await window.ttsManager.unlockAudio();
             }
 
             this.audioUnlocked = true;
@@ -129,10 +129,16 @@ class ListeningManager {
             // Just loading the audio during user interaction unlocks it for Chrome iOS
             touchedAudio.load();
 
-            // Store for TTSManager to reuse
+            // Store for TTSManager to reuse and mark as unlocked
             if (window.ttsManager) {
                 window.ttsManager.primedAudioForChromeIOS = touchedAudio;
-                window.ttsManager.userInteracted = true;
+                window.ttsManager.audioUnlocked = true;
+                // Persist unlock state in session
+                try {
+                    sessionStorage.setItem('tts_audio_unlocked', 'true');
+                } catch (error) {
+                    console.warn('⚠️ Could not save unlock state:', error);
+                }
             }
 
             this.audioUnlocked = true;
@@ -143,7 +149,13 @@ class ListeningManager {
 
             // Fallback: Just set the flag anyway
             if (window.ttsManager) {
-                window.ttsManager.userInteracted = true;
+                window.ttsManager.audioUnlocked = true;
+                // Persist unlock state in session
+                try {
+                    sessionStorage.setItem('tts_audio_unlocked', 'true');
+                } catch (error) {
+                    console.warn('⚠️ Could not save unlock state:', error);
+                }
             }
 
             this.audioUnlocked = true;

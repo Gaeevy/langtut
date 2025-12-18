@@ -6,6 +6,38 @@
 // Track prefetch attempts to prevent duplicates
 let prefetchAttempted = false;
 
+// Track if we've attempted to unlock audio
+let unlockAttempted = false;
+
+/**
+ * Unlock audio on first user interaction (critical for iOS)
+ */
+async function unlockAudioOnFirstInteraction() {
+    if (unlockAttempted || !window.ttsManager) {
+        return;
+    }
+
+    // Only unlock if not already unlocked
+    if (window.ttsManager.isUnlocked()) {
+        unlockAttempted = true;
+        return;
+    }
+
+    unlockAttempted = true;
+    console.log('🔓 Attempting to unlock audio on first interaction...');
+
+    try {
+        const success = await window.ttsManager.unlockAudio();
+        if (success) {
+            console.log('✅ Audio unlocked successfully on first interaction');
+        } else {
+            console.warn('⚠️ Audio unlock failed on first interaction');
+        }
+    } catch (error) {
+        console.error('❌ Error unlocking audio:', error);
+    }
+}
+
 /**
  * Card flipping functionality for review mode
  */
@@ -101,6 +133,17 @@ function initCardPage() {
     // Setup keyboard navigation
     setupKeyboardNavigation();
 
+    // Add first-click unlock handler for mobile
+    // This ensures audio is unlocked during the FIRST user interaction
+    const unlockOnFirstClick = async (event) => {
+        await unlockAudioOnFirstInteraction();
+        // Remove listener after first click
+        document.removeEventListener('click', unlockOnFirstClick);
+        document.removeEventListener('touchstart', unlockOnFirstClick);
+    };
+    document.addEventListener('click', unlockOnFirstClick, { once: true });
+    document.addEventListener('touchstart', unlockOnFirstClick, { once: true });
+
     // Start TTS prefetching
     prefetchCardTTS();
 }
@@ -111,6 +154,13 @@ document.addEventListener('DOMContentLoaded', initCardPage);
 // Play button handler
 document.querySelector('.play-button')?.addEventListener('click', async () => {
     console.log('🎵 Play button clicked');
+
+    // Ensure audio is unlocked before playing (critical for iOS)
+    if (window.ttsManager && !window.ttsManager.isUnlocked()) {
+        console.log('🔓 Unlocking audio on play button click...');
+        await window.ttsManager.unlockAudio();
+    }
+
     await window.ttsManager.speakCard(
         window.cardData.word,
         window.cardData.example,
