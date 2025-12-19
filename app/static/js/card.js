@@ -17,14 +17,10 @@ async function unlockAudioOnFirstInteraction() {
         return;
     }
 
-    // For Chrome iOS: always recreate primed audio element on new page
-    // Even if audioUnlocked flag was restored from session storage
-    const needsUnlock = !window.ttsManager.isUnlocked() ||
-                        (window.ttsManager.browser === 'chrome-ios' && !window.ttsManager.primedAudioForChromeIOS);
-
-    if (!needsUnlock) {
+    // Only unlock if not already unlocked
+    // Trust the session storage - iOS remembers domain unlock across pages
+    if (window.ttsManager.isUnlocked()) {
         unlockAttempted = true;
-        console.log('✅ Audio already unlocked with valid primed element');
         return;
     }
 

@@ -14,14 +14,10 @@ async function unlockAudioOnFirstInteraction() {
         return;
     }
 
-    // For Chrome iOS: always recreate primed audio element on new page
-    // Even if audioUnlocked flag was restored from session storage
-    const needsUnlock = !window.ttsManager.isUnlocked() ||
-                        (window.ttsManager.browser === 'chrome-ios' && !window.ttsManager.primedAudioForChromeIOS);
-
-    if (!needsUnlock) {
+    // Only unlock if not already unlocked
+    // Trust the session storage - iOS remembers domain unlock across pages
+    if (window.ttsManager.isUnlocked()) {
         unlockAttempted = true;
-        console.log('✅ Audio already unlocked with valid primed element');
         return;
     }
 
@@ -120,12 +116,9 @@ function setupTTS(cardData) {
 
     const { word, example, spreadsheetId, sheetGid } = cardData;
 
-    // Auto-play if audio is TRULY unlocked (not just flag restored from session)
-    // For Chrome iOS, we need both the flag AND the primed audio element
-    const isReallyUnlocked = window.ttsManager.isUnlocked() &&
-                             (window.ttsManager.browser !== 'chrome-ios' || window.ttsManager.primedAudioForChromeIOS);
-
-    if (isReallyUnlocked) {
+    // Auto-play if audio is unlocked
+    // iOS remembers domain unlock across pages, so new Audio elements will work
+    if (window.ttsManager.isUnlocked()) {
         console.log('✅ Audio unlocked - auto-playing card audio');
         setTimeout(async () => {
             // Wait for TTS service to be ready

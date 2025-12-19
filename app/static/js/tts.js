@@ -292,13 +292,8 @@ class TTSManager {
      * @returns {Promise<boolean>} True if unlock successful
      */
     async unlockAudio() {
-        // For Chrome iOS, also check if we have a primed audio element
-        // Session storage can restore the flag, but not the in-memory element
-        const hasValidUnlock = this.audioUnlocked &&
-                              (this.browser !== 'chrome-ios' || this.primedAudioForChromeIOS);
-
-        if (hasValidUnlock) {
-            console.log('✅ Audio already unlocked with valid primed element');
+        if (this.audioUnlocked) {
+            console.log('✅ Audio already unlocked');
             return true;
         }
 
