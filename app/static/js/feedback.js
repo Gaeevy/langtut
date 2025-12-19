@@ -14,9 +14,14 @@ async function unlockAudioOnFirstInteraction() {
         return;
     }
 
-    // Only unlock if not already unlocked
-    if (window.ttsManager.isUnlocked()) {
+    // For Chrome iOS: always recreate primed audio element on new page
+    // Even if audioUnlocked flag was restored from session storage
+    const needsUnlock = !window.ttsManager.isUnlocked() ||
+                        (window.ttsManager.browser === 'chrome-ios' && !window.ttsManager.primedAudioForChromeIOS);
+
+    if (!needsUnlock) {
         unlockAttempted = true;
+        console.log('✅ Audio already unlocked with valid primed element');
         return;
     }
 
@@ -115,8 +120,12 @@ function setupTTS(cardData) {
 
     const { word, example, spreadsheetId, sheetGid } = cardData;
 
-    // Auto-play if audio is unlocked
-    if (window.ttsManager.isUnlocked()) {
+    // Auto-play if audio is TRULY unlocked (not just flag restored from session)
+    // For Chrome iOS, we need both the flag AND the primed audio element
+    const isReallyUnlocked = window.ttsManager.isUnlocked() &&
+                             (window.ttsManager.browser !== 'chrome-ios' || window.ttsManager.primedAudioForChromeIOS);
+
+    if (isReallyUnlocked) {
         console.log('✅ Audio unlocked - auto-playing card audio');
         setTimeout(async () => {
             // Wait for TTS service to be ready
@@ -128,7 +137,7 @@ function setupTTS(cardData) {
             }
         }, 300);
     } else {
-        console.log('⚠️ Audio not unlocked - skipping auto-play');
+        console.log('⚠️ Audio not unlocked - skipping auto-play (will unlock on first click)');
     }
 
     // Setup speak button click handler
