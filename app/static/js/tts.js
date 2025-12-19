@@ -180,11 +180,36 @@ class TTSManager {
             console.warn('💡 Unlock audio during a user interaction (click/touch) before calling playAudio()');
         }
 
-        // Create and track audio element
-        const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
-        this.currentAudio = audio;
+        // Log base64 preview for debugging
+        const base64Preview = audioBase64.substring(0, 10);
+        console.log(`🔊 Starting audio playback... [${base64Preview}...]`);
 
-        console.log('🔊 Starting audio playback');
+        // For Chrome iOS: Use primed Audio element if available
+        let audio;
+        if (this.primedAudioForChromeIOS) {
+            console.log('📱 Using primed Chrome iOS audio element');
+            audio = this.primedAudioForChromeIOS;
+
+            // Make sure primed audio is stopped before reusing
+            if (!audio.paused) {
+                audio.pause();
+                audio.currentTime = 0;
+            }
+
+            // Remove any existing event listeners to prevent conflicts
+            audio.onended = null;
+            audio.onerror = null;
+            audio.oncanplaythrough = null;
+
+            // Reuse the primed element but update its source
+            audio.src = `data:audio/mp3;base64,${audioBase64}`;
+        } else {
+            console.log('🖥️ Creating new audio element');
+            // Create new audio element for other browsers
+            audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+        }
+
+        this.currentAudio = audio;
 
         return new Promise((resolve, reject) => {
             audio.onended = () => {
