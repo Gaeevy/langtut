@@ -23,7 +23,7 @@
 
     <!-- Visual feedback indicator - only for study mode -->
     {% if mode != 'review' %}
-    <div class="feedback-indicator mb-4">
+    <div class="feedback-indicator mb-3">
         {% if correct %}
         <div class="success-indicator">
             <i class="bi bi-check-circle-fill"></i>
@@ -34,6 +34,20 @@
         </div>
         {% endif %}
     </div>
+    <!-- Mode-specific feedback label -->
+    {% if question_mode is defined %}
+    <p class="text-muted small mb-2">
+        {% if question_mode == 'pick_one' %}
+            {% if correct %}Good pick!{% else %}Wrong choice — the correct translation is shown below.{% endif %}
+        {% elif question_mode == 'build_sentence' %}
+            {% if correct %}Sentence correct!{% else %}Not quite — the correct sentence is shown below.{% endif %}
+        {% elif question_mode == 'build_word' %}
+            {% if correct %}Word spelled correctly!{% else %}Not quite — the correct word is shown below.{% endif %}
+        {% else %}
+            {% if correct %}Correct!{% else %}Not quite — the correct word is shown below.{% endif %}
+        {% endif %}
+    </p>
+    {% endif %}
     {% endif %}
 
     <!-- Navigation arrows for review mode -->

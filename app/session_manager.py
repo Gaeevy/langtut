@@ -29,12 +29,17 @@ class SessionKeys(Enum):
     LEARNING_CARDS = "learning.cards"
     LEARNING_CURRENT_INDEX = "learning.current_index"
     LEARNING_ANSWERS = "learning.answers"
-    LEARNING_INCORRECT_CARDS = "learning.incorrect_cards"
-    LEARNING_REVIEWING_INCORRECT = "learning.reviewing_incorrect"
     LEARNING_ACTIVE_TAB = "learning.active_tab"
     LEARNING_ORIGINAL_COUNT = "learning.original_count"
     LEARNING_SHEET_GID = "learning.sheet_gid"
     LEARNING_LAST_LEVEL_CHANGE = "learning.last_level_change"
+    # Task queue for multi-mode sessions
+    LEARNING_TASK_QUEUE = "learning.task_queue"
+    LEARNING_TASK_INDEX = "learning.task_index"
+    # Per-card progress tracking (keyed by str(card_idx))
+    LEARNING_CARD_PIPELINES = "learning.card_pipelines"  # {card_idx: [modes]}
+    LEARNING_CARD_MODES_DONE = "learning.card_modes_done"  # {card_idx: [completed modes]}
+    LEARNING_CARD_RETRIES = "learning.card_retries"  # {card_idx: retry_count}
 
     # Review namespace - Review mode session state
     REVIEW_CARDS = "review.cards"
