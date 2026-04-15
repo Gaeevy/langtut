@@ -1084,8 +1084,4 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = ListeningManager;
 }
 
-window.addEventListener('beforeunload', () => {
-    if (window.ttsManager) {
-        window.ttsManager.cleanupForPageUnload();
-    }
-});
+// beforeunload cleanup is handled centrally in tts.js

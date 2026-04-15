@@ -36,9 +36,10 @@
                 buttons.forEach(function (b) { b.classList.remove('selected'); });
                 btn.classList.add('selected');
 
-                // Fill hidden input and auto-submit
+                // Fill hidden input and submit (requestSubmit triggers the submit event
+                // so card.js can intercept it for AJAX + audio autoplay)
                 answerInput.value = btn.dataset.value;
-                form.submit();
+                form.requestSubmit();
             });
         });
     }
@@ -99,7 +100,7 @@
             submitBtn.addEventListener('click', function () {
                 if (targetTiles.length === 0) return;
                 updateAnswer();
-                form.submit();
+                form.requestSubmit();
             });
         }
 

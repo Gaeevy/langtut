@@ -524,3 +524,10 @@ class TTSManager {
 
 // Global instance
 window.ttsManager = TTSManager.getInstance();
+
+// Centralized cleanup on page unload (no need to register this in every page script)
+window.addEventListener('beforeunload', () => {
+    if (window.ttsManager) {
+        window.ttsManager.cleanupForPageUnload();
+    }
+});
