@@ -186,9 +186,3 @@ function initFeedbackPage() {
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', initFeedbackPage);
-
-window.addEventListener('beforeunload', () => {
-    if (window.ttsManager) {
-        window.ttsManager.cleanupForPageUnload();
-    }
-});

@@ -6,7 +6,7 @@ Thin route handlers that delegate to LearnService.
 
 import logging
 
-from flask import Blueprint, redirect, render_template, request, url_for
+from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 
 from app.services.auth_manager import auth_manager
 from app.services.learning.learn_service import LearnService
@@ -74,16 +74,59 @@ def card():
 @learn_bp.route("/answer", methods=["POST"])
 @auth_manager.require_auth
 def answer():
-    """Process the user's answer to a flashcard."""
-    user_answer = request.form.get("user_answer", "").strip()
+    """Process the user's answer to a flashcard.
+
+    Supports both traditional form POST (redirect) and AJAX JSON requests
+    (returns JSON for in-page feedback rendering with audio autoplay).
+    """
+    is_ajax = request.is_json
+
+    if is_ajax:
+        data = request.get_json()
+        user_answer = data.get("user_answer", "").strip()
+    else:
+        user_answer = request.form.get("user_answer", "").strip()
+
     logger.info(f'User submitted answer: "{user_answer}"')
 
     service = LearnService()
     result = service.process_answer(user_answer)
 
     if not result.success:
+        if is_ajax:
+            return jsonify({"success": False, "error": result.error})
         logger.warning(f"Answer processing failed: {result.error}")
         return redirect(url_for("index.home"))
+
+    if is_ajax:
+        context = service.get_current_card_context()
+        service.get_level_change()  # clear from session (consumed here)
+        user = auth_manager.user
+
+        card = context.card if context else {}
+        level_val = card.get("level", 0)
+        if hasattr(level_val, "value"):
+            level_val = level_val.value
+
+        return jsonify(
+            {
+                "success": True,
+                "correct": result.is_correct,
+                "card": {
+                    "word": card.get("word", ""),
+                    "translation": card.get("translation", ""),
+                    "example": card.get("example"),
+                    "example_translation": card.get("example_translation"),
+                    "level": level_val,
+                },
+                "level_change": result.level_change,
+                "question_mode": context.mode if context else "type_answer",
+                "task_index": context.task_index if context else 0,
+                "task_total": context.task_total if context else 0,
+                "spreadsheet_id": user.get_active_spreadsheet_id() if user else None,
+                "sheet_gid": context.sheet_gid if context else None,
+            }
+        )
 
     feedback_url = url_for("learn.feedback", correct="yes" if result.is_correct else "no")
     return redirect(feedback_url)

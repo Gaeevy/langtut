@@ -387,9 +387,9 @@ class AuthManager:
         Returns:
             Redirect URI for OAuth callback
         """
-        if config.environment == Environment.PRODUCTION:
-            return f"https://{host}/oauth2callback"
-        return f"http://{host}/oauth2callback"
+        use_https = config.environment == Environment.PRODUCTION or "ngrok" in host
+        scheme = "https" if use_https else "http"
+        return f"{scheme}://{host}/oauth2callback"
 
     # Credential Management Methods
 
