@@ -10,16 +10,30 @@
     </div>
     {% endif %}
 
-    <!-- Progress bar - shown for both study and review modes -->
+    <!-- Overall task-queue progress (for learn mode) -->
+    {% if mode == 'learn' %}
+    <div class="progress-container mb-2">
+        <div class="progress" style="height: 6px;">
+            <div class="progress-bar task-progress-bar" role="progressbar"
+                 style="width: {{ (task_index / task_total * 100)|round if task_total else 0 }}%;"
+                 aria-valuenow="{{ task_index }}" aria-valuemin="0" aria-valuemax="{{ task_total }}"></div>
+        </div>
+        <div class="d-flex justify-content-between mt-1">
+            <small class="text-muted">Overall: {{ task_index + 1 }} / {{ task_total }}</small>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Per-mode-round progress bar -->
     <div class="progress-container">
         <div class="progress" style="height: 10px;">
             <div class="progress-bar {% if reviewing %}pastel-progress-warning{% elif mode == 'review' %}pastel-progress-review{% else %}pastel-progress-study{% endif %}" role="progressbar"
-                 style="width: {{ (index / total * 100)|round }}%;"
+                 style="width: {{ (index / total * 100)|round if total else 0 }}%;"
                  aria-valuenow="{{ index }}" aria-valuemin="0" aria-valuemax="{{ total }}"></div>
         </div>
         <div class="d-flex justify-content-between mt-1">
             <small>Card {{ index + 1 }} of {{ total }}{% if reviewing %} (Review){% elif mode == 'review' %} (Browse){% endif %}</small>
-            <small>{{ (index / total * 100)|round }}% complete</small>
+            <small>{{ (index / total * 100)|round if total else 0 }}% complete</small>
         </div>
     </div>
 </div>
@@ -41,18 +55,48 @@
 </div>
 {% endif %}
 
+<!-- Card face -->
 <div class="language-card mb-4" {% if mode == 'review' %}onclick="flipCard()" style="cursor: pointer;"{% endif %}>
     <div class="row">
-        <div class="col-md-12 text-center">
-            <!-- Main translation (English) - larger and more prominent -->
-            <h3 class="card-translation-main text-dark fw-semibold mb-3">{{ card.translation }}</h3>
+        <div class="col-md-12 text-center p-4">
 
-            <!-- Example translation - medium size, italicized -->
-            {% if card.example_translation %}
-            <p class="card-example-translation text-secondary fst-italic mb-3" style="font-size: 1.2rem; line-height: 1.3;">{{ card.example_translation }}</p>
+            <!-- Mode label badge (learn mode only) -->
+            {% if mode == 'learn' %}
+            <div class="mb-2">
+                {% if question_mode == 'pick_one' %}
+                <span class="mode-label">Choose the translation</span>
+                {% elif question_mode == 'build_sentence' %}
+                <span class="mode-label">Build the sentence</span>
+                {% elif question_mode == 'build_word' %}
+                <span class="mode-label">Spell the word</span>
+                {% else %}
+                <span class="mode-label">Type the word</span>
+                {% endif %}
+            </div>
             {% endif %}
 
-            <!-- Toggle for English equivalent only -->
+            <!-- Prompt shown to the user: what they need to answer -->
+            {% if question_mode == 'build_sentence' %}
+                <!-- For build_sentence: show the translation of the example so they build the target sentence -->
+                {% if card.example_translation %}
+                <p class="card-example-translation text-secondary fst-italic mb-3" style="font-size: 1.2rem; line-height: 1.3;">{{ card.example_translation }}</p>
+                {% endif %}
+                <h3 class="card-translation-main text-dark fw-semibold mb-3">{{ card.translation }}</h3>
+            {% elif question_mode == 'build_word' %}
+                <!-- For build_word: show the translation so they spell the target word -->
+                <h3 class="card-translation-main text-dark fw-semibold mb-3">{{ card.translation }}</h3>
+                {% if card.example_translation %}
+                <p class="card-example-translation text-secondary fst-italic mb-3" style="font-size: 1.1rem;">{{ card.example_translation }}</p>
+                {% endif %}
+            {% else %}
+                <!-- pick_one and type_answer: show translation (and example translation as context) -->
+                <h3 class="card-translation-main text-dark fw-semibold mb-3">{{ card.translation }}</h3>
+                {% if card.example_translation %}
+                <p class="card-example-translation text-secondary fst-italic mb-3" style="font-size: 1.2rem; line-height: 1.3;">{{ card.example_translation }}</p>
+                {% endif %}
+            {% endif %}
+
+            <!-- Hint toggle (equivalent) -->
             {% if card.equivalent %}
             <div class="equivalent-toggle mb-3">
                 <button type="button" class="btn btn-secondary btn-sm" onclick="toggleEquivalent()">
@@ -81,16 +125,69 @@
     </div>
 </div>
 
-<!-- Answer form - only for learn mode -->
+<!-- Answer UI - only for learn mode -->
 {% if mode != 'review' %}
-<form action="{{ url_for('learn.answer') }}" method="post">
+
+<!-- Shared hidden form (all modes submit to same endpoint) -->
+<form id="mode-form" action="{{ url_for('learn.answer') }}" method="post">
+    <input type="hidden" id="user-answer-input" name="user_answer" value="">
+
+    {% if question_mode == 'pick_one' %}
+    <!-- ------------------------------------------------------------------ -->
+    <!-- Mode: Pick One                                                       -->
+    <!-- ------------------------------------------------------------------ -->
+    <div class="pick-one-options">
+        {% for option in mode_data.options %}
+        <button type="button" class="pick-one-btn" data-value="{{ option }}">
+            {{ option }}
+        </button>
+        {% endfor %}
+    </div>
+
+    {% elif question_mode in ('build_sentence', 'build_word') %}
+    <!-- ------------------------------------------------------------------ -->
+    <!-- Mode: Build Sentence / Build Word                                    -->
+    <!-- ------------------------------------------------------------------ -->
+    <div class="build-area">
+        <!-- Drop zone -->
+        <div id="build-target" class="build-target">
+            <span class="text-muted" id="target-placeholder" style="font-size: 0.85rem;">
+                {% if question_mode == 'build_sentence' %}Tap words to build the sentence{% else %}Tap letters to spell the word{% endif %}
+            </span>
+        </div>
+        <div class="text-center mb-2">
+            <button type="button" id="build-reset" class="build-reset-btn">Clear</button>
+        </div>
+
+        <!-- Tile pool -->
+        <div id="build-source" class="build-source">
+            {% for tile in mode_data.tiles %}
+            <span class="build-tile {% if question_mode == 'build_word' %}letter-tile{% endif %}"
+                  data-value="{{ tile }}">{{ tile }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="d-grid mt-3">
+            <button type="button" id="build-submit" class="btn btn-primary btn-lg" disabled>Check</button>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- ------------------------------------------------------------------ -->
+    <!-- Mode: Type Answer (default)                                          -->
+    <!-- The hidden input above isn't used here; the visible input has the    -->
+    <!-- real name="user_answer" attribute that submits the value.           -->
+    <!-- ------------------------------------------------------------------ -->
     <div class="mb-3">
         <input type="text" name="user_answer" class="form-control form-control-lg"
-               placeholder="Type your answer..." autocomplete="off" required>
+               placeholder="Type your answer..." autocomplete="off" required autofocus>
     </div>
     <div class="d-grid">
         <button type="submit" class="btn btn-primary btn-lg">Submit</button>
     </div>
+
+    {% endif %}
+
 </form>
 
 <div class="text-center mt-3">
@@ -99,6 +196,7 @@
         End Session Early
     </a>
 </div>
+
 {% else %}
 <!-- Review mode - back to index -->
 <div class="text-center mt-3">
@@ -121,10 +219,14 @@
         example: {{ card.example|tojson if card.example else 'null' }}
     };
     window.cardMode = {{ mode|tojson if mode else '"learn"' }};
+    window.questionMode = {{ question_mode|tojson if question_mode else '"type_answer"' }};
     window.reviewFlipUrl = '{{ url_for("review.flip") }}';
 </script>
 
 <!-- External scripts -->
 <script src="{{ url_for('static', filename='js/tts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/card.js') }}"></script>
+{% if mode == 'learn' and question_mode in ('pick_one', 'build_sentence', 'build_word') %}
+<script src="{{ url_for('static', filename='js/modes.js') }}"></script>
+{% endif %}
 {% endblock %}

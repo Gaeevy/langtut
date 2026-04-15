@@ -37,12 +37,12 @@ def start(tab_name: str):
 
     if user_spreadsheet:
         language_settings = user_spreadsheet.get_language_settings()
-        target_lang = language_settings.get("target", "pt")  # Default to pt
+        target_lang = language_settings.get("target", "pt")
 
         sm = SessionManager()
         sm.set(SessionKeys.TARGET_LANGUAGE, target_lang)
 
-    logger.info(f"Learn session started with {result.card_count} cards")
+    logger.info(f"Learn session started with {result.card_count} cards, {result.task_count} tasks")
     return redirect(url_for("learn.card"))
 
 
@@ -54,7 +54,7 @@ def card():
     context = service.get_current_card_context()
 
     if not context:
-        logger.info("No more cards, redirecting to results")
+        logger.info("No more tasks, redirecting to results")
         return redirect(url_for("learn.results"))
 
     user = auth_manager.user
@@ -64,8 +64,12 @@ def card():
         card=context.card,
         index=context.index,
         total=context.total,
+        task_index=context.task_index,
+        task_total=context.task_total,
         reviewing=context.is_reviewing_incorrect,
         mode="learn",
+        question_mode=context.mode,
+        mode_data=context.mode_data,
         user_spreadsheet_id=user.get_active_spreadsheet_id(),
         active_tab=context.active_tab,
         sheet_gid=context.sheet_gid,
@@ -100,7 +104,6 @@ def feedback(correct: str):
     if not context:
         return redirect(url_for("index.home"))
 
-    # Get level change info
     level_change = service.get_level_change()
 
     user = auth_manager.user
@@ -110,12 +113,15 @@ def feedback(correct: str):
         card=context.card,
         index=context.index,
         total=context.total,
+        task_index=context.task_index,
+        task_total=context.task_total,
         correct=(correct == "yes"),
         user_answer=request.args.get("answer", ""),
         reviewing=context.is_reviewing_incorrect,
-        card_index=context.index,
+        card_index=context.task_index,
         level_change=level_change,
         mode="learn",
+        question_mode=context.mode,
         user_spreadsheet_id=user.get_active_spreadsheet_id(),
         active_tab=context.active_tab,
         sheet_gid=context.sheet_gid,
@@ -133,7 +139,7 @@ def rate_difficulty(card_index: int, difficulty: str):
 @learn_bp.route("/next_card")
 @auth_manager.require_auth
 def next_card():
-    """Move to the next card in the session."""
+    """Move to the next task in the session."""
     service = LearnService()
     service.advance_to_next()
     return redirect(url_for("learn.card"))
@@ -145,7 +151,6 @@ def results():
     """Display the results of the learning session."""
     service = LearnService()
 
-    # Check if there's an active session
     if not service.has_active_session():
         return redirect(url_for("index.home"))
 
@@ -171,7 +176,6 @@ def end_early():
     """End the current learning session early."""
     service = LearnService()
 
-    # Check if there's an active session
     if not service.has_active_session():
         return redirect(url_for("index.home"))
 

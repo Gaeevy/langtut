@@ -93,6 +93,40 @@ class CardStatistics:
         return any(normalized_user == correct.strip().lower() for correct in correct_answers)
 
     @staticmethod
+    def check_answer_choice(selected: str, correct: str) -> bool:
+        """Check pick_one answer: selected option matches correct translation.
+
+        Args:
+            selected: The translation the user clicked
+            correct: The card's correct translation
+
+        Returns:
+            True if they match (case-insensitive, trimmed)
+        """
+        return selected.strip().lower() == correct.strip().lower()
+
+    @staticmethod
+    def check_answer_ordered(user_answer: str, correct_answer: str) -> bool:
+        """Check build_sentence / build_word answer submitted as a single joined string.
+
+        For build_sentence the user submits words joined by spaces;
+        for build_word the user submits letters joined without separator.
+        Both are compared against the canonical string after normalizing whitespace.
+
+        Args:
+            user_answer: Joined string submitted by the user
+            correct_answer: The canonical sentence or word from the card
+
+        Returns:
+            True if strings match (case-insensitive, whitespace-normalized)
+        """
+
+        def normalize(s: str) -> str:
+            return " ".join(s.lower().split())
+
+        return normalize(user_answer) == normalize(correct_answer)
+
+    @staticmethod
     def update_on_answer(card: Card, is_correct: bool) -> AnswerResult:
         """Update card statistics based on answer.
 

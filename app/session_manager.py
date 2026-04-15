@@ -35,6 +35,9 @@ class SessionKeys(Enum):
     LEARNING_ORIGINAL_COUNT = "learning.original_count"
     LEARNING_SHEET_GID = "learning.sheet_gid"
     LEARNING_LAST_LEVEL_CHANGE = "learning.last_level_change"
+    # Task queue for multi-mode sessions
+    LEARNING_TASK_QUEUE = "learning.task_queue"
+    LEARNING_TASK_INDEX = "learning.task_index"
 
     # Review namespace - Review mode session state
     REVIEW_CARDS = "review.cards"
