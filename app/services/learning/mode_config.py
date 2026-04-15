@@ -82,10 +82,10 @@ def build_task_queue(cards: list[Card]) -> list[dict]:
 
 
 def generate_distractors(card: Card, all_cards: list[dict], count: int = 3) -> list[str]:
-    """Generate wrong-answer options for pick_one mode.
+    """Generate wrong-answer word options for pick_one mode.
 
-    Picks `count` translations from other cards in the session. Falls back to
-    placeholder strings if there aren't enough distinct cards.
+    Picks `count` target-language words from other cards in the session.
+    Falls back to placeholder strings if there aren't enough distinct cards.
 
     Args:
         card: The correct card
@@ -93,10 +93,10 @@ def generate_distractors(card: Card, all_cards: list[dict], count: int = 3) -> l
         count: Number of distractors to generate
 
     Returns:
-        List of distractor translation strings (length == count)
+        List of distractor word strings (length == count)
     """
-    correct = card.translation.strip().lower()
-    pool = [c["translation"] for c in all_cards if c["translation"].strip().lower() != correct]
+    correct = card.word.strip().lower()
+    pool = [c["word"] for c in all_cards if c["word"].strip().lower() != correct]
     random.shuffle(pool)
     distractors = pool[:count]
 
@@ -129,39 +129,34 @@ def shuffle_words(sentence: str) -> list[str]:
     return shuffled
 
 
-def shuffle_letters(word: str) -> list[str]:
-    """Shuffle the letters of a word for build_word mode.
+def sort_letters(word: str) -> list[str]:
+    """Return the letters of a word sorted alphabetically for build_word mode.
 
-    Ensures the result is never in the original order (when possible).
+    Alphabetical order removes the visual positional giveaway while remaining
+    predictable and easy to scan.
 
     Args:
-        word: The target word to shuffle
+        word: The target word
 
     Returns:
-        List of letter strings in shuffled order
+        List of letter strings sorted A-Z (case-insensitive key, original case preserved)
     """
-    letters = list(word)
-    if len(letters) <= 1:
-        return letters
-    shuffled = letters.copy()
-    attempts = 0
-    while shuffled == letters and attempts < 10:
-        random.shuffle(shuffled)
-        attempts += 1
-    return shuffled
+    return sorted(word, key=lambda c: c.lower())
 
 
 def build_options(card: Card, all_cards: list[dict]) -> list[str]:
-    """Build the full list of options for pick_one mode (correct + distractors), shuffled.
+    """Build the full list of options for pick_one mode (correct word + distractors), shuffled.
+
+    The prompt shows the translation; the options are target-language words.
 
     Args:
         card: The correct card
         all_cards: All card dicts in the session
 
     Returns:
-        Shuffled list of PICK_ONE_OPTIONS_COUNT translation strings
+        Shuffled list of PICK_ONE_OPTIONS_COUNT word strings
     """
     distractors = generate_distractors(card, all_cards, count=PICK_ONE_OPTIONS_COUNT - 1)
-    options = [card.translation, *distractors]
+    options = [card.word, *distractors]
     random.shuffle(options)
     return options

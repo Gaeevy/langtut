@@ -32,17 +32,14 @@ def start(tab_name: str):
         logger.warning(f"Failed to start learn session: {result.error}")
         return redirect(url_for("index.home"))
 
-    # Set target language in session
     user_spreadsheet = user.get_active_spreadsheet()
-
     if user_spreadsheet:
         language_settings = user_spreadsheet.get_language_settings()
         target_lang = language_settings.get("target", "pt")
-
         sm = SessionManager()
         sm.set(SessionKeys.TARGET_LANGUAGE, target_lang)
 
-    logger.info(f"Learn session started with {result.card_count} cards, {result.task_count} tasks")
+    logger.info(f"Learn session started: {result.card_count} cards, {result.task_count} tasks")
     return redirect(url_for("learn.card"))
 
 
@@ -62,11 +59,9 @@ def card():
     return render_template(
         "card.html",
         card=context.card,
-        index=context.index,
-        total=context.total,
         task_index=context.task_index,
         task_total=context.task_total,
-        reviewing=context.is_reviewing_incorrect,
+        reviewing=False,
         mode="learn",
         question_mode=context.mode,
         mode_data=context.mode_data,
@@ -111,13 +106,13 @@ def feedback(correct: str):
     return render_template(
         "feedback.html",
         card=context.card,
-        index=context.index,
-        total=context.total,
         task_index=context.task_index,
         task_total=context.task_total,
+        # kept for template compat with review mode
+        index=context.task_index,
+        total=context.task_total,
         correct=(correct == "yes"),
-        user_answer=request.args.get("answer", ""),
-        reviewing=context.is_reviewing_incorrect,
+        reviewing=False,
         card_index=context.task_index,
         level_change=level_change,
         mode="learn",
@@ -131,7 +126,7 @@ def feedback(correct: str):
 @learn_bp.route("/rate/<int:card_index>/<difficulty>")
 @auth_manager.require_auth
 def rate_difficulty(card_index: int, difficulty: str):
-    """Rate the difficulty of a card (for future spaced repetition)."""
+    """Rate the difficulty of a card (stub for future spaced repetition)."""
     logger.info(f"Card {card_index} rated as {difficulty}")
     return redirect(url_for("learn.next_card"))
 

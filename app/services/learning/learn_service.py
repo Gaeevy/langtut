@@ -1,11 +1,15 @@
 """Learn mode service - orchestrates learn session logic.
 
-This service encapsulates all business logic for learn (study) mode sessions,
-including session initialization, answer processing, and results calculation.
-
 The session is built as a task queue: an ordered list of {card_idx, mode} pairs.
 Cards appear multiple times in the queue (once per mode in their pipeline).
-A single task index walks the full queue, so progress is always linear.
+A single task index walks the full queue.
+
+Key behaviours:
+- Wrong answer: the task is appended to the END of the queue (retry until correct).
+- Level change: only happens when ALL pipeline modes for a card are successfully
+  completed. The level INCREASES if total retries for that card <=
+  max(0, pipeline_length - 1), otherwise it DECREASES.
+- No separate review pass -- retried tasks are simply part of the main queue.
 """
 
 import logging
@@ -17,15 +21,16 @@ from app.models import Card
 from app.services.auth_manager import auth_manager
 from app.session_manager import SessionKeys as sk
 from app.session_manager import SessionManager as sm
-from app.utils import parse_timestamp
+from app.utils import get_timestamp, parse_timestamp
 
 from .card_session import CardSessionManager
 from .mode_config import (
     LearningMode,
     build_options,
     build_task_queue,
-    shuffle_letters,
+    get_pipeline,
     shuffle_words,
+    sort_letters,
 )
 from .statistics import CardStatistics
 
@@ -47,11 +52,8 @@ class CardDisplayContext:
     """Context for displaying a card in learn mode."""
 
     card: dict
-    index: int  # position within the current mode-round (for display)
-    total: int  # total tasks in this mode-round (for display)
-    task_index: int  # absolute position in the full task queue
-    task_total: int  # total tasks in the queue
-    is_reviewing_incorrect: bool
+    task_index: int  # current position in the queue (0-based)
+    task_total: int  # current queue length (grows when retries are added)
     active_tab: str
     sheet_gid: int
     mode: str = LearningMode.TYPE_ANSWER
@@ -85,14 +87,7 @@ class SessionEndResult:
 
 
 class LearnService:
-    """Service for learn mode operations.
-
-    Handles the complete learn session lifecycle:
-    - Starting sessions with filtered cards (builds a task queue)
-    - Displaying cards with mode-specific context
-    - Processing answers with mode-aware checking
-    - Ending sessions and persisting results
-    """
+    """Service for learn mode operations."""
 
     def __init__(self):
         """Initialize the learn service."""
@@ -108,13 +103,6 @@ class LearnService:
 
         Reads cards from the spreadsheet, builds a task queue based on each
         card's level pipeline, and initialises session state.
-
-        Args:
-            tab_name: Name of the worksheet/tab to learn from
-            spreadsheet_id: Google Sheets spreadsheet ID
-
-        Returns:
-            LearnSessionResult with success status, card count, and task count
         """
         try:
             card_set = read_card_set(worksheet_name=tab_name, spreadsheet_id=spreadsheet_id)
@@ -130,17 +118,21 @@ class LearnService:
             if not cards:
                 return LearnSessionResult(success=False, error="No cards due for review")
 
-            # Store cards and build task queue
             self.session.initialize(cards, tab_name, card_set.gid)
 
             task_queue = build_task_queue(cards)
             sm.set(sk.LEARNING_TASK_QUEUE, task_queue)
             sm.set(sk.LEARNING_TASK_INDEX, 0)
 
-            # Initialise answer tracking state
+            # Store original pipeline per card (used for completion check)
+            card_pipelines = {
+                str(i): list(get_pipeline(card.level)) for i, card in enumerate(cards)
+            }
+            sm.set(sk.LEARNING_CARD_PIPELINES, card_pipelines)
+            sm.set(sk.LEARNING_CARD_MODES_DONE, {})
+            sm.set(sk.LEARNING_CARD_RETRIES, {})
+
             sm.set(sk.LEARNING_ANSWERS, [])
-            sm.set(sk.LEARNING_INCORRECT_CARDS, [])
-            sm.set(sk.LEARNING_REVIEWING_INCORRECT, False)
             sm.set(sk.LEARNING_ORIGINAL_COUNT, len(cards))
 
             logger.info(
@@ -162,16 +154,7 @@ class LearnService:
         return self.session.has_active_session()
 
     def end_session(self, early: bool = False) -> SessionEndResult:
-        """End the learn session and return results.
-
-        Performs batch update to Google Sheets and clears session.
-
-        Args:
-            early: Whether the session is ending early (before completion)
-
-        Returns:
-            SessionEndResult with statistics and update status
-        """
+        """End the learn session and return results."""
         answers = sm.get(sk.LEARNING_ANSWERS, [])
         original_count = sm.get(sk.LEARNING_ORIGINAL_COUNT, len(answers))
 
@@ -183,7 +166,7 @@ class LearnService:
         if early:
             task_queue = sm.get(sk.LEARNING_TASK_QUEUE, [])
             task_index = sm.get(sk.LEARNING_TASK_INDEX, 0)
-            cards_remaining = len(task_queue) - task_index
+            cards_remaining = max(0, len(task_queue) - task_index)
 
         sm.clear_namespace("learning")
         logger.info("Learn session ended, data cleared")
@@ -208,84 +191,39 @@ class LearnService:
     def get_current_card_context(self) -> CardDisplayContext | None:
         """Get context for displaying the current task (card + mode).
 
-        Reads the current task from the task queue. Once the main queue is
-        exhausted, switches to reviewing incorrect tasks. Returns None when
-        fully complete.
-
-        Returns:
-            CardDisplayContext for template rendering, or None if session complete
+        Returns None when the queue is exhausted (session complete).
         """
         session_state = self.session.get_state()
         if not session_state:
             return None
 
-        reviewing = sm.get(sk.LEARNING_REVIEWING_INCORRECT, False)
         task_queue = sm.get(sk.LEARNING_TASK_QUEUE, [])
         task_index = sm.get(sk.LEARNING_TASK_INDEX, 0)
 
-        if not reviewing:
-            # Main pass
-            if task_index >= len(task_queue):
-                return self._start_review_pass_or_finish(session_state.cards)
-            task = task_queue[task_index]
-        else:
-            # Review pass: incorrect tasks stored separately
-            incorrect_tasks = sm.get(sk.LEARNING_INCORRECT_CARDS, [])
-            if task_index >= len(incorrect_tasks):
-                return None  # Review complete
-            task = incorrect_tasks[task_index]
+        if task_index >= len(task_queue):
+            return None  # Queue exhausted, session complete
 
+        task = task_queue[task_index]
         card_idx = task["card_idx"]
         mode = task["mode"]
+
         card = session_state.cards[card_idx].copy()
-        card["is_review"] = reviewing
+        card["is_review"] = False
 
         mode_data = self._build_mode_data(mode, card, session_state.cards)
 
-        # For display progress: count tasks of this mode in the active queue
-        active_queue = sm.get(sk.LEARNING_INCORRECT_CARDS, []) if reviewing else task_queue
-        mode_tasks = [t for t in active_queue if t["mode"] == mode]
-        mode_position = next((i for i, t in enumerate(active_queue) if t == task), 0)
-        # Relative position within this mode-round
-        mode_task_indices = [i for i, t in enumerate(active_queue) if t["mode"] == mode]
-        rel_index = (
-            mode_task_indices.index(mode_position) if mode_position in mode_task_indices else 0
-        )
-
         return CardDisplayContext(
             card=card,
-            index=rel_index,
-            total=len(mode_tasks),
             task_index=task_index,
-            task_total=len(active_queue),
-            is_reviewing_incorrect=reviewing,
+            task_total=len(task_queue),
             active_tab=session_state.active_tab,
             sheet_gid=session_state.sheet_gid,
             mode=mode,
             mode_data=mode_data,
         )
 
-    def _start_review_pass_or_finish(self, cards: list[dict]):
-        """Switch to review pass or finish if no incorrect tasks."""
-        incorrect_tasks = sm.get(sk.LEARNING_INCORRECT_CARDS, [])
-        if incorrect_tasks:
-            sm.set(sk.LEARNING_REVIEWING_INCORRECT, True)
-            sm.set(sk.LEARNING_TASK_INDEX, 0)
-            logger.info(f"Starting review pass: {len(incorrect_tasks)} tasks")
-            return self.get_current_card_context()
-        return None
-
     def _build_mode_data(self, mode: str, card: dict, all_cards: list[dict]) -> dict:
-        """Generate mode-specific data for template rendering.
-
-        Args:
-            mode: LearningMode string
-            card: Current card dict
-            all_cards: All session card dicts (for distractor generation)
-
-        Returns:
-            Dict with mode-specific fields
-        """
+        """Generate mode-specific data for template rendering."""
         if mode == LearningMode.PICK_ONE:
             card_obj = Card(**{k: v for k, v in card.items() if k in Card.model_fields})
             options = build_options(card_obj, all_cards)
@@ -297,9 +235,8 @@ class LearnService:
 
         if mode == LearningMode.BUILD_WORD:
             word = card.get("word", "")
-            return {"tiles": shuffle_letters(word), "correct": word}
+            return {"tiles": sort_letters(word), "correct": word}
 
-        # type_answer -- no extra data needed
         return {}
 
     # ------------------------------------------------------------------
@@ -309,78 +246,118 @@ class LearnService:
     def process_answer(self, user_answer: str) -> AnswerProcessResult:
         """Process the user's answer for the current task.
 
-        Dispatches to mode-appropriate answer checking, updates card statistics,
-        and tracks incorrect tasks for the review pass.
+        Correct answer: marks the mode as done for the card. When all pipeline
+        modes for a card are done, updates the level.
 
-        Args:
-            user_answer: The answer submitted by the user
-
-        Returns:
-            AnswerProcessResult with correctness and level change info
+        Wrong answer: increments the card's retry count and appends the task to
+        the end of the queue so the user tries again later.
         """
-        context = self.get_current_card_context()
-        if not context:
+        session_state = self.session.get_state()
+        if not session_state:
             return AnswerProcessResult(success=False, error="No active session")
 
-        card = context.card
-        mode = context.mode
-        reviewing = context.is_reviewing_incorrect
+        task_queue = sm.get(sk.LEARNING_TASK_QUEUE, [])
+        task_index = sm.get(sk.LEARNING_TASK_INDEX, 0)
+
+        if task_index >= len(task_queue):
+            return AnswerProcessResult(success=False, error="No active task")
+
+        task = task_queue[task_index]
+        card_idx = task["card_idx"]
+        mode = task["mode"]
+        card = session_state.cards[card_idx].copy()
+        card_key = str(card_idx)
 
         is_correct = self._check_answer_for_mode(user_answer, card, mode)
 
-        # Determine the card's actual index in session.cards
-        task_queue = (
-            sm.get(sk.LEARNING_TASK_QUEUE, [])
-            if not reviewing
-            else sm.get(sk.LEARNING_INCORRECT_CARDS, [])
-        )
-        task_index = sm.get(sk.LEARNING_TASK_INDEX, 0)
-        task = task_queue[task_index]
-        card_idx = task["card_idx"]
+        card_retries = sm.get(sk.LEARNING_CARD_RETRIES, {})
+        card_modes_done = sm.get(sk.LEARNING_CARD_MODES_DONE, {})
 
-        # Update card statistics (level, counters)
-        card_obj = Card(**{k: v for k, v in card.items() if k in Card.model_fields})
-        result = self.stats.update_on_answer(card_obj, is_correct)
-        updated_card = result.updated_card
-        level_change = result.level_change
+        # Deserialize card for stat updates
+        card_obj = self.session.deserialize_card(card)
 
-        self.session.update_card(card_idx, self.session._serialize_card(updated_card))
+        # Update cnt_shown and last_shown the first time this card appears
+        is_first_encounter = card_key not in card_modes_done and card_retries.get(card_key, 0) == 0
+        if is_first_encounter:
+            card_obj.cnt_shown += 1
+            card_obj.last_shown = get_timestamp()
 
-        # Record the answer
-        answer_record = self._create_answer_record(
-            card, user_answer, is_correct, reviewing, card_idx, mode
-        )
+        level_change: dict | None = None
+
+        if is_correct:
+            # Mark this mode as completed for this card
+            if card_key not in card_modes_done:
+                card_modes_done[card_key] = []
+            if mode not in card_modes_done[card_key]:
+                card_modes_done[card_key].append(mode)
+            sm.set(sk.LEARNING_CARD_MODES_DONE, card_modes_done)
+
+            # Check if all original pipeline modes are now done
+            card_pipelines = sm.get(sk.LEARNING_CARD_PIPELINES, {})
+            pipeline = card_pipelines.get(card_key, [LearningMode.TYPE_ANSWER])
+            all_modes_done = all(m in card_modes_done[card_key] for m in pipeline)
+
+            if all_modes_done:
+                retries = card_retries.get(card_key, 0)
+                max_allowed_retries = max(0, len(pipeline) - 1)
+                original_level = card_obj.level.value
+                card_obj.cnt_corr_answers += 1
+
+                if retries <= max_allowed_retries:
+                    card_obj.level = card_obj.level.next_level()
+                else:
+                    card_obj.level = card_obj.level.previous_level()
+
+                level_change = {
+                    "from": original_level,
+                    "to": card_obj.level.value,
+                    "is_correct": retries <= max_allowed_retries,
+                }
+                logger.info(
+                    f"Card {card_idx} complete: retries={retries}, max={max_allowed_retries}, "
+                    f"level {original_level}→{card_obj.level.value}"
+                )
+
+        else:
+            # Wrong: track retry and re-queue the task
+            card_retries[card_key] = card_retries.get(card_key, 0) + 1
+            sm.set(sk.LEARNING_CARD_RETRIES, card_retries)
+
+            task_queue.append({"card_idx": card_idx, "mode": mode})
+            sm.set(sk.LEARNING_TASK_QUEUE, task_queue)
+
+            logger.info(
+                f"Wrong answer for card {card_idx} ({mode}), re-queued. "
+                f"Retry #{card_retries[card_key]}"
+            )
+
+        # Persist updated card
+        self.session.update_card(card_idx, self.session._serialize_card(card_obj))
+
+        # Record answer
+        answer_record = self._create_answer_record(card, user_answer, is_correct, card_idx, mode)
         answers = sm.get(sk.LEARNING_ANSWERS, [])
         answers.append(answer_record)
         sm.set(sk.LEARNING_ANSWERS, answers)
 
-        # Track failed tasks for review pass (first pass only)
-        if not is_correct and not reviewing:
-            incorrect = sm.get(sk.LEARNING_INCORRECT_CARDS, [])
-            incorrect.append({"card_idx": card_idx, "mode": mode})
-            sm.set(sk.LEARNING_INCORRECT_CARDS, incorrect)
-            logger.info(f"Task queued for review: card {card_idx}, mode {mode}")
-
-        sm.set(sk.LEARNING_LAST_LEVEL_CHANGE, level_change.to_dict())
+        if level_change:
+            sm.set(sk.LEARNING_LAST_LEVEL_CHANGE, level_change)
 
         return AnswerProcessResult(
             success=True,
             is_correct=is_correct,
-            level_change=level_change.to_dict(),
+            level_change=level_change,
         )
 
     def _check_answer_for_mode(self, user_answer: str, card: dict, mode: str) -> bool:
         """Dispatch answer checking to the appropriate method for the mode."""
         if mode == LearningMode.PICK_ONE:
-            return self.stats.check_answer_choice(user_answer, card.get("translation", ""))
+            return self.stats.check_answer_choice(user_answer, card.get("word", ""))
 
         if mode == LearningMode.BUILD_SENTENCE:
             return self.stats.check_answer_ordered(user_answer, card.get("example", ""))
 
-        if mode in (LearningMode.BUILD_WORD, LearningMode.TYPE_ANSWER):
-            return self.stats.check_answer(user_answer, card.get("word", ""))
-
-        # Fallback
+        # build_word and type_answer both check against the target word
         return self.stats.check_answer(user_answer, card.get("word", ""))
 
     @staticmethod
@@ -388,17 +365,12 @@ class LearnService:
         card: dict,
         user_answer: str,
         is_correct: bool,
-        is_review: bool,
         card_index: int,
         mode: str,
     ) -> dict:
         """Create an answer record for session history."""
-        from app.utils import get_timestamp
-
         correct_answer = card.get("word", "")
-        if mode == LearningMode.PICK_ONE:
-            correct_answer = card.get("translation", "")
-        elif mode == LearningMode.BUILD_SENTENCE:
+        if mode == LearningMode.BUILD_SENTENCE:
             correct_answer = card.get("example", "")
 
         return {
@@ -409,7 +381,7 @@ class LearnService:
             "correct_answer": correct_answer,
             "is_correct": is_correct,
             "timestamp": get_timestamp().isoformat(),
-            "is_review": is_review,
+            "is_review": False,
             "mode": mode,
         }
 
