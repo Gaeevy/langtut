@@ -340,6 +340,41 @@ def protected_endpoint():
 - Touch-friendly interface design
 - Responsive CSS with Bootstrap
 
+## Mobile Testing with ngrok
+
+ngrok tunnels your local server to a public HTTPS URL, allowing you to test on a real iPhone with full Google OAuth.
+
+### Setup (one-time)
+
+1. Install: `brew install ngrok`
+2. Auth: `ngrok config add-authtoken <token>` (from https://dashboard.ngrok.com)
+3. Claim a free static domain at https://dashboard.ngrok.com/domains (e.g. `your-name.ngrok-free.dev`)
+4. Add `https://your-name.ngrok-free.dev/oauth2callback` to:
+   - **Google Cloud Console** → Credentials → your OAuth client → Authorized redirect URIs
+   - **`client_secret.json`** → `redirect_uris` array
+
+### Running
+
+```bash
+# Terminal 1: start the app
+uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload run:app
+
+# Terminal 2: start the tunnel
+ngrok http 8080 --url=your-name.ngrok-free.dev
+```
+
+Open `https://your-name.ngrok-free.dev` on your phone. The ngrok interstitial page appears once per session -- tap "Visit Site".
+
+### Current domain
+
+The project's static ngrok domain is `evette-nontransposing-barabara.ngrok-free.dev` (already configured in `client_secret.json` and GCP).
+
+### Notes
+
+- The `auth_manager.py` detects `ngrok` in the hostname and uses HTTPS for the OAuth redirect URI automatically
+- The static domain never changes, so no GCP reconfiguration is needed between sessions
+- ngrok free tier: 1 static domain, rate-limited but sufficient for testing
+
 ## Deployment
 
 ### Railway Deployment with Docker
