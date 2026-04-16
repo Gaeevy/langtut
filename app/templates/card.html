@@ -82,10 +82,14 @@
 
             <!-- Prompt: what the user needs to respond to -->
             {% if question_mode == 'build_sentence' %}
-                {% if card.example_translation %}
-                <p class="card-example-translation text-secondary fst-italic mb-2 build-sentence-cue" style="font-size: 1rem; line-height: 1.3;">{{ card.example_translation }}</p>
-                {% endif %}
-                <h4 class="card-translation-build text-dark fw-semibold mb-3">{{ card.translation }}</h4>
+                {# Cue = meaning of the target sentence only (no separate word gloss). Bold for scanability. #}
+                <p class="build-sentence-cue-primary mb-3">
+                    {% if card.example_translation %}
+                        {{ card.example_translation }}
+                    {% else %}
+                        {{ card.translation }}
+                    {% endif %}
+                </p>
             {% elif question_mode == 'pick_translation' %}
                 <h3 class="card-translation-main text-dark fw-semibold mb-3">{{ card.word }}</h3>
             {% elif question_mode == 'write_example' %}

@@ -44,16 +44,13 @@
     margin-bottom: 1rem;
 }
 
-/* Smaller cue for build_sentence — tiles carry the main text size */
-.card-translation-build {
+/* build_sentence: single cue (example translation); word tiles are the main “sentence” size */
+.build-sentence-cue-primary {
     font-size: 1.35rem;
-    font-weight: 600;
+    font-weight: 700;
+    line-height: 1.35;
     color: #2c3e50;
     margin-bottom: 0.75rem;
-}
-
-.build-sentence-cue {
-    font-size: 0.95rem !important;
 }
 
 .card-word-main {
