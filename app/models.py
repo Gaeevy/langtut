@@ -24,10 +24,11 @@ class Levels(int, Enum):
     LEVEL_5 = 5
     LEVEL_6 = 6
     LEVEL_7 = 7
+    LEVEL_8 = 8
 
     def next_level(self):
         """Get the next proficiency level."""
-        return Levels(self.value + 1) if self.value < 7 else Levels.LEVEL_7
+        return Levels(self.value + 1) if self.value < 8 else Levels.LEVEL_8
 
     def previous_level(self):
         """Get the previous proficiency level."""
@@ -43,6 +44,7 @@ days_to_review = {
     Levels.LEVEL_5: 25,
     Levels.LEVEL_6: 40,
     Levels.LEVEL_7: 60,
+    Levels.LEVEL_8: 90,
 }
 
 

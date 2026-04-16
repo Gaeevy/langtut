@@ -1,6 +1,6 @@
 [default]
 # Shared settings across all environments
-max_cards_per_session = 10
+max_cards_per_session = 5
 spreadsheet_id = "15_PsHfMb440wtUgZ0d1aJmu5YIXoo9JKytlJINxOV8Q"
 
 # Google OAuth

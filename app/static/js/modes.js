@@ -1,8 +1,8 @@
 /**
  * Learning mode interaction logic.
  *
- * Handles UI for three question modes:
- *   - pick_one    : click one of four option buttons
+ * Handles UI for question modes:
+ *   - pick_translation / pick_one : click one of four option buttons
  *   - build_word  : click letter tiles to assemble a word
  *   - build_sentence : click word tiles to assemble a sentence
  *
@@ -15,7 +15,7 @@
 
     const mode = window.questionMode;
 
-    if (mode === 'pick_one') {
+    if (mode === 'pick_one' || mode === 'pick_translation') {
         initPickOne();
     } else if (mode === 'build_word' || mode === 'build_sentence') {
         initBuild();

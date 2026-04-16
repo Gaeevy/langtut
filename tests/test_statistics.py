@@ -110,14 +110,14 @@ class TestUpdateOnAnswer:
         assert result.level_change.to_level == 0
 
     def test_no_level_above_max(self):
-        """Level should not go above LEVEL_7."""
-        card = make_card(level=Levels.LEVEL_7)
+        """Level should not go above LEVEL_8."""
+        card = make_card(level=Levels.LEVEL_8)
 
         result = CardStatistics.update_on_answer(card, is_correct=True)
 
-        assert result.updated_card.level == Levels.LEVEL_7
-        assert result.level_change.from_level == 7
-        assert result.level_change.to_level == 7
+        assert result.updated_card.level == Levels.LEVEL_8
+        assert result.level_change.from_level == 8
+        assert result.level_change.to_level == 8
 
 
 class TestCalculateSessionStats:

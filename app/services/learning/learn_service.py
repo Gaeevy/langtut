@@ -28,6 +28,7 @@ from .mode_config import (
     LearningMode,
     build_options,
     build_task_queue,
+    build_translation_options,
     get_pipeline,
     shuffle_words,
     sort_letters,
@@ -229,6 +230,11 @@ class LearnService:
             options = build_options(card_obj, all_cards)
             return {"options": options}
 
+        if mode == LearningMode.PICK_TRANSLATION:
+            card_obj = Card(**{k: v for k, v in card.items() if k in Card.model_fields})
+            options = build_translation_options(card_obj, all_cards)
+            return {"options": options}
+
         if mode == LearningMode.BUILD_SENTENCE:
             sentence = card.get("example", "")
             return {"tiles": shuffle_words(sentence), "correct": sentence}
@@ -354,7 +360,13 @@ class LearnService:
         if mode == LearningMode.PICK_ONE:
             return self.stats.check_answer_choice(user_answer, card.get("word", ""))
 
+        if mode == LearningMode.PICK_TRANSLATION:
+            return self.stats.check_answer_choice(user_answer, card.get("translation", ""))
+
         if mode == LearningMode.BUILD_SENTENCE:
+            return self.stats.check_answer_ordered(user_answer, card.get("example", ""))
+
+        if mode == LearningMode.WRITE_EXAMPLE:
             return self.stats.check_answer_ordered(user_answer, card.get("example", ""))
 
         # build_word and type_answer both check against the target word
@@ -370,7 +382,9 @@ class LearnService:
     ) -> dict:
         """Create an answer record for session history."""
         correct_answer = card.get("word", "")
-        if mode == LearningMode.BUILD_SENTENCE:
+        if mode == LearningMode.PICK_TRANSLATION:
+            correct_answer = card.get("translation", "")
+        elif mode in (LearningMode.BUILD_SENTENCE, LearningMode.WRITE_EXAMPLE):
             correct_answer = card.get("example", "")
 
         return {

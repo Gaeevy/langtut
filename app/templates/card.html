@@ -3,7 +3,8 @@
 {% block title %}{% if mode == 'review' %}Review{% else %}Flashcard{% endif %}{% endblock %}
 
 {% block content %}
-<div class="text-center mb-4">
+{% set level_value = card.level.value if card.level.value is defined else card.level %}
+<div class="text-center mb-4 learn-progress-wrap">
     {% if reviewing %}
     <div class="alert alert-warning mb-3">
         <strong>Review Mode:</strong> Let's practice the cards you missed earlier.
@@ -53,19 +54,26 @@
 {% endif %}
 
 <!-- Card face -->
-<div class="language-card mb-4" {% if mode == 'review' %}onclick="flipCard()" style="cursor: pointer;"{% endif %}>
+<div class="language-card mb-4"
+     data-level="{{ level_value }}"
+     style="--level-pct: {{ (level_value * 100 / 8)|round }}%;{% if mode == 'review' %} cursor: pointer;{% endif %}"
+     {% if mode == 'review' %}onclick="flipCard()"{% endif %}>
     <div class="row">
         <div class="col-md-12 text-center p-4">
 
             <!-- Mode label badge (learn mode only) -->
             {% if mode == 'learn' %}
             <div class="mb-2">
-                {% if question_mode == 'pick_one' %}
+                {% if question_mode == 'pick_translation' %}
+                <span class="mode-label">Choose the translation</span>
+                {% elif question_mode == 'pick_one' %}
                 <span class="mode-label">Choose the word</span>
                 {% elif question_mode == 'build_sentence' %}
                 <span class="mode-label">Build the sentence</span>
                 {% elif question_mode == 'build_word' %}
                 <span class="mode-label">Spell the word</span>
+                {% elif question_mode == 'write_example' %}
+                <span class="mode-label">Write an example</span>
                 {% else %}
                 <span class="mode-label">Type the word</span>
                 {% endif %}
@@ -74,13 +82,16 @@
 
             <!-- Prompt: what the user needs to respond to -->
             {% if question_mode == 'build_sentence' %}
-                <!-- show example translation so user can reconstruct the target sentence -->
                 {% if card.example_translation %}
-                <p class="card-example-translation text-secondary fst-italic mb-3" style="font-size: 1.2rem; line-height: 1.3;">{{ card.example_translation }}</p>
+                <p class="card-example-translation text-secondary fst-italic mb-2 build-sentence-cue" style="font-size: 1rem; line-height: 1.3;">{{ card.example_translation }}</p>
                 {% endif %}
-                <h3 class="card-translation-main text-dark fw-semibold mb-3">{{ card.translation }}</h3>
+                <h4 class="card-translation-build text-dark fw-semibold mb-3">{{ card.translation }}</h4>
+            {% elif question_mode == 'pick_translation' %}
+                <h3 class="card-translation-main text-dark fw-semibold mb-3">{{ card.word }}</h3>
+            {% elif question_mode == 'write_example' %}
+                <h3 class="card-translation-main text-dark fw-semibold mb-2">{{ card.word }}</h3>
+                <p class="text-secondary mb-3 write-example-translation">{{ card.translation }}</p>
             {% else %}
-                <!-- pick_one, build_word, type_answer: show translation as the cue -->
                 <h3 class="card-translation-main text-dark fw-semibold mb-3">{{ card.translation }}</h3>
                 {% if card.example_translation %}
                 <p class="card-example-translation text-secondary fst-italic mb-3" style="font-size: 1.1rem; line-height: 1.3;">{{ card.example_translation }}</p>
@@ -99,19 +110,9 @@
             </div>
             {% endif %}
 
-            <!-- Level Progress Dots -->
-            <div class="level-progress-container">
-                <div class="level-tooltip">Level {{ card.level.value if card.level.value is defined else card.level }}</div>
-                <div class="level-progress">
-                    {% set level_value = card.level.value if card.level.value is defined else card.level %}
-                    {% for i in range(8) %}
-                    <div class="level-dot {% if i < level_value %}completed{% elif i == level_value %}current{% endif %}"></div>
-                    {% endfor %}
-                </div>
-                {% if card.is_review %}
-                <small class="text-warning"><i class="bi bi-arrow-repeat"></i> Review</small>
-                {% endif %}
-            </div>
+            {% if card.is_review %}
+            <small class="text-warning d-inline-block mt-1"><i class="bi bi-arrow-repeat"></i> Review</small>
+            {% endif %}
 
         </div>
     </div>
@@ -121,12 +122,11 @@
 {% if mode != 'review' %}
 
 <form id="mode-form" action="{{ url_for('learn.answer') }}" method="post">
+    {% if question_mode in ('pick_one', 'pick_translation', 'build_sentence', 'build_word') %}
     <input type="hidden" id="user-answer-input" name="user_answer" value="">
+    {% endif %}
 
-    {% if question_mode == 'pick_one' %}
-    <!-- ------------------------------------------------------------------ -->
-    <!-- Mode: Pick One -- click a word button                               -->
-    <!-- ------------------------------------------------------------------ -->
+    {% if question_mode in ('pick_one', 'pick_translation') %}
     <div class="pick-one-options">
         {% for option in mode_data.options %}
         <button type="button" class="pick-one-btn" data-value="{{ option }}">
@@ -136,9 +136,6 @@
     </div>
 
     {% elif question_mode in ('build_sentence', 'build_word') %}
-    <!-- ------------------------------------------------------------------ -->
-    <!-- Mode: Build Sentence / Build Word                                    -->
-    <!-- ------------------------------------------------------------------ -->
     <div class="build-area">
         <div id="build-target" class="build-target">
             <span class="text-muted" id="target-placeholder" style="font-size: 0.85rem;">
@@ -148,7 +145,7 @@
         <div class="text-center mb-2">
             <button type="button" id="build-reset" class="build-reset-btn">Clear</button>
         </div>
-        <div id="build-source" class="build-source">
+        <div id="build-source" class="build-source {% if question_mode == 'build_sentence' %}build-sentence-tiles{% endif %}">
             {% for tile in mode_data.tiles %}
             <span class="build-tile {% if question_mode == 'build_word' %}letter-tile{% endif %}"
                   data-value="{{ tile }}">{{ tile }}</span>
@@ -159,10 +156,17 @@
         </div>
     </div>
 
+    {% elif question_mode == 'write_example' %}
+    <div class="mb-3">
+        <label for="write-example-input" class="form-label visually-hidden">Example sentence</label>
+        <textarea id="write-example-input" name="user_answer" class="form-control form-control-lg" rows="2"
+                  placeholder="Write the example sentence..." autocomplete="off" required autofocus></textarea>
+    </div>
+    <div class="d-grid">
+        <button type="submit" class="btn btn-primary btn-lg">Submit</button>
+    </div>
+
     {% else %}
-    <!-- ------------------------------------------------------------------ -->
-    <!-- Mode: Type Answer                                                    -->
-    <!-- ------------------------------------------------------------------ -->
     <div class="mb-3">
         <input type="text" name="user_answer" class="form-control form-control-lg"
                placeholder="Type your answer..." autocomplete="off" required autofocus>
@@ -208,7 +212,7 @@
 
 <script src="{{ url_for('static', filename='js/tts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/card.js') }}"></script>
-{% if mode == 'learn' and question_mode in ('pick_one', 'build_sentence', 'build_word') %}
+{% if mode == 'learn' and question_mode in ('pick_one', 'pick_translation', 'build_sentence', 'build_word') %}
 <script src="{{ url_for('static', filename='js/modes.js') }}"></script>
 {% endif %}
 {% endblock %}
