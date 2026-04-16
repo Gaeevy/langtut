@@ -88,26 +88,6 @@ function setupKeyboardNavigation() {
 }
 
 /**
- * Animate level progression dots
- */
-function animateLevelChange(currentLevel, levelChange) {
-    if (!levelChange) return;
-
-    console.log('Level change detected:', levelChange);
-
-    const levelDots = document.querySelectorAll('.level-dot');
-    if (levelDots.length === 0) return;
-
-    const currentDot = levelDots[currentLevel];
-    if (currentDot) {
-        currentDot.classList.add('level-changed');
-        setTimeout(() => {
-            currentDot.classList.remove('level-changed');
-        }, 1000);
-    }
-}
-
-/**
  * Setup TTS auto-play and button handlers
  */
 function setupTTS(cardData) {
@@ -159,7 +139,7 @@ function initFeedbackPage() {
     if (!cardDataElement) return;
 
     const cardData = JSON.parse(cardDataElement.textContent);
-    const { correct, level, levelChange, mode } = cardData;
+    const { correct, mode } = cardData;
 
     // Setup keyboard navigation
     setupKeyboardNavigation();
@@ -174,11 +154,6 @@ function initFeedbackPage() {
     };
     document.addEventListener('click', unlockOnFirstClick, { once: true });
     document.addEventListener('touchstart', unlockOnFirstClick, { once: true });
-
-    // Level progression animation - only for learn mode
-    if (mode === 'learn') {
-        animateLevelChange(level, levelChange);
-    }
 
     // Setup TTS
     setupTTS(cardData);

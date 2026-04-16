@@ -1,5 +1,58 @@
 /* Mobile-First Responsive Design */
 
+/* Compact learn layout — fit more on one iPhone screen */
+@media (max-width: 768px) {
+    .app-header {
+        display: none;
+    }
+
+    .container {
+        padding-top: 0.25rem;
+    }
+
+    .learn-progress-wrap.mb-4 {
+        margin-bottom: 0.75rem !important;
+    }
+
+    .mode-label {
+        display: none;
+    }
+
+    .language-card {
+        padding: 14px 12px;
+        margin: 8px 0;
+    }
+
+    .card-translation-main {
+        font-size: 1.45rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .build-sentence-cue-primary {
+        font-size: 1.15rem;
+        line-height: 1.3;
+        margin-bottom: 0.5rem;
+    }
+
+    .feedback-indicator {
+        display: none;
+    }
+
+    .feedback-text {
+        display: none;
+    }
+
+    .correct-card,
+    .incorrect-card {
+        border-width: 4px;
+    }
+
+    .difficulty-rating {
+        padding: 8px;
+        margin-top: 0.75rem !important;
+    }
+}
+
 /* Touch-friendly interactions */
 .btn {
     min-height: 44px; /* Apple's recommended touch target size */

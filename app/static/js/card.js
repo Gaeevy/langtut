@@ -155,23 +155,19 @@ function escapeHtml(str) {
 }
 
 function renderFeedback(data) {
-    const { correct, card, level_change, question_mode, task_index, task_total } = data;
+    const { correct, card, question_mode, task_index, task_total } = data;
 
     const messages = {
-        pick_one:       correct ? 'Good pick!'              : 'Wrong choice \u2014 the correct translation is shown below.',
+        pick_translation: correct ? 'Nice match!' : 'Not quite \u2014 the correct translation is shown below.',
+        pick_one:       correct ? 'Good pick!'              : 'Wrong choice \u2014 the correct word is shown below.',
         build_sentence: correct ? 'Sentence correct!'       : 'Not quite \u2014 the correct sentence is shown below.',
         build_word:     correct ? 'Word spelled correctly!'  : 'Not quite \u2014 the correct word is shown below.',
+        write_example:  correct ? 'Example matches!'       : 'Not quite \u2014 the example is shown below.',
         type_answer:    correct ? 'Correct!'                 : 'Not quite \u2014 the correct word is shown below.'
     };
     const feedbackMsg = messages[question_mode] || messages.type_answer;
 
-    let levelDotsHtml = '';
-    for (let i = 0; i < 8; i++) {
-        let cls = 'level-dot';
-        if (i < card.level) cls += ' completed';
-        else if (i === card.level) cls += ' current';
-        levelDotsHtml += `<div class="${cls}" data-level="${i}"></div>`;
-    }
+    const levelPct = (card.level != null) ? Math.round((card.level / 8) * 100) : 0;
 
     const difficultyHtml = correct ? `
         <div class="difficulty-rating mt-4">
@@ -210,8 +206,8 @@ function renderFeedback(data) {
                     <i class="bi bi-${correct ? 'check-circle' : 'x-circle'}-fill"></i>
                 </div>
             </div>
-            <p class="text-muted small mb-2">${feedbackMsg}</p>
-            <div class="language-card feedback-card ${correct ? 'correct-card' : 'incorrect-card'} mb-4">
+            <p class="text-muted small mb-2 feedback-text">${feedbackMsg}</p>
+            <div class="language-card feedback-card ${correct ? 'correct-card' : 'incorrect-card'} mb-4" data-level="${card.level}" style="--level-pct: ${levelPct}%">
                 <div class="row">
                     <div class="col-md-12 text-center">
                         <div class="word-with-audio mb-3">
@@ -223,10 +219,6 @@ function renderFeedback(data) {
                         <p class="card-translation h5 text-secondary mb-3">${escapeHtml(card.translation)}</p>
                         ${exHtml}
                         ${exTransHtml}
-                        <div class="level-progress-container">
-                            <div class="level-tooltip">Level ${card.level}</div>
-                            <div class="level-progress">${levelDotsHtml}</div>
-                        </div>
                         ${difficultyHtml}
                     </div>
                 </div>
@@ -253,15 +245,6 @@ function renderFeedback(data) {
         });
     }
 
-    // Animate level-dot change
-    if (level_change) {
-        const dots = document.querySelectorAll('.level-dot');
-        const dot = dots[card.level];
-        if (dot) {
-            dot.classList.add('level-changed');
-            setTimeout(() => dot.classList.remove('level-changed'), 1000);
-        }
-    }
 }
 
 // ---- Form Interception ----
@@ -276,8 +259,8 @@ function setupAjaxSubmission() {
         e.preventDefault();
 
         let userAnswer;
-        if (window.questionMode === 'type_answer') {
-            const textInput = form.querySelector('input[type="text"][name="user_answer"]');
+        if (window.questionMode === 'type_answer' || window.questionMode === 'write_example') {
+            const textInput = form.querySelector('input[name="user_answer"], textarea[name="user_answer"]');
             userAnswer = textInput ? textInput.value.trim() : '';
         } else {
             const hiddenInput = document.getElementById('user-answer-input');
@@ -325,7 +308,9 @@ function setupKeyboardNavigation() {
 function initCardPage() {
     if (window.cardMode === 'learn') {
         const answerInput = document.querySelector('input[type="text"][name="user_answer"]');
+        const exampleTa = document.querySelector('textarea[name="user_answer"]');
         if (answerInput) answerInput.focus();
+        else if (exampleTa) exampleTa.focus();
     }
 
     setupKeyboardNavigation();

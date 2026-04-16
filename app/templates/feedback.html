@@ -3,6 +3,7 @@
 {% block title %}{% if mode == 'review' %}Review - Flip Side{% else %}Feedback{% endif %}{% endblock %}
 
 {% block content %}
+{% set level_value = card.level.value if card.level.value is defined else card.level %}
 <div class="text-center">
     <!-- Progress bar - shown for both study and review modes -->
     {% if mode == 'review' %}
@@ -36,13 +37,17 @@
     </div>
     <!-- Mode-specific feedback label -->
     {% if question_mode is defined %}
-    <p class="text-muted small mb-2">
-        {% if question_mode == 'pick_one' %}
-            {% if correct %}Good pick!{% else %}Wrong choice — the correct translation is shown below.{% endif %}
+    <p class="text-muted small mb-2 feedback-text">
+        {% if question_mode == 'pick_translation' %}
+            {% if correct %}Nice match!{% else %}Not quite — the correct translation is shown below.{% endif %}
+        {% elif question_mode == 'pick_one' %}
+            {% if correct %}Good pick!{% else %}Wrong choice — the correct word is shown below.{% endif %}
         {% elif question_mode == 'build_sentence' %}
             {% if correct %}Sentence correct!{% else %}Not quite — the correct sentence is shown below.{% endif %}
         {% elif question_mode == 'build_word' %}
             {% if correct %}Word spelled correctly!{% else %}Not quite — the correct word is shown below.{% endif %}
+        {% elif question_mode == 'write_example' %}
+            {% if correct %}Example matches!{% else %}Not quite — the example is shown below.{% endif %}
         {% else %}
             {% if correct %}Correct!{% else %}Not quite — the correct word is shown below.{% endif %}
         {% endif %}
@@ -68,7 +73,10 @@
     {% endif %}
 
     <!-- Card with visual border feedback -->
-    <div class="language-card feedback-card {% if correct %}correct-card{% else %}incorrect-card{% endif %} mb-4" {% if mode == 'review' %}onclick="flipCard()" style="cursor: pointer;"{% endif %}>
+    <div class="language-card feedback-card {% if correct %}correct-card{% else %}incorrect-card{% endif %} mb-4"
+         data-level="{{ level_value }}"
+         style="--level-pct: {{ (level_value * 100 / 8)|round }}%;{% if mode == 'review' %} cursor: pointer;{% endif %}"
+         {% if mode == 'review' %}onclick="flipCard()"{% endif %}>
         <div class="row">
             <div class="col-md-12 text-center">
                 <!-- 1. Portuguese word (main focus) with TTS button -->
@@ -94,20 +102,9 @@
                 </p>
                 {% endif %}
 
-                <!-- Animated Level Progress Dots -->
-                <div class="level-progress-container">
-                    <div class="level-tooltip">Level {{ card.level.value if card.level.value is defined else card.level }}</div>
-                    <div class="level-progress">
-                        {% set level_value = card.level.value if card.level.value is defined else card.level %}
-                        {% for i in range(8) %}
-                        <div class="level-dot {% if i < level_value %}completed{% elif i == level_value %}current{% endif %}"
-                             data-level="{{ i }}"></div>
-                        {% endfor %}
-                    </div>
-                    {% if reviewing %}
-                    <small class="text-warning"><i class="bi bi-arrow-repeat"></i> Review</small>
-                    {% endif %}
-                </div>
+                {% if reviewing %}
+                <small class="text-warning d-inline-block mt-1"><i class="bi bi-arrow-repeat"></i> Review</small>
+                {% endif %}
 
                 <!-- Difficulty rating for correct answers - only for learn mode -->
                 {% if correct and not reviewing and mode != 'review' %}

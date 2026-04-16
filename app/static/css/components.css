@@ -44,6 +44,15 @@
     margin-bottom: 1rem;
 }
 
+/* build_sentence: single cue (example translation); word tiles are the main “sentence” size */
+.build-sentence-cue-primary {
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: #2c3e50;
+    margin-bottom: 0.75rem;
+}
+
 .card-word-main {
     font-size: 2.5rem;
     font-weight: 700;
@@ -265,6 +274,17 @@
     text-align: center;
     font-size: 1.1rem;
     font-weight: 600;
+}
+
+/* build_sentence: emphasize tile size over the cue line */
+.build-sentence-tiles .build-tile {
+    font-size: 1.12rem;
+    padding: 0.55rem 0.95rem;
+    font-weight: 600;
+}
+
+.write-example-translation {
+    font-size: 1.05rem;
 }
 
 /* Reset / clear button under the target */

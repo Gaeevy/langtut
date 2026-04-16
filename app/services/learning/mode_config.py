@@ -13,31 +13,42 @@ from app.models import Card, Levels
 class LearningMode(StrEnum):
     """Available question modes, ordered from easiest to hardest."""
 
+    PICK_TRANSLATION = "pick_translation"
     PICK_ONE = "pick_one"
     BUILD_SENTENCE = "build_sentence"
     BUILD_WORD = "build_word"
     TYPE_ANSWER = "type_answer"
+    WRITE_EXAMPLE = "write_example"
 
 
 # Global mode order -- queue is always built in this order so easier modes come first.
 GLOBAL_MODE_ORDER: list[LearningMode] = [
+    LearningMode.PICK_TRANSLATION,
     LearningMode.PICK_ONE,
     LearningMode.BUILD_SENTENCE,
     LearningMode.BUILD_WORD,
     LearningMode.TYPE_ANSWER,
+    LearningMode.WRITE_EXAMPLE,
 ]
 
 # Maps the *minimum* level at which each pipeline applies.
 # The highest-matching threshold wins.
-# Level 0-2 -> pick_one + build_sentence + build_word
+# Level 0-2 -> pick_translation + pick_one + build_sentence
 # Level 3   -> build_sentence + build_word + type_answer
 # Level 4   -> build_word + type_answer
-# Level 5+  -> type_answer only
+# Level 5-7 -> type_answer only
+# Level 8   -> write_example only
 LEVEL_PIPELINES: dict[int, list[LearningMode]] = {
-    0: [LearningMode.PICK_ONE, LearningMode.BUILD_SENTENCE, LearningMode.BUILD_WORD],
+    0: [
+        LearningMode.PICK_ONE,
+        LearningMode.BUILD_SENTENCE,
+        LearningMode.PICK_TRANSLATION,
+    ],
+    1: [LearningMode.PICK_ONE, LearningMode.BUILD_SENTENCE, LearningMode.BUILD_WORD],
     3: [LearningMode.BUILD_SENTENCE, LearningMode.BUILD_WORD, LearningMode.TYPE_ANSWER],
     4: [LearningMode.BUILD_WORD, LearningMode.TYPE_ANSWER],
     5: [LearningMode.TYPE_ANSWER],
+    8: [LearningMode.WRITE_EXAMPLE],
 }
 
 # Number of options shown in pick_one mode (including correct answer)
@@ -158,5 +169,51 @@ def build_options(card: Card, all_cards: list[dict]) -> list[str]:
     """
     distractors = generate_distractors(card, all_cards, count=PICK_ONE_OPTIONS_COUNT - 1)
     options = [card.word, *distractors]
+    random.shuffle(options)
+    return options
+
+
+def generate_translation_distractors(
+    card: Card, all_cards: list[dict], count: int = 3
+) -> list[str]:
+    """Generate wrong translation options for pick_translation mode.
+
+    Picks `count` translations from other cards in the session.
+
+    Args:
+        card: The correct card
+        all_cards: All card dicts in the session (used as distractor pool)
+        count: Number of distractors to generate
+
+    Returns:
+        List of distractor translation strings (length == count)
+    """
+    correct = card.translation.strip().lower()
+    pool = [c["translation"] for c in all_cards if c["translation"].strip().lower() != correct]
+    random.shuffle(pool)
+    distractors = pool[:count]
+
+    while len(distractors) < count:
+        distractors.append(f"option {len(distractors) + 1}")
+
+    return distractors
+
+
+def build_translation_options(card: Card, all_cards: list[dict]) -> list[str]:
+    """Build options for pick_translation (correct translation + distractors), shuffled.
+
+    The prompt shows the target-language word; options are translations.
+
+    Args:
+        card: The correct card
+        all_cards: All card dicts in the session
+
+    Returns:
+        Shuffled list of PICK_ONE_OPTIONS_COUNT translation strings
+    """
+    distractors = generate_translation_distractors(
+        card, all_cards, count=PICK_ONE_OPTIONS_COUNT - 1
+    )
+    options = [card.translation, *distractors]
     random.shuffle(options)
     return options

@@ -27,13 +27,36 @@
 .correct-card {
     border: 3px solid #28a745;
     box-shadow: 0 0 20px rgba(40, 167, 69, 0.3);
-    background: linear-gradient(135deg, rgba(40, 167, 69, 0.05) 0%, rgba(255, 255, 255, 1) 100%);
+    background-image: linear-gradient(135deg, rgba(40, 167, 69, 0.05) 0%, rgba(255, 255, 255, 1) 100%);
 }
 
 .incorrect-card {
     border: 3px solid #dc3545;
     box-shadow: 0 0 20px rgba(220, 53, 69, 0.3);
-    background: linear-gradient(135deg, rgba(220, 53, 69, 0.05) 0%, rgba(255, 255, 255, 1) 100%);
+    background-image: linear-gradient(135deg, rgba(220, 53, 69, 0.05) 0%, rgba(255, 255, 255, 1) 100%);
+}
+
+/* Level progress tint (first layer) — requires --level-pct on the card */
+.feedback-card.correct-card[data-level] {
+    background-image:
+        linear-gradient(
+            to right,
+            rgba(40, 167, 69, 0.08) 0%,
+            rgba(40, 167, 69, 0.08) var(--level-pct),
+            transparent var(--level-pct)
+        ),
+        linear-gradient(135deg, rgba(40, 167, 69, 0.05) 0%, rgba(255, 255, 255, 1) 100%);
+}
+
+.feedback-card.incorrect-card[data-level] {
+    background-image:
+        linear-gradient(
+            to right,
+            rgba(40, 167, 69, 0.08) 0%,
+            rgba(40, 167, 69, 0.08) var(--level-pct),
+            transparent var(--level-pct)
+        ),
+        linear-gradient(135deg, rgba(220, 53, 69, 0.05) 0%, rgba(255, 255, 255, 1) 100%);
 }
 
 /* TTS Controls Styling */
