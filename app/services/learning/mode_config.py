@@ -40,10 +40,11 @@ GLOBAL_MODE_ORDER: list[LearningMode] = [
 # Level 8   -> write_example only
 LEVEL_PIPELINES: dict[int, list[LearningMode]] = {
     0: [
-        LearningMode.PICK_TRANSLATION,
         LearningMode.PICK_ONE,
         LearningMode.BUILD_SENTENCE,
+        LearningMode.PICK_TRANSLATION,
     ],
+    1: [LearningMode.PICK_ONE, LearningMode.BUILD_SENTENCE, LearningMode.BUILD_WORD],
     3: [LearningMode.BUILD_SENTENCE, LearningMode.BUILD_WORD, LearningMode.TYPE_ANSWER],
     4: [LearningMode.BUILD_WORD, LearningMode.TYPE_ANSWER],
     5: [LearningMode.TYPE_ANSWER],
