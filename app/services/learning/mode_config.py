@@ -31,6 +31,51 @@ GLOBAL_MODE_ORDER: list[LearningMode] = [
     LearningMode.WRITE_EXAMPLE,
 ]
 
+# Short labels for segmented progress bar (initial queue mode blocks + Review tail).
+MODE_SECTION_LABELS: dict[str, str] = {
+    "pick_translation": "Translate",
+    "pick_one": "Pick",
+    "build_sentence": "Sentence",
+    "build_word": "Spell",
+    "type_answer": "Type",
+    "write_example": "Write",
+    "review": "Review",
+}
+
+
+def compute_queue_section_defs(task_queue: list[dict]) -> list[dict]:
+    """Split the task queue into contiguous same-mode sections for progress UI.
+
+    Args:
+        task_queue: List of {"card_idx": int, "mode": str} tasks.
+
+    Returns:
+        List of dicts with keys: mode, label, start, length (indices into this queue).
+    """
+    if not task_queue:
+        return []
+
+    sections: list[dict] = []
+    i = 0
+    n = len(task_queue)
+    while i < n:
+        mode = task_queue[i]["mode"]
+        j = i
+        while j < n and task_queue[j]["mode"] == mode:
+            j += 1
+        label = MODE_SECTION_LABELS.get(mode, str(mode))
+        sections.append(
+            {
+                "mode": mode,
+                "label": label,
+                "start": i,
+                "length": j - i,
+            }
+        )
+        i = j
+    return sections
+
+
 # Maps the *minimum* level at which each pipeline applies.
 # The highest-matching threshold wins.
 # Level 0-2 -> pick_translation + pick_one + build_sentence

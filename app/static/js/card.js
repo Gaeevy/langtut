@@ -154,8 +154,52 @@ function escapeHtml(str) {
     return el.innerHTML;
 }
 
+/**
+ * Build segmented learn progress HTML (must match card.html structure).
+ */
+function buildLearnProgressHtml(data) {
+    const taskIndex = data.task_index ?? 0;
+    const taskTotal = data.task_total ?? 0;
+    const sections = data.progress_sections;
+    const pct = taskTotal ? Math.round((taskIndex / taskTotal) * 100) : 0;
+
+    if (!sections || sections.length === 0) {
+        return `
+        <div class="progress-container">
+            <div class="progress" style="height:10px">
+                <div class="progress-bar pastel-progress-study" role="progressbar"
+                     style="width:${pct}%" aria-valuenow="${taskIndex}" aria-valuemin="0" aria-valuemax="${taskTotal}"></div>
+            </div>
+        </div>`;
+    }
+
+    const cols = sections.map(function (s) {
+        const flex = s.length != null ? s.length : 1;
+        const fp = s.fill_pct != null ? s.fill_pct : 0;
+        const mode = s.mode || 'type_answer';
+        const lab = escapeHtml(s.label || '');
+        const cur = s.is_current ? ' learn-progress-label-current' : '';
+        const titleAttr = escapeHtml(s.label || '');
+        return `
+            <div class="learn-progress-col" style="flex:${flex} 1 0%;min-width:0">
+                <div class="progress learn-segment-track" style="height:10px">
+                    <div class="progress-bar learn-segment-fill learn-seg-${mode}" style="width:${fp}%"></div>
+                </div>
+                <small class="learn-progress-label${cur}" title="${titleAttr}">
+                    <span class="learn-progress-dot learn-seg-dot-${mode}" aria-hidden="true"></span>${lab}
+                </small>
+            </div>`;
+    }).join('');
+
+    return `
+        <div class="progress-container">
+            <div class="learn-progress-track mb-1">${cols}</div>
+        </div>`;
+}
+
 function renderFeedback(data) {
     const { correct, card, question_mode, task_index, task_total } = data;
+    const correctnessClass = correct ? 'is-correct' : 'is-incorrect';
 
     const messages = {
         pick_translation: correct ? 'Nice match!' : 'Not quite \u2014 the correct translation is shown below.',
@@ -168,6 +212,7 @@ function renderFeedback(data) {
     const feedbackMsg = messages[question_mode] || messages.type_answer;
 
     const levelPct = (card.level != null) ? Math.round((card.level / 8) * 100) : 0;
+    const levelSat = (card.level != null) ? (0.6 + card.level * 0.05).toFixed(2) : '0.85';
 
     const difficultyHtml = correct ? `
         <div class="difficulty-rating mt-4">
@@ -185,20 +230,11 @@ function renderFeedback(data) {
         ? `<p class="card-example-translation small text-muted fst-italic mb-3" style="opacity:.8"><em>${escapeHtml(card.example_translation)}</em></p>`
         : '';
 
-    const pct = task_total ? Math.round((task_index / task_total) * 100) : 0;
+    const progressBlock = buildLearnProgressHtml(data);
 
     const html = `
-        <div class="text-center mb-4">
-            <div class="progress-container">
-                <div class="progress" style="height:10px">
-                    <div class="progress-bar pastel-progress-study" role="progressbar"
-                         style="width:${pct}%" aria-valuenow="${task_index}" aria-valuemin="0" aria-valuemax="${task_total}"></div>
-                </div>
-                <div class="d-flex justify-content-between mt-1">
-                    <small>Task ${task_index + 1} of ${task_total}</small>
-                    <small>${pct}% done</small>
-                </div>
-            </div>
+        <div class="text-center mb-4 learn-progress-wrap">
+            ${progressBlock}
         </div>
         <div class="text-center">
             <div class="feedback-indicator mb-3">
@@ -207,7 +243,7 @@ function renderFeedback(data) {
                 </div>
             </div>
             <p class="text-muted small mb-2 feedback-text">${feedbackMsg}</p>
-            <div class="language-card feedback-card ${correct ? 'correct-card' : 'incorrect-card'} mb-4" data-level="${card.level}" style="--level-pct: ${levelPct}%">
+            <div class="language-card feedback-card mb-4 ${correctnessClass}" data-level="${card.level}" style="--level-pct: ${levelPct}%; --level-sat: ${levelSat}">
                 <div class="row">
                     <div class="col-md-12 text-center">
                         <div class="word-with-audio mb-3">
@@ -219,12 +255,13 @@ function renderFeedback(data) {
                         <p class="card-translation h5 text-secondary mb-3">${escapeHtml(card.translation)}</p>
                         ${exHtml}
                         ${exTransHtml}
+                        <span class="level-badge">L${card.level}</span>
                         ${difficultyHtml}
                     </div>
                 </div>
             </div>
             <div class="d-grid gap-2 mt-3">
-                <a href="/learn/next_card" class="btn btn-primary">Next Card</a>
+                <a href="/learn/next_card" class="btn btn-primary" id="next-card-btn">Next Card</a>
             </div>
         </div>`;
 
@@ -281,10 +318,20 @@ function setupAjaxSubmission() {
     });
 }
 
-// ---- Keyboard Navigation (review mode) ----
+// ---- Keyboard Navigation ----
 
 function setupKeyboardNavigation() {
     document.addEventListener('keydown', (event) => {
+        // Enter on feedback view (learn mode): advance to next card.
+        if (event.key === 'Enter') {
+            const nextBtn = document.getElementById('next-card-btn');
+            if (nextBtn) {
+                event.preventDefault();
+                nextBtn.click();
+                return;
+            }
+        }
+
         if (window.cardMode !== 'review') return;
         switch (event.key) {
             case 'ArrowLeft':

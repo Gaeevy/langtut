@@ -1,31 +1,79 @@
-/* Level progress as a subtle tint on the question card (learn face, not feedback). */
+/* Level progress: bottom-edge accent + compact level pill (top-right). */
 
-.language-card[data-level]:not(.feedback-card) {
-    --level-pct: 0%;
-    background-image:
-        linear-gradient(
-            to right,
-            rgba(40, 167, 69, 0.1) 0%,
-            rgba(40, 167, 69, 0.1) var(--level-pct),
-            transparent var(--level-pct)
-        ),
-        linear-gradient(
-            135deg,
-            rgba(255, 255, 255, 0.95) 0%,
-            rgba(248, 250, 252, 0.95) 50%,
-            rgba(243, 246, 251, 0.95) 100%
+.language-card[data-level] {
+    position: relative;
+    overflow: hidden;
+    --mode-accent: #60a5fa;
+}
+
+.language-card[data-level]::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 4px;
+    width: var(--level-pct, 0%);
+    border-radius: 0 2px 0 0;
+    background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--mode-accent) 45%, white) 0%,
+        var(--mode-accent) 100%
+    );
+    filter: saturate(var(--level-sat, 0.85));
+    pointer-events: none;
+    z-index: 1;
+}
+
+.language-card .level-badge {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    z-index: 2;
+    pointer-events: none;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.35px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: color-mix(
+        in srgb,
+        var(--mode-accent) calc(10% + var(--level-sat, 0.85) * 22%),
+        rgba(255, 255, 255, 0.92)
+    );
+    color: color-mix(
+        in srgb,
+        var(--mode-accent) calc(40% + var(--level-sat, 0.85) * 35%),
+        #64748b
+    );
+    border: 1px solid
+        color-mix(
+            in srgb,
+            var(--mode-accent) calc(12% + var(--level-sat, 0.85) * 20%),
+            transparent
         );
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
 @media (prefers-color-scheme: dark) {
-    .language-card[data-level]:not(.feedback-card) {
-        background-image:
-            linear-gradient(
-                to right,
-                rgba(40, 167, 69, 0.12) 0%,
-                rgba(40, 167, 69, 0.12) var(--level-pct),
-                transparent var(--level-pct)
-            ),
-            linear-gradient(135deg, rgba(45, 45, 45, 0.95) 0%, rgba(40, 40, 40, 0.95) 100%);
+    .language-card[data-level]::after {
+        background: linear-gradient(
+            90deg,
+            color-mix(in srgb, var(--mode-accent) 55%, #1e293b) 0%,
+            var(--mode-accent) 100%
+        );
+    }
+
+    .language-card .level-badge {
+        background: color-mix(
+            in srgb,
+            var(--mode-accent) calc(15% + var(--level-sat, 0.85) * 25%),
+            rgba(30, 41, 59, 0.95)
+        );
+        color: #e2e8f0;
+        border-color: color-mix(
+            in srgb,
+            var(--mode-accent) calc(20% + var(--level-sat, 0.85) * 25%),
+            transparent
+        );
     }
 }

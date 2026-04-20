@@ -40,6 +40,14 @@ class SessionKeys(Enum):
     LEARNING_CARD_PIPELINES = "learning.card_pipelines"  # {card_idx: [modes]}
     LEARNING_CARD_MODES_DONE = "learning.card_modes_done"  # {card_idx: [completed modes]}
     LEARNING_CARD_RETRIES = "learning.card_retries"  # {card_idx: retry_count}
+    # Initial task queue length and contiguous mode blocks (for segmented progress UI)
+    LEARNING_TASK_INITIAL_LENGTH = "learning.task_initial_length"
+    LEARNING_TASK_SECTION_DEFS = (
+        "learning.task_section_defs"  # list[dict] for queue at session start
+    )
+    LEARNING_CARD_START_LEVELS = (
+        "learning.card_start_levels"  # {str(idx): int level at session start}
+    )
 
     # Review namespace - Review mode session state
     REVIEW_CARDS = "review.cards"
