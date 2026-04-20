@@ -61,6 +61,8 @@ def card():
         card=context.card,
         task_index=context.task_index,
         task_total=context.task_total,
+        progress_sections=context.progress_sections,
+        initial_task_length=context.initial_task_length,
         reviewing=False,
         mode="learn",
         question_mode=context.mode,
@@ -100,7 +102,6 @@ def answer():
 
     if is_ajax:
         context = service.get_current_card_context()
-        service.get_level_change()  # clear from session (consumed here)
         user = auth_manager.user
 
         card = context.card if context else {}
@@ -108,6 +109,7 @@ def answer():
         if hasattr(level_val, "value"):
             level_val = level_val.value
 
+        progress_sections = context.progress_sections if context else []
         return jsonify(
             {
                 "success": True,
@@ -119,10 +121,10 @@ def answer():
                     "example_translation": card.get("example_translation"),
                     "level": level_val,
                 },
-                "level_change": result.level_change,
                 "question_mode": context.mode if context else "type_answer",
                 "task_index": context.task_index if context else 0,
                 "task_total": context.task_total if context else 0,
+                "progress_sections": progress_sections,
                 "spreadsheet_id": user.get_active_spreadsheet_id() if user else None,
                 "sheet_gid": context.sheet_gid if context else None,
             }
@@ -142,8 +144,6 @@ def feedback(correct: str):
     if not context:
         return redirect(url_for("index.home"))
 
-    level_change = service.get_level_change()
-
     user = auth_manager.user
 
     return render_template(
@@ -157,7 +157,6 @@ def feedback(correct: str):
         correct=(correct == "yes"),
         reviewing=False,
         card_index=context.task_index,
-        level_change=level_change,
         mode="learn",
         question_mode=context.mode,
         user_spreadsheet_id=user.get_active_spreadsheet_id(),
@@ -205,6 +204,8 @@ def results():
         original_count=result.original_count,
         is_authenticated=True,
         updated=result.update_successful,
+        tab_name=result.session_tab,
+        per_card_breakdown=result.per_card_breakdown,
     )
 
 
@@ -232,4 +233,6 @@ def end_early():
         cards_remaining=result.cards_remaining,
         is_authenticated=True,
         updated=result.update_successful,
+        tab_name=result.session_tab,
+        per_card_breakdown=result.per_card_breakdown,
     )

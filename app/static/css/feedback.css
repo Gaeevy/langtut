@@ -17,46 +17,37 @@
     animation: errorShake 0.6s ease-out;
 }
 
-/* Card border feedback */
+/* Card: unified blue-tinted feedback (no per-mode variations) */
 .feedback-card {
-    transition: all 0.5s ease;
+    transition: all 0.35s ease;
     position: relative;
     overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    --feedback-accent: #60a5fa;
+    border-left: 4px solid var(--feedback-accent);
+    background-image: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--feedback-accent) 10%, white) 0%,
+        rgba(255, 255, 255, 1) 100%
+    );
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
-.correct-card {
-    border: 3px solid #28a745;
-    box-shadow: 0 0 20px rgba(40, 167, 69, 0.3);
-    background-image: linear-gradient(135deg, rgba(40, 167, 69, 0.05) 0%, rgba(255, 255, 255, 1) 100%);
+.feedback-card.is-incorrect {
+    border-left-style: dashed;
+    filter: grayscale(0.22);
+    opacity: 0.96;
 }
 
-.incorrect-card {
-    border: 3px solid #dc3545;
-    box-shadow: 0 0 20px rgba(220, 53, 69, 0.3);
-    background-image: linear-gradient(135deg, rgba(220, 53, 69, 0.05) 0%, rgba(255, 255, 255, 1) 100%);
-}
-
-/* Level progress tint (first layer) — requires --level-pct on the card */
-.feedback-card.correct-card[data-level] {
-    background-image:
-        linear-gradient(
-            to right,
-            rgba(40, 167, 69, 0.08) 0%,
-            rgba(40, 167, 69, 0.08) var(--level-pct),
-            transparent var(--level-pct)
-        ),
-        linear-gradient(135deg, rgba(40, 167, 69, 0.05) 0%, rgba(255, 255, 255, 1) 100%);
-}
-
-.feedback-card.incorrect-card[data-level] {
-    background-image:
-        linear-gradient(
-            to right,
-            rgba(40, 167, 69, 0.08) 0%,
-            rgba(40, 167, 69, 0.08) var(--level-pct),
-            transparent var(--level-pct)
-        ),
-        linear-gradient(135deg, rgba(220, 53, 69, 0.05) 0%, rgba(255, 255, 255, 1) 100%);
+@media (prefers-color-scheme: dark) {
+    .feedback-card {
+        background-image: linear-gradient(
+            135deg,
+            color-mix(in srgb, var(--feedback-accent) 18%, #1e293b) 0%,
+            #0f172a 100%
+        );
+        border-color: rgba(255, 255, 255, 0.08);
+    }
 }
 
 /* TTS Controls Styling */

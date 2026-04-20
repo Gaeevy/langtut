@@ -72,10 +72,11 @@
     </div>
     {% endif %}
 
-    <!-- Card with visual border feedback -->
-    <div class="language-card feedback-card {% if correct %}correct-card{% else %}incorrect-card{% endif %} mb-4"
+    <!-- Card: learn mode uses segment-matched tint; review stays neutral -->
+    <div class="language-card feedback-card mb-4
+         {% if correct %}is-correct{% else %}is-incorrect{% endif %}"
          data-level="{{ level_value }}"
-         style="--level-pct: {{ (level_value * 100 / 8)|round }}%;{% if mode == 'review' %} cursor: pointer;{% endif %}"
+         style="--level-pct: {{ (level_value * 100 / 8)|round }}%; --level-sat: {{ (0.6 + level_value * 0.05)|round(2) }};{% if mode == 'review' %} cursor: pointer;{% endif %}"
          {% if mode == 'review' %}onclick="flipCard()"{% endif %}>
         <div class="row">
             <div class="col-md-12 text-center">
@@ -106,6 +107,10 @@
                 <small class="text-warning d-inline-block mt-1"><i class="bi bi-arrow-repeat"></i> Review</small>
                 {% endif %}
 
+                {% if mode == 'learn' %}
+                <span class="level-badge">L{{ level_value }}</span>
+                {% endif %}
+
                 <!-- Difficulty rating for correct answers - only for learn mode -->
                 {% if correct and not reviewing and mode != 'review' %}
                 <div class="difficulty-rating mt-4">
@@ -129,7 +134,7 @@
     <!-- Next card button - only for learn mode -->
     {% if mode != 'review' %}
     <div class="d-grid gap-2 mt-3">
-        <a href="{{ url_for('learn.next_card') }}" class="btn btn-primary">Next Card</a>
+        <a href="{{ url_for('learn.next_card') }}" class="btn btn-primary" id="next-card-btn">Next Card</a>
     </div>
     {% else %}
     <!-- Review mode - back to home -->
@@ -150,7 +155,6 @@
     "example": {{ card.example|tojson if card.example else 'null' }},
     "correct": {{ 'true' if correct else 'false' }},
     "level": {{ card.level.value if card.level.value is defined else card.level }},
-    "levelChange": {{ level_change|tojson if level_change else 'null' }},
     "spreadsheetId": {{ user_spreadsheet_id|tojson if user_spreadsheet_id else 'null' }},
     "sheetGid": {{ sheet_gid|tojson if sheet_gid else 'null' }},
     "mode": {{ mode|tojson if mode else '"learn"' }}

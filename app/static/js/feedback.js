@@ -83,6 +83,16 @@ function setupKeyboardNavigation() {
                     flipCard();
                     break;
             }
+            return;
+        }
+
+        // Learn mode feedback: Enter advances to next card.
+        if (event.key === 'Enter') {
+            const nextCardBtn = document.getElementById('next-card-btn');
+            if (nextCardBtn) {
+                event.preventDefault();
+                nextCardBtn.click();
+            }
         }
     });
 }

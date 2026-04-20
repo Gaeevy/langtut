@@ -11,8 +11,25 @@
     </div>
     {% endif %}
 
-    <!-- Single progress bar -->
+    <!-- Progress: segmented (learn) or single bar (review browse) -->
     <div class="progress-container">
+        {% if mode == 'learn' and progress_sections %}
+        <div class="learn-progress-track mb-1" role="group" aria-label="Session progress by stage">
+            {% for s in progress_sections %}
+            <div class="learn-progress-col" style="flex: {{ s.length }} 1 0%;">
+                <div class="progress learn-segment-track" style="height: 10px;">
+                    <div class="progress-bar learn-segment-fill learn-seg-{{ s.mode }}" role="progressbar"
+                         style="width: {{ s.fill_pct }}%;"
+                         aria-valuenow="{{ s.fill_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <small class="learn-progress-label {% if s.is_current %}learn-progress-label-current{% endif %}"
+                       title="{{ s.label }}">
+                    <span class="learn-progress-dot learn-seg-dot-{{ s.mode }}" aria-hidden="true"></span>{{ s.label }}
+                </small>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
         <div class="progress" style="height: 10px;">
             {% if mode == 'learn' %}
             <div class="progress-bar pastel-progress-study" role="progressbar"
@@ -24,15 +41,13 @@
                  aria-valuenow="{{ index }}" aria-valuemin="0" aria-valuemax="{{ total }}"></div>
             {% endif %}
         </div>
+        {% if mode == 'review' %}
         <div class="d-flex justify-content-between mt-1">
-            {% if mode == 'learn' %}
-            <small>Task {{ task_index + 1 }} of {{ task_total }}</small>
-            <small>{{ (task_index / task_total * 100)|round if task_total else 0 }}% done</small>
-            {% else %}
             <small>Card {{ index + 1 }} of {{ total }} (Browse)</small>
             <small>{{ (index / total * 100)|round if total else 0 }}% complete</small>
-            {% endif %}
         </div>
+        {% endif %}
+        {% endif %}
     </div>
 </div>
 
@@ -56,7 +71,7 @@
 <!-- Card face -->
 <div class="language-card mb-4"
      data-level="{{ level_value }}"
-     style="--level-pct: {{ (level_value * 100 / 8)|round }}%;{% if mode == 'review' %} cursor: pointer;{% endif %}"
+     style="--level-pct: {{ (level_value * 100 / 8)|round }}%; --level-sat: {{ (0.6 + level_value * 0.05)|round(2) }};{% if mode == 'review' %} cursor: pointer;{% endif %}"
      {% if mode == 'review' %}onclick="flipCard()"{% endif %}>
     <div class="row">
         <div class="col-md-12 text-center p-4">
@@ -118,6 +133,10 @@
             <small class="text-warning d-inline-block mt-1"><i class="bi bi-arrow-repeat"></i> Review</small>
             {% endif %}
 
+            {% if mode == 'learn' %}
+            <span class="level-badge">L{{ level_value }}</span>
+            {% endif %}
+
         </div>
     </div>
 </div>
@@ -155,6 +174,9 @@
                   data-value="{{ tile }}">{{ tile }}</span>
             {% endfor %}
         </div>
+        {% if question_mode == 'build_word' %}
+        <p class="text-center text-muted small build-type-hint mb-0">You can also type</p>
+        {% endif %}
         <div class="d-grid mt-3">
             <button type="button" id="build-submit" class="btn btn-primary btn-lg" disabled>Check</button>
         </div>
