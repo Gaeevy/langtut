@@ -3,221 +3,106 @@
 @README.md
 
 ## Project Overview
-This is a Flask-based Language Learning Flashcard App with the following characteristics:
-- **Core Purpose**: ANKI-style flashcards with European Portuguese text-to-speech
-- **Data Source**: Google Sheets integration for vocabulary management
-- **Architecture**: Modular Flask app with Blueprint-based routing
-- **Features**: Statistics tracking, PWA support, OAuth authentication
-- **Deployment**: Railway with Docker + uv for fast, reproducible builds
-- **Code Quality**: Pre-commit hooks with ruff linting/formatting
+Flask-based ANKI-style flashcard app with European Portuguese TTS, Google Sheets
+content management, and Google OAuth authentication. Deployed on Railway via
+Docker + `uv`.
 
-## Current Project Structure
+## Project Layout
+- `run.py` — Gunicorn entry point (creates Flask app, inits DB)
+- `app/` — main package (Flask app factory in `app/__init__.py`)
+  - `routes/` — one blueprint per feature: `index`, `learn`, `review`,
+    `settings`, `admin`, `auth`, `test`, and `api/` sub-package
+    (`api/cards.py`, `api/tts.py`, `api/language.py`)
+  - `services/` — business logic (thin routes → services)
+    - `auth_manager.py` — centralized auth (OAuth, token refresh,
+      `@auth_manager.require_auth` decorator)
+    - `tts.py` — Google Cloud TTS with GCS caching
+    - `learning/` — `learn_service.py`, `review_service.py`,
+      `card_session.py`, `mode_config.py`, `statistics.py`
+  - `models.py` — Pydantic models
+  - `database.py` — SQLAlchemy ORM (User, UserSpreadsheet, RefreshToken)
+  - `gsheet.py` — Google Sheets API
+  - `config.py` — Dynaconf settings loader
+  - `logging.py` — request logging middleware
+  - `session_manager.py` — `SessionManager` / `SessionKeys`
+  - `templates/`, `static/` — Jinja2 + PWA assets
+- `tests/` — pytest suite, mirrors `app/` structure (e.g.
+  `tests/services/learning/`)
+- `config/languages.yaml` — supported language definitions
+- `settings.toml` / `.secrets.toml` — Dynaconf config (env sections:
+  `[default]`, `[local]`, `[production]`)
+- `docs/` — architecture, audio, development guides
 
-### Core Application Files
-```
-app.py                          # Entry point - creates Flask app and handles dev/prod modes
-src/                           # Main application module
-├── __init__.py               # Flask app factory with blueprint registration
-├── routes/                   # Blueprint-based route organization
-│   ├── __init__.py          # Blueprint registration
-│   ├── auth.py              # Authentication routes
-│   ├── flashcard.py         # Core learning functionality
-│   ├── settings.py          # User settings & spreadsheet config
-│   ├── api.py               # TTS and API endpoints
-│   ├── admin.py             # Database administration
-│   └── test.py              # Testing & debugging
-├── models.py                # Pydantic data models
-├── config.py                # Dynaconf configuration management
-├── gsheet.py                # Google Sheets API integration
-├── auth.py                  # Google OAuth authentication
-├── database.py              # SQLAlchemy database operations
-├── tts_service.py           # Text-to-Speech service
-├── user_manager.py          # User management utilities
-├── session_manager.py       # Centralized session management
-└── utils.py                 # Helper utilities
-```
+## Core Rules
 
-### Templates & Assets
-```
-templates/                    # Jinja2 HTML templates
-static/                      # Frontend assets (CSS, JS, PWA files)
-docs/                        # Comprehensive documentation
-```
+### Environment & Tooling
+- Python **3.13** only. Always invoke through `uv`:
+  - Run server: `uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload run:app`
+  - Tests: `uv run pytest`
+  - Ad-hoc: `uv run python -c "..."`
+- Never call `python` / `pip` / `poetry` directly.
 
-### Configuration & Dependencies
-```
-pyproject.toml              # Project dependencies (PEP 621 format)
-uv.lock                     # Locked dependency versions for reproducibility
-Dockerfile                  # Docker configuration for Railway deployment
-.dockerignore              # Docker build exclusions
-settings.toml              # Main configuration (non-sensitive)
-.secrets.toml              # Sensitive configuration (not in git)
-.pre-commit-config.yaml    # Code quality automation
-```
+### Architecture
+- **Blueprints only** — never add routes to a monolithic file. Register in
+  `app/routes/__init__.py::register_blueprints`.
+- **Thin routes, fat services** — routes parse input, call a service, render.
+  No Google Sheets, SQLAlchemy, or TTS calls directly in route handlers.
+- **Dual store**:
+  - Google Sheets = user content (vocabulary, card state)
+  - SQLite via SQLAlchemy ORM = app data (users, spreadsheets, refresh tokens)
+  - Never write raw SQL.
+- **Protected routes** use `@auth_manager.require_auth` (handles token refresh
+  transparently). Access the current user via `auth_manager.user`.
+- Cross-blueprint URLs: `url_for('learn.card')`, `url_for('auth.auth')`, etc.
 
-## Development Rules
+### Session Management
+- Always go through `SessionManager`; never touch `flask.session` directly.
+- Import: `from app.session_manager import SessionManager, SessionKeys`
+- API: `SessionManager.get/set/has/remove(key, ...)`,
+  `SessionManager.clear_namespace('learning')`
+- Key namespaces: `auth.*`, `user.*`, `learning.*`, `review.*`, `tts.*`,
+  `test.*`. Add new keys to the `SessionKeys` enum.
+- Auth tokens: access token lives in session (`ACCESS_TOKEN`), refresh token
+  is encrypted in DB and referenced by `REFRESH_TOKEN_ID`. The legacy
+  `AUTH_CREDENTIALS` key is gone — do not reintroduce it.
 
-### 1. Development Environment Rules
-- **ALWAYS use uv** - Never use direct `python` commands
-  - ✅ `uv run python -c "from src.config import config; print(config.DEBUG)"`
-  - ✅ `uv run pytest`
-  - ✅ `uv run gunicorn --bind 0.0.0.0:8080 --reload run:app`
-  - ❌ `python app.py`
-  - ❌ `python -m pytest`
-- **UV for all development tasks** - Testing, running, debugging (10-100x faster than poetry)
-- **VIRTUAL ENVIRONMENT** - uv manages dependencies and isolation automatically
-
-### 2. File Organization Rules
-- **NEVER add code to monolithic files** - Use blueprint pattern
-- **FEATURE-BASED blueprints**: Each blueprint handles one functional area
-- **BLUEPRINT registration** - Centralized in `routes/__init__.py`
-- **KEEP services focused** - One responsibility per service file
-
-### 3. Code Quality Rules
-- **TYPE HINTS required** - Add type hints to all functions
-- **PYDANTIC models** for all data validation
-- **ERROR HANDLING** - Comprehensive try/catch blocks with logging
-- **PRE-COMMIT HOOKS** - All code must pass ruff linting, formatting, and security checks
-- **NO direct database calls** in routes - use service layer
-- **LOGGING** required for all external API calls
-- **DOCSTRING STYLE** - Summary on first line with opening quotes:
+### Code Quality
+- Type hints on every function signature.
+- Pydantic models for all structured data and validation.
+- Module-level logger: `logger = logging.getLogger(__name__)`. Log all
+  external API calls (Sheets, TTS, OAuth) and service-level errors.
+- Docstring style — summary on the first line with the opening quotes:
   ```python
-  def function():
-      """Summary description on first line.
+  def foo() -> int:
+      """Return the answer.
 
-      Additional details, Args, Returns on subsequent lines.
+      Longer description, Args, Returns...
       """
   ```
+- Avoid obvious narrating comments; only comment non-obvious intent.
+- Ruff enforces style: line length **100**, double quotes, isort, pyupgrade,
+  flake8-bugbear/simplify/pathlib. Config in `pyproject.toml`.
 
-### 4. Session Management Rules
-- **USE SessionManager** - Never access `session[]` directly
-- **IMPORT PATTERN**: `from src.session_manager import SessionManager as sm, SessionKeys as sk`
-- **USAGE PATTERNS**:
-  - Get: `sm.get(sk.USER_ID, default_value)`
-  - Set: `sm.set(sk.AUTH_STATE, value)`
-  - Check: `if sm.has(sk.AUTH_CREDENTIALS):`
-  - Remove: `sm.remove(sk.LEARNING_CARDS)`
-  - Clear namespace: `sm.clear_namespace('auth')`
-- **SESSION KEY NAMESPACES**:
-  - `auth.*` - OAuth state, credentials, redirect URIs
-  - `user.*` - User ID, Google ID
-  - `learning.*` - Cards, progress, answers, review state
-  - `test.*` - Development/debugging
+### Configuration & Secrets
+- Settings via Dynaconf: `from app.config import config` (also exports
+  `logger`, `Environment`). Never hardcode credentials, paths, or IDs.
+- Sensitive values live in `.secrets.toml` (gitignored) or env vars prefixed
+  with `LANGTUT_` (env takes precedence).
+- Environment is auto-detected: `testing` (pytest), `production`
+  (`RAILWAY_ENVIRONMENT=production`), else `local`.
 
-### 5. Data Persistence Rules
-- **DUAL-STORE ARCHITECTURE**:
-  - **Google Sheets**: Content management (cards, vocabulary, learning material)
-  - **SQLite**: Application data (users, sessions, authentication state)
-- **NEVER raw SQL** - Use SQLAlchemy ORM for application data
-- **USE Google Sheets API** for content data with proper error handling
+### Testing
+- Tests live in `tests/`, mirroring `app/` structure. Use pytest + fixtures in
+  `tests/conftest.py`. Testing env uses in-memory SQLite and disabled TTS.
 
-### 6. Configuration Rules
-- **NEVER hardcode credentials** - Use settings.toml/.secrets.toml
-- **ENVIRONMENT variables** take precedence over file config
-- **VALIDATE configuration** on app startup
+### Git & Pre-commit
+- Feature branches only — `master`/`main` are blocked by pre-commit.
+- Commit message: `type: brief description` (max ~150 chars). Types: `feat`,
+  `fix`, `refactor`, `docs`, `style`, `test`, `chore`.
+- All code must pass pre-commit (ruff lint/format, bandit, file checks) before
+  commit.
 
-### 7. Security Rules
-- **VALIDATE all inputs** - Use Pydantic validation
-- **SANITIZE outputs** to prevent XSS
-- **RATE LIMITING** on API endpoints
-- **AUDIT logs** for sensitive operations
-
-### 8. Git Commit Rules
-- **CONCISE commit messages** - Maximum 200 characters total
-- **FORMAT**: `type: brief description (max 150 chars)`
-- **TYPES**: feat, fix, refactor, docs, style, test, chore
-- **FOCUS**: What changed, not why
-
-## Blueprint Patterns
-
-### Blueprint Structure
-```python
-from flask import Blueprint, render_template, request, redirect, url_for
-from typing import Dict, Any, Optional
-
-# Create blueprint with descriptive name
-feature_bp = Blueprint('feature', __name__, url_prefix='/feature')
-
-@feature_bp.route('/endpoint')
-def endpoint_function() -> ReturnType:
-    """Clear docstring describing the endpoint."""
-    # Implementation with proper error handling
-    pass
-```
-
-### Blueprint Registration
-```python
-# In routes/__init__.py
-from flask import Flask
-from .auth import auth_bp
-from .flashcard import flashcard_bp
-
-def register_blueprints(app: Flask) -> None:
-    """Register all blueprints with the Flask app."""
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(flashcard_bp)
-```
-
-### Cross-Blueprint URL Generation
-```python
-# Use blueprint.endpoint format for url_for
-return redirect(url_for('flashcard.index'))
-return redirect(url_for('auth.auth'))
-```
-
-## Route Organization
-
-The application uses 6 main blueprints for route organization:
-
-- **Authentication** (`auth.py`) - OAuth flow, callbacks, credential management
-- **Core Flashcard** (`flashcard.py`) - Learning sessions, card display, feedback
-- **Settings** (`settings.py`) - User preferences, spreadsheet configuration
-- **API** (`api.py`) - TTS endpoints, card management, language settings
-- **Admin** (`admin.py`) - Database administration, user management
-- **Test** (`test.py`) - Development testing and debugging
-
-*For detailed route mappings, see [docs/architecture.md](docs/architecture.md)*
-
-## Development Workflow
-
-### Running the Application
-```bash
-# Start development server (recommended)
-uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload run:app
-
-# Run tests
-uv run pytest
-
-# Run pre-commit hooks
-uv run pre-commit run --all-files
-```
-
-### Testing and Debugging
-```bash
-# Test specific functionality
-uv run python -c "from src.tts_service import tts_service; print(tts_service.generate_audio('test'))"
-
-# Check configuration
-uv run python -c "from src.config import config; print(config.DEBUG)"
-
-# Test database connection
-uv run python -c "from src.database import db; print(db.engine.execute('SELECT 1').fetchone())"
-
-# Check uv environment
-uv pip list  # List installed packages
-uv tree      # Show dependency tree
-```
-
-## Pre-commit Configuration
-The project uses automated code quality checks via pre-commit hooks:
-- **Ruff**: Fast Python linting and formatting
-- **File checks**: Trailing whitespace, JSON/YAML/TOML validation
-- **Security**: Bandit security scanning, private key detection
-
-## Documentation
-Comprehensive documentation is available in the `docs/` directory:
-- **Architecture & Configuration** - System design and setup
-- **Feature Documentation** - Listening mode, TTS, user properties
-- **Development Guide** - Setup, testing, deployment procedures
-
-*Always refer to current documentation for detailed implementation guidelines.*
+## Further Reading
+- `docs/architecture.md` — detailed architecture & auth flow
+- `docs/audio.md` — TTS & listening mode
+- `docs/development-guide.md` — setup, testing, deployment
