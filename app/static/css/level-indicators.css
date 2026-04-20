@@ -14,12 +14,7 @@
     height: 4px;
     width: var(--level-pct, 0%);
     border-radius: 0 2px 0 0;
-    background: linear-gradient(
-        90deg,
-        color-mix(in srgb, var(--mode-accent) 45%, white) 0%,
-        var(--mode-accent) 100%
-    );
-    filter: saturate(var(--level-sat, 0.85));
+    background: var(--mode-accent);
     pointer-events: none;
     z-index: 1;
 }
@@ -56,11 +51,7 @@
 
 @media (prefers-color-scheme: dark) {
     .language-card[data-level]::after {
-        background: linear-gradient(
-            90deg,
-            color-mix(in srgb, var(--mode-accent) 55%, #1e293b) 0%,
-            var(--mode-accent) 100%
-        );
+        background: var(--mode-accent);
     }
 
     .language-card .level-badge {

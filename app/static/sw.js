@@ -5,7 +5,7 @@ const urlsToCache = [
     '/',
     '/static/css/style.css',
     '/static/css/mobile.css',
-    '/static/css/level-dots.css',
+    '/static/css/level-indicators.css',
     '/static/css/feedback.css',
     '/static/js/mobile.js',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css',
