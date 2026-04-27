@@ -167,6 +167,10 @@
     background: linear-gradient(90deg, #fdba74, #fb923c) !important;
 }
 
+.learn-seg-type_example_guided {
+    background: linear-gradient(90deg, #5eead4, #2dd4bf) !important;
+}
+
 .learn-seg-review {
     background: linear-gradient(90deg, #d8b4fe, #c084fc) !important;
 }
@@ -202,6 +206,10 @@
 
 .learn-seg-dot-write_example {
     background: #fb923c;
+}
+
+.learn-seg-dot-type_example_guided {
+    background: #2dd4bf;
 }
 
 .learn-seg-dot-review {
@@ -392,6 +400,10 @@
 
 .mode-check.mode-check-write_example.ok {
     background: #fb923c;
+}
+
+.mode-check.mode-check-type_example_guided.ok {
+    background: #2dd4bf;
 }
 
 .mode-check.mode-check-review.ok {
@@ -603,6 +615,45 @@
 
 .write-example-translation {
     font-size: 1.05rem;
+}
+
+/* Guided sentence: character slots (word-builder style target) */
+.guided-sentence-target {
+    min-height: 3.5rem;
+    justify-content: center;
+}
+
+.guided-slot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.15rem;
+    min-height: 2.2rem;
+    padding: 0.2rem 0.15rem;
+    margin: 0.1rem;
+    border-radius: 6px;
+    border: 1.5px solid rgba(0, 0, 0, 0.12);
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #94a3b8;
+    background: rgba(248, 250, 252, 0.9);
+    user-select: none;
+}
+
+.guided-slot-space {
+    min-width: 0.65rem;
+    border-color: transparent;
+    background: transparent;
+}
+
+.guided-slot.guided-revealed {
+    color: #5e35b1;
+    border-color: #7c4dff;
+    background: rgba(124, 77, 255, 0.08);
+}
+
+.guided-sentence-target.guided-shake {
+    animation: buildSourceShake 0.4s ease;
 }
 
 /* Reset / clear button under the target */

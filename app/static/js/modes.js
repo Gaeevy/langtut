@@ -6,6 +6,7 @@
  *   - build_word  : click letter tiles to assemble a word (keyboard shortcuts;
  *                   drag to reorder tiles in the target row)
  *   - build_sentence : click word tiles; drag to reorder in target
+ *   - type_example_guided : free typing; only correct next character is accepted
  *
  * All modes submit via the standard answer form with a hidden `user_answer` field.
  * type_answer uses a plain text input and needs no JS here.
@@ -16,10 +17,34 @@
 
     const mode = window.questionMode;
 
+    /** Strip combining marks for loose letter matching (Portuguese diacritics). */
+    function stripDiacritics(ch) {
+        return ch.normalize('NFD').replace(/\p{M}/gu, '');
+    }
+
+    function charsLooselyEqual(a, b) {
+        return stripDiacritics(a).toLowerCase() === stripDiacritics(b).toLowerCase();
+    }
+
+    function keyMatchesNextGlyph(key, glyph) {
+        if (glyph === ' ') {
+            return key === ' ';
+        }
+        if (glyph.length !== 1) {
+            return key === glyph;
+        }
+        if (/\p{L}/u.test(glyph)) {
+            return charsLooselyEqual(key, glyph);
+        }
+        return key === glyph;
+    }
+
     if (mode === 'pick_one' || mode === 'pick_translation') {
         initPickOne();
     } else if (mode === 'build_word' || mode === 'build_sentence') {
         initBuild();
+    } else if (mode === 'type_example_guided') {
+        initGuidedSentenceTyping();
     }
 
     // ------------------------------------------------------------------
@@ -31,32 +56,155 @@
         const answerInput = document.getElementById('user-answer-input');
         const buttons = document.querySelectorAll('.pick-one-btn');
 
+        function selectButton(btn) {
+            if (!btn) return;
+            buttons.forEach(function (b) { b.classList.remove('selected'); });
+            btn.classList.add('selected');
+            answerInput.value = btn.dataset.value;
+            form.requestSubmit();
+        }
+
         buttons.forEach(function (btn) {
             btn.addEventListener('click', function () {
-                // Visually mark selected
-                buttons.forEach(function (b) { b.classList.remove('selected'); });
-                btn.classList.add('selected');
-
-                // Fill hidden input and submit (requestSubmit triggers the submit event
-                // so card.js can intercept it for AJAX + audio autoplay)
-                answerInput.value = btn.dataset.value;
-                form.requestSubmit();
+                selectButton(btn);
             });
         });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            const t = e.target;
+            if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+            const n = parseInt(e.key, 10);
+            if (n < 1 || n > 4) return;
+            const idx = n - 1;
+            if (idx >= buttons.length) return;
+            e.preventDefault();
+            selectButton(buttons[idx]);
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Guided sentence (levels 6-7)
+    // ------------------------------------------------------------------
+
+    function initGuidedSentenceTyping() {
+        const text = window.guidedSentenceText;
+        if (!text) return;
+
+        const glyphs = Array.from(text);
+        const form = document.getElementById('mode-form');
+        const hidden = document.getElementById('user-answer-input');
+        const target = document.getElementById('guided-target');
+        const resetBtn = document.getElementById('guided-reset');
+        const submitBtn = document.getElementById('guided-submit');
+        if (!form || !hidden || !target) return;
+
+        if (glyphs.length === 0) {
+            if (submitBtn) submitBtn.disabled = true;
+            return;
+        }
+
+        const slots = Array.from(target.querySelectorAll('.guided-slot'));
+        let pos = 0;
+        let built = '';
+
+        function placeholderFor(glyph) {
+            return glyph === ' ' ? '\u00a0' : '\u00b7';
+        }
+
+        function setSubmitState() {
+            if (submitBtn) {
+                submitBtn.disabled = (pos !== glyphs.length);
+            }
+        }
+
+        function shake() {
+            target.classList.add('guided-shake');
+            window.setTimeout(function () {
+                target.classList.remove('guided-shake');
+            }, 400);
+        }
+
+        function reset() {
+            pos = 0;
+            built = '';
+            hidden.value = '';
+            glyphs.forEach(function (g, i) {
+                slots[i].textContent = placeholderFor(g);
+                slots[i].classList.remove('guided-revealed');
+                slots[i].classList.add('guided-pending');
+            });
+            setSubmitState();
+        }
+
+        function onKeyDown(e) {
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            const t = e.target;
+            if (t && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && t.type !== 'hidden'))) {
+                return;
+            }
+
+            if (e.key === 'Enter') {
+                if (submitBtn && !submitBtn.disabled) {
+                    e.preventDefault();
+                    form.requestSubmit();
+                }
+                return;
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                reset();
+                return;
+            }
+            if (e.key === 'Backspace') {
+                if (pos <= 0) return;
+                e.preventDefault();
+                pos -= 1;
+                built = built.slice(0, -1);
+                hidden.value = built;
+                const g = glyphs[pos];
+                slots[pos].textContent = placeholderFor(g);
+                slots[pos].classList.remove('guided-revealed');
+                slots[pos].classList.add('guided-pending');
+                setSubmitState();
+                return;
+            }
+
+            if (pos >= glyphs.length) return;
+            if (e.key.length !== 1) return;
+
+            const next = glyphs[pos];
+            if (keyMatchesNextGlyph(e.key, next)) {
+                e.preventDefault();
+                built += next;
+                hidden.value = built;
+                slots[pos].textContent = next;
+                slots[pos].classList.add('guided-revealed');
+                slots[pos].classList.remove('guided-pending');
+                pos += 1;
+                setSubmitState();
+            } else {
+                e.preventDefault();
+                shake();
+            }
+        }
+
+        document.addEventListener('keydown', onKeyDown);
+        if (resetBtn) {
+            resetBtn.addEventListener('click', reset);
+        }
+        if (submitBtn) {
+            submitBtn.addEventListener('click', function () {
+                if (pos !== glyphs.length) return;
+                form.requestSubmit();
+            });
+        }
+        setSubmitState();
     }
 
     // ------------------------------------------------------------------
     // Build Word / Build Sentence
     // ------------------------------------------------------------------
-
-    /** Strip combining marks for loose letter matching (Portuguese diacritics). */
-    function stripDiacritics(ch) {
-        return ch.normalize('NFD').replace(/\p{M}/gu, '');
-    }
-
-    function charsLooselyEqual(a, b) {
-        return stripDiacritics(a).toLowerCase() === stripDiacritics(b).toLowerCase();
-    }
 
     function initBuild() {
         const form = document.getElementById('mode-form');

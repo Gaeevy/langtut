@@ -48,6 +48,8 @@
             {% if correct %}Word spelled correctly!{% else %}Not quite — the correct word is shown below.{% endif %}
         {% elif question_mode == 'write_example' %}
             {% if correct %}Example matches!{% else %}Not quite — the example is shown below.{% endif %}
+        {% elif question_mode == 'type_example_guided' %}
+            {% if correct %}Sentence complete!{% else %}Not quite — the example is shown below.{% endif %}
         {% else %}
             {% if correct %}Correct!{% else %}Not quite — the correct word is shown below.{% endif %}
         {% endif %}

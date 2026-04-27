@@ -207,6 +207,7 @@ function renderFeedback(data) {
         build_sentence: correct ? 'Sentence correct!'       : 'Not quite \u2014 the correct sentence is shown below.',
         build_word:     correct ? 'Word spelled correctly!'  : 'Not quite \u2014 the correct word is shown below.',
         write_example:  correct ? 'Example matches!'       : 'Not quite \u2014 the example is shown below.',
+        type_example_guided: correct ? 'Sentence complete!' : 'Not quite \u2014 the example is shown below.',
         type_answer:    correct ? 'Correct!'                 : 'Not quite \u2014 the correct word is shown below.'
     };
     const feedbackMsg = messages[question_mode] || messages.type_answer;
@@ -296,7 +297,10 @@ function setupAjaxSubmission() {
         e.preventDefault();
 
         let userAnswer;
-        if (window.questionMode === 'type_answer' || window.questionMode === 'write_example') {
+        if (
+            window.questionMode === 'type_answer'
+            || window.questionMode === 'write_example'
+        ) {
             const textInput = form.querySelector('input[name="user_answer"], textarea[name="user_answer"]');
             userAnswer = textInput ? textInput.value.trim() : '';
         } else {

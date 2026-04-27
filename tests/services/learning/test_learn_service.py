@@ -78,6 +78,40 @@ class TestLearnServiceLevelBumpAtPipelineEnd:
         assert by_mode["pick_translation"]["final_ok"] is True
 
 
+class TestTypeExampleGuidedMode:
+    """type_example_guided checks full example sentence; answer record uses example."""
+
+    def test_process_answer_guided_mode(self, request_context):
+        card = make_card(
+            id=1,
+            level=Levels.LEVEL_6,
+            example="não me parece",
+            example_translation="it does not seem to me",
+        )
+        manager = CardSessionManager("learn")
+        manager.initialize([card], "TestTab", 1)
+
+        sm.set(sk.LEARNING_TASK_QUEUE, [{"card_idx": 0, "mode": LearningMode.TYPE_EXAMPLE_GUIDED}])
+        sm.set(sk.LEARNING_TASK_INDEX, 0)
+        sm.set(sk.LEARNING_CARD_PIPELINES, {"0": [LearningMode.TYPE_EXAMPLE_GUIDED]})
+        sm.set(sk.LEARNING_CARD_START_LEVELS, {"0": 6})
+        sm.set(sk.LEARNING_ORIGINAL_COUNT, 1)
+        sm.set(sk.LEARNING_CARD_MODES_DONE, {})
+        sm.set(sk.LEARNING_CARD_RETRIES, {})
+        sm.set(sk.LEARNING_ANSWERS, [])
+
+        service = LearnService()
+        bad = service.process_answer("wrong")
+        assert bad.success and not bad.is_correct
+
+        ok = service.process_answer("não me parece")
+        assert ok.success and ok.is_correct
+
+        answers = sm.get(sk.LEARNING_ANSWERS, [])
+        assert answers[-1]["correct_answer"] == "não me parece"
+        assert answers[-1]["mode"] == LearningMode.TYPE_EXAMPLE_GUIDED
+
+
 def _card_level(service: LearnService, card_idx: int) -> Levels:
     """Read card level from session after deserialize."""
     state = service.session.get_state()
