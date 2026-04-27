@@ -308,8 +308,12 @@ class LearnService:
             return {"tiles": shuffle_words(sentence), "correct": sentence}
 
         if mode == LearningMode.BUILD_WORD:
-            word = card.get("word", "")
+            word = card.get("word", "").strip().lower()
             return {"tiles": sort_letters(word), "correct": word}
+
+        if mode == LearningMode.TYPE_EXAMPLE_GUIDED:
+            ex = card.get("example", "").strip()
+            return {"guided_display": ex, "guided_glyphs": list(ex)}
 
         return {}
 
@@ -406,6 +410,9 @@ class LearnService:
         if mode == LearningMode.WRITE_EXAMPLE:
             return self.stats.check_answer_ordered(user_answer, card.get("example", ""))
 
+        if mode == LearningMode.TYPE_EXAMPLE_GUIDED:
+            return self.stats.check_answer_ordered(user_answer, card.get("example", ""))
+
         # build_word and type_answer both check against the target word
         return self.stats.check_answer(user_answer, card.get("word", ""))
 
@@ -421,7 +428,11 @@ class LearnService:
         correct_answer = card.get("word", "")
         if mode == LearningMode.PICK_TRANSLATION:
             correct_answer = card.get("translation", "")
-        elif mode in (LearningMode.BUILD_SENTENCE, LearningMode.WRITE_EXAMPLE):
+        elif mode in (
+            LearningMode.BUILD_SENTENCE,
+            LearningMode.WRITE_EXAMPLE,
+            LearningMode.TYPE_EXAMPLE_GUIDED,
+        ):
             correct_answer = card.get("example", "")
 
         return {

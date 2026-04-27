@@ -5,6 +5,7 @@ for generating mode-specific data (distractors, shuffled tiles).
 """
 
 import random
+import unicodedata
 from enum import StrEnum
 
 from app.models import Card, Levels
@@ -18,6 +19,7 @@ class LearningMode(StrEnum):
     BUILD_SENTENCE = "build_sentence"
     BUILD_WORD = "build_word"
     TYPE_ANSWER = "type_answer"
+    TYPE_EXAMPLE_GUIDED = "type_example_guided"
     WRITE_EXAMPLE = "write_example"
 
 
@@ -28,6 +30,7 @@ GLOBAL_MODE_ORDER: list[LearningMode] = [
     LearningMode.BUILD_SENTENCE,
     LearningMode.BUILD_WORD,
     LearningMode.TYPE_ANSWER,
+    LearningMode.TYPE_EXAMPLE_GUIDED,
     LearningMode.WRITE_EXAMPLE,
 ]
 
@@ -38,6 +41,7 @@ MODE_SECTION_LABELS: dict[str, str] = {
     "build_sentence": "Sentence",
     "build_word": "Spell",
     "type_answer": "Type",
+    "type_example_guided": "Reveal",
     "write_example": "Write",
     "review": "Review",
 }
@@ -81,7 +85,8 @@ def compute_queue_section_defs(task_queue: list[dict]) -> list[dict]:
 # Level 0-2 -> pick_translation + pick_one + build_sentence
 # Level 3   -> build_sentence + build_word + type_answer
 # Level 4   -> build_word + type_answer
-# Level 5-7 -> type_answer only
+# Level 5   -> type_answer only
+# Level 6-7 -> type_example_guided (reveal letters by correct keypresses)
 # Level 8   -> write_example only
 LEVEL_PIPELINES: dict[int, list[LearningMode]] = {
     0: [
@@ -93,6 +98,8 @@ LEVEL_PIPELINES: dict[int, list[LearningMode]] = {
     3: [LearningMode.BUILD_SENTENCE, LearningMode.BUILD_WORD, LearningMode.TYPE_ANSWER],
     4: [LearningMode.BUILD_WORD, LearningMode.TYPE_ANSWER],
     5: [LearningMode.TYPE_ANSWER],
+    6: [LearningMode.TYPE_EXAMPLE_GUIDED],
+    7: [LearningMode.TYPE_EXAMPLE_GUIDED],
     8: [LearningMode.WRITE_EXAMPLE],
 }
 
@@ -185,19 +192,81 @@ def shuffle_words(sentence: str) -> list[str]:
     return shuffled
 
 
-def sort_letters(word: str) -> list[str]:
-    """Return the letters of a word sorted alphabetically for build_word mode.
+def _strip_diacritics_char(ch: str) -> str:
+    """Return base letter for *ch* (lowercase) with combining marks removed."""
+    return "".join(
+        c for c in unicodedata.normalize("NFD", ch) if unicodedata.category(c) != "Mn"
+    ).lower()
 
-    Alphabetical order removes the visual positional giveaway while remaining
-    predictable and easy to scan.
+
+def _letter_base_key(ch: str) -> str | None:
+    """Return grouping key for alphabetic characters; non-letters return None."""
+    if ch.isalpha():
+        return _strip_diacritics_char(ch)
+    return None
+
+
+def _build_word_shuffle_units(chars: list[str]) -> list[list[str]]:
+    """Split *chars* into shuffle units for build_word (diacritic-safe blocks)."""
+    by_base: dict[str, list[str]] = {}
+    for c in chars:
+        bk = _letter_base_key(c)
+        if bk is None:
+            continue
+        by_base.setdefault(bk, []).append(c)
+    ambiguous_bases = {bk for bk, lst in by_base.items() if len(set(lst)) > 1}
+
+    n = len(chars)
+    consumed = [False] * n
+    units: list[list[str]] = []
+    i = 0
+    while i < n:
+        if consumed[i]:
+            i += 1
+            continue
+        c = chars[i]
+        bk = _letter_base_key(c)
+        if bk is None or bk not in ambiguous_bases:
+            units.append([c])
+            consumed[i] = True
+            i += 1
+            continue
+        block = by_base[bk]
+        units.append(block)
+        for j in range(n):
+            if _letter_base_key(chars[j]) == bk:
+                consumed[j] = True
+        i += 1
+    return units
+
+
+def sort_letters(word: str) -> list[str]:
+    """Return shuffled letter tiles for build_word mode.
+
+    Letters that share the same keyboard base (e.g. ``a`` / ``ã``) stay in
+    canonical word order as a block. Other letters shuffle as single tiles.
 
     Args:
-        word: The target word
+        word: Target word (typically lowercased by the caller)
 
     Returns:
-        List of letter strings sorted A-Z (case-insensitive key, original case preserved)
+        List of single-character tile strings
     """
-    return sorted(word, key=lambda c: c.lower())
+    if not word:
+        return []
+    chars = list(word)
+    if len(chars) == 1:
+        return chars
+    units = _build_word_shuffle_units(chars)
+    if len(units) <= 1:
+        return [c for u in units for c in u]
+    flat_orig = [c for u in units for c in u]
+    shuffled = [u[:] for u in units]
+    attempts = 0
+    while [c for u in shuffled for c in u] == flat_orig and attempts < 12:
+        random.shuffle(shuffled)
+        attempts += 1
+    return [c for u in shuffled for c in u]
 
 
 def build_options(card: Card, all_cards: list[dict]) -> list[str]:

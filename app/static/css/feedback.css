@@ -5,6 +5,42 @@
     animation: feedbackPulse 0.6s ease-out;
 }
 
+@keyframes feedbackPulse {
+    0% {
+        transform: scale(0.92);
+        opacity: 0.65;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes successBounce {
+    0% {
+        transform: scale(0.85);
+    }
+    55% {
+        transform: scale(1.06);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes errorShake {
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-6px);
+    }
+    75% {
+        transform: translateX(6px);
+    }
+}
+
 .success-indicator i {
     font-size: 4rem;
     color: #28a745;
@@ -24,7 +60,7 @@
     overflow: hidden;
     border: 1px solid rgba(0, 0, 0, 0.06);
     --feedback-accent: #60a5fa;
-    border-left: 4px solid var(--feedback-accent);
+    --feedback-line: #60a5fa;
     background-image: linear-gradient(
         135deg,
         color-mix(in srgb, var(--feedback-accent) 10%, white) 0%,
@@ -33,10 +69,57 @@
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
+/* L-shaped line from top-right: horizontal (left) + vertical (down); animated only on the line.
+   For `to left`, the 0% stop is the right edge (the corner) — solid there, fade toward the tip. */
+.feedback-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+        linear-gradient(
+            to left,
+            var(--feedback-line) 0%,
+            color-mix(in srgb, var(--feedback-line) 72%, transparent) 45%,
+            transparent 100%
+        )
+            top right / 0% 5px no-repeat,
+        linear-gradient(
+            to bottom,
+            var(--feedback-line) 0%,
+            color-mix(in srgb, var(--feedback-line) 70%, transparent) 50%,
+            transparent 100%
+        )
+            top right / 5px 0% no-repeat;
+    animation: feedbackCornerLines 1s ease-out forwards;
+}
+
+.feedback-card.is-correct {
+    --feedback-line: #60a5fa;
+}
+
 .feedback-card.is-incorrect {
-    border-left-style: dashed;
-    filter: grayscale(0.22);
-    opacity: 0.96;
+    --feedback-line: color-mix(in srgb, #7c3aed 55%, #dc2626 45%);
+}
+
+.feedback-card > .row {
+    position: relative;
+    z-index: 1;
+}
+
+@keyframes feedbackCornerLines {
+    0% {
+        background-size: 0% 5px, 5px 0%;
+        opacity: 1;
+    }
+    55% {
+        opacity: 0.95;
+    }
+    100% {
+        background-size: min(52%, 18rem) 5px, 5px min(48%, 16rem);
+        opacity: 0.88;
+    }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -317,5 +400,11 @@
 
     .feedback-card {
         transition: none;
+    }
+
+    .feedback-card::before {
+        animation: none;
+        background-size: min(52%, 18rem) 5px, 5px min(48%, 16rem);
+        opacity: 0.88;
     }
 }

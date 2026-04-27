@@ -88,7 +88,9 @@
                 {% elif question_mode == 'build_word' %}
                 <span class="mode-label">Spell the word</span>
                 {% elif question_mode == 'write_example' %}
-                <span class="mode-label">Write an example</span>
+                <span class="mode-label">Write the example</span>
+                {% elif question_mode == 'type_example_guided' %}
+                <span class="mode-label">Reveal the example</span>
                 {% else %}
                 <span class="mode-label">Type the word</span>
                 {% endif %}
@@ -110,6 +112,12 @@
             {% elif question_mode == 'write_example' %}
                 <h3 class="card-translation-main text-dark fw-semibold mb-2">{{ card.word }}</h3>
                 <p class="text-secondary mb-3 write-example-translation">{{ card.translation }}</p>
+            {% elif question_mode == 'type_example_guided' %}
+                <h3 class="card-translation-main text-dark fw-semibold mb-2">{{ card.word }}</h3>
+                <p class="text-secondary mb-2 write-example-translation">{{ card.translation }}</p>
+                {% if card.example_translation %}
+                <p class="build-sentence-cue-primary mb-3">{{ card.example_translation }}</p>
+                {% endif %}
             {% else %}
                 <h3 class="card-translation-main text-dark fw-semibold mb-3">{{ card.translation }}</h3>
                 {% if card.example_translation %}
@@ -145,7 +153,7 @@
 {% if mode != 'review' %}
 
 <form id="mode-form" action="{{ url_for('learn.answer') }}" method="post">
-    {% if question_mode in ('pick_one', 'pick_translation', 'build_sentence', 'build_word') %}
+    {% if question_mode in ('pick_one', 'pick_translation', 'build_sentence', 'build_word', 'type_example_guided') %}
     <input type="hidden" id="user-answer-input" name="user_answer" value="">
     {% endif %}
 
@@ -192,6 +200,22 @@
         <button type="submit" class="btn btn-primary btn-lg">Submit</button>
     </div>
 
+    {% elif question_mode == 'type_example_guided' %}
+    <div class="guided-sentence-area">
+        <div id="guided-target" class="build-target guided-sentence-target" aria-label="Type to reveal each character">
+            {% for ch in mode_data.guided_glyphs %}
+            <span class="guided-slot {% if ch == ' ' %}guided-slot-space{% endif %} guided-pending" data-idx="{{ loop.index0 }}">{% if ch == ' ' %}&nbsp;{% else %}·{% endif %}</span>
+            {% endfor %}
+        </div>
+        <div class="text-center mb-2">
+            <button type="button" id="guided-reset" class="build-reset-btn">Clear</button>
+        </div>
+        <p class="text-center text-muted small build-type-hint mb-0">Type the sentence. Wrong keys are ignored.</p>
+        <div class="d-grid mt-3">
+            <button type="button" id="guided-submit" class="btn btn-primary btn-lg" disabled>Check</button>
+        </div>
+    </div>
+
     {% else %}
     <div class="mb-3">
         <input type="text" name="user_answer" class="form-control form-control-lg"
@@ -234,11 +258,16 @@
     window.cardMode = {{ mode|tojson if mode else '"learn"' }};
     window.questionMode = {{ question_mode|tojson if question_mode else '"type_answer"' }};
     window.reviewFlipUrl = '{{ url_for("review.flip") }}';
+    {% if question_mode == 'type_example_guided' and mode_data.guided_display is defined %}
+    window.guidedSentenceText = {{ mode_data.guided_display|tojson }};
+    {% else %}
+    window.guidedSentenceText = null;
+    {% endif %}
 </script>
 
 <script src="{{ url_for('static', filename='js/tts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/card.js') }}"></script>
-{% if mode == 'learn' and question_mode in ('pick_one', 'pick_translation', 'build_sentence', 'build_word') %}
+{% if mode == 'learn' and question_mode in ('pick_one', 'pick_translation', 'build_sentence', 'build_word', 'type_example_guided') %}
 <script src="{{ url_for('static', filename='js/modes.js') }}"></script>
 {% endif %}
 {% endblock %}
