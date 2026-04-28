@@ -96,9 +96,9 @@ LEVEL_PIPELINES: dict[int, list[LearningMode]] = {
     ],
     1: [LearningMode.PICK_ONE, LearningMode.BUILD_SENTENCE, LearningMode.BUILD_WORD],
     3: [LearningMode.BUILD_SENTENCE, LearningMode.BUILD_WORD, LearningMode.TYPE_ANSWER],
-    4: [LearningMode.BUILD_WORD, LearningMode.TYPE_ANSWER],
-    5: [LearningMode.TYPE_ANSWER],
-    6: [LearningMode.TYPE_EXAMPLE_GUIDED],
+    4: [LearningMode.BUILD_WORD, LearningMode.TYPE_EXAMPLE_GUIDED, LearningMode.TYPE_ANSWER],
+    5: [LearningMode.TYPE_ANSWER, LearningMode.TYPE_EXAMPLE_GUIDED],
+    6: [LearningMode.TYPE_ANSWER, LearningMode.TYPE_EXAMPLE_GUIDED],
     7: [LearningMode.TYPE_EXAMPLE_GUIDED],
     8: [LearningMode.WRITE_EXAMPLE],
 }
