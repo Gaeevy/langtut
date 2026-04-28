@@ -6,7 +6,8 @@
  *   - build_word  : click letter tiles to assemble a word (keyboard shortcuts;
  *                   drag to reorder tiles in the target row)
  *   - build_sentence : click word tiles; drag to reorder in target
- *   - type_example_guided : free typing; only correct next character is accepted
+ *   - type_example_guided : focused proxy input + ghost sentence; only correct
+ *                           next character is accepted (mobile + desktop)
  *
  * All modes submit via the standard answer form with a hidden `user_answer` field.
  * type_answer uses a plain text input and needs no JS here.
@@ -94,22 +95,27 @@
         const glyphs = Array.from(text);
         const form = document.getElementById('mode-form');
         const hidden = document.getElementById('user-answer-input');
-        const target = document.getElementById('guided-target');
+        const shell = document.querySelector('.guided-sentence-shell');
+        const display = document.getElementById('guided-display');
+        const proxy = document.getElementById('guided-proxy-input');
         const resetBtn = document.getElementById('guided-reset');
         const submitBtn = document.getElementById('guided-submit');
-        if (!form || !hidden || !target) return;
+        if (!form || !hidden || !display || !proxy) return;
 
         if (glyphs.length === 0) {
             if (submitBtn) submitBtn.disabled = true;
             return;
         }
 
-        const slots = Array.from(target.querySelectorAll('.guided-slot'));
+        const slots = Array.from(display.querySelectorAll('.guided-glyph'));
         let pos = 0;
         let built = '';
 
-        function placeholderFor(glyph) {
-            return glyph === ' ' ? '\u00a0' : '\u00b7';
+        let useBeforeInput = false;
+        try {
+            useBeforeInput = 'onbeforeinput' in proxy;
+        } catch (e) {
+            useBeforeInput = false;
         }
 
         function setSubmitState() {
@@ -119,28 +125,138 @@
         }
 
         function shake() {
-            target.classList.add('guided-shake');
+            if (!shell) return;
+            shell.classList.add('guided-shake');
             window.setTimeout(function () {
-                target.classList.remove('guided-shake');
+                shell.classList.remove('guided-shake');
             }, 400);
+        }
+
+        function renderPendingSlot(i) {
+            const g = glyphs[i];
+            slots[i].classList.remove('guided-revealed');
+            slots[i].classList.add('guided-pending');
+            if (g === ' ') {
+                slots[i].innerHTML = '<span class="guided-space-gap" aria-hidden="true"></span>';
+            } else {
+                slots[i].textContent = '*';
+            }
+        }
+
+        function acceptNextGlyph() {
+            const g = glyphs[pos];
+            built += g;
+            hidden.value = built;
+            slots[pos].classList.add('guided-revealed');
+            slots[pos].classList.remove('guided-pending');
+            if (g === ' ') {
+                slots[pos].innerHTML = '<span class="guided-space-gap" aria-hidden="true"></span>';
+            } else {
+                slots[pos].textContent = g;
+            }
+            pos += 1;
+            setSubmitState();
+        }
+
+        function tryConsumeChars(raw) {
+            if (!raw || pos >= glyphs.length) return;
+            for (let i = 0; i < raw.length; i++) {
+                if (pos >= glyphs.length) break;
+                const ch = raw[i];
+                if (keyMatchesNextGlyph(ch, glyphs[pos])) {
+                    acceptNextGlyph();
+                } else {
+                    if (i === 0) shake();
+                    break;
+                }
+            }
+        }
+
+        function doBackspace() {
+            if (pos <= 0) return;
+            pos -= 1;
+            built = built.slice(0, -1);
+            hidden.value = built;
+            renderPendingSlot(pos);
+            setSubmitState();
         }
 
         function reset() {
             pos = 0;
             built = '';
             hidden.value = '';
-            glyphs.forEach(function (g, i) {
-                slots[i].textContent = placeholderFor(g);
-                slots[i].classList.remove('guided-revealed');
-                slots[i].classList.add('guided-pending');
+            proxy.value = '';
+            glyphs.forEach(function (_g, i) {
+                renderPendingSlot(i);
             });
             setSubmitState();
+            proxy.focus();
         }
 
-        function onKeyDown(e) {
+        function onBeforeInput(e) {
+            if (e.inputType === 'deleteContentBackward') {
+                e.preventDefault();
+                doBackspace();
+                return;
+            }
+            if (!e.data) return;
+            if (
+                e.inputType === 'insertText' ||
+                e.inputType === 'insertCompositionText' ||
+                e.inputType === 'insertFromPaste'
+            ) {
+                e.preventDefault();
+                tryConsumeChars(e.data);
+            }
+        }
+
+        function onInput(e) {
+            const v = proxy.value;
+            if (useBeforeInput) {
+                if (v) {
+                    proxy.value = '';
+                    tryConsumeChars(v);
+                }
+                return;
+            }
+            if (e.inputType === 'deleteContentBackward') {
+                proxy.value = '';
+                doBackspace();
+                return;
+            }
+            if (v) {
+                proxy.value = '';
+                tryConsumeChars(v);
+            }
+        }
+
+        function onProxyKeyDown(e) {
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (e.key === 'Enter') {
+                if (submitBtn && !submitBtn.disabled) {
+                    e.preventDefault();
+                    form.requestSubmit();
+                }
+                return;
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                reset();
+                return;
+            }
+            if (e.key === 'Backspace' && !useBeforeInput) {
+                if (pos <= 0) return;
+                e.preventDefault();
+                doBackspace();
+            }
+        }
+
+        /** Desktop: document-level typing when proxy is not focused (e.g. after Clear). */
+        function onDocumentKeyDown(e) {
             if (e.ctrlKey || e.metaKey || e.altKey) return;
             const t = e.target;
             if (t && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && t.type !== 'hidden'))) {
+                if (t === proxy) return;
                 return;
             }
 
@@ -159,14 +275,7 @@
             if (e.key === 'Backspace') {
                 if (pos <= 0) return;
                 e.preventDefault();
-                pos -= 1;
-                built = built.slice(0, -1);
-                hidden.value = built;
-                const g = glyphs[pos];
-                slots[pos].textContent = placeholderFor(g);
-                slots[pos].classList.remove('guided-revealed');
-                slots[pos].classList.add('guided-pending');
-                setSubmitState();
+                doBackspace();
                 return;
             }
 
@@ -176,20 +285,25 @@
             const next = glyphs[pos];
             if (keyMatchesNextGlyph(e.key, next)) {
                 e.preventDefault();
-                built += next;
-                hidden.value = built;
-                slots[pos].textContent = next;
-                slots[pos].classList.add('guided-revealed');
-                slots[pos].classList.remove('guided-pending');
-                pos += 1;
-                setSubmitState();
+                acceptNextGlyph();
             } else {
                 e.preventDefault();
                 shake();
             }
         }
 
-        document.addEventListener('keydown', onKeyDown);
+        if (useBeforeInput) {
+            proxy.addEventListener('beforeinput', onBeforeInput);
+        }
+        proxy.addEventListener('input', onInput);
+        proxy.addEventListener('keydown', onProxyKeyDown);
+        document.addEventListener('keydown', onDocumentKeyDown);
+
+        if (shell) {
+            shell.addEventListener('click', function () {
+                proxy.focus();
+            });
+        }
         if (resetBtn) {
             resetBtn.addEventListener('click', reset);
         }
@@ -199,7 +313,11 @@
                 form.requestSubmit();
             });
         }
+
         setSubmitState();
+        window.setTimeout(function () {
+            proxy.focus();
+        }, 0);
     }
 
     // ------------------------------------------------------------------

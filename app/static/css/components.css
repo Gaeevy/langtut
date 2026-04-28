@@ -617,43 +617,87 @@
     font-size: 1.05rem;
 }
 
-/* Guided sentence: character slots (word-builder style target) */
-.guided-sentence-target {
-    min-height: 3.5rem;
-    justify-content: center;
+/* Guided sentence: ghost line + invisible focus proxy (mobile keyboard) */
+.guided-sentence-area {
+    margin-top: 1rem;
 }
 
-.guided-slot {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 1.15rem;
-    min-height: 2.2rem;
-    padding: 0.2rem 0.15rem;
-    margin: 0.1rem;
-    border-radius: 6px;
-    border: 1.5px solid rgba(0, 0, 0, 0.12);
-    font-size: 1.05rem;
+.guided-sentence-shell {
+    position: relative;
+    min-height: 4.5rem;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    padding: 1rem 1rem 1.25rem;
+    background: rgba(255, 255, 255, 0.96);
+    margin-bottom: 0.75rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.guided-sentence-shell:focus-within {
+    border-color: rgba(124, 77, 255, 0.45);
+    box-shadow: 0 0 0 3px rgba(124, 77, 255, 0.12);
+}
+
+.guided-sentence-shell.guided-shake {
+    animation: buildSourceShake 0.4s ease;
+}
+
+.guided-sentence-display {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0;
+    row-gap: 0.15rem;
+    font-size: 1.2rem;
     font-weight: 600;
-    color: #94a3b8;
-    background: rgba(248, 250, 252, 0.9);
+    line-height: 1.65;
+    color: #334155;
+    pointer-events: none;
     user-select: none;
 }
 
-.guided-slot-space {
-    min-width: 0.65rem;
-    border-color: transparent;
-    background: transparent;
+.guided-glyph {
+    display: inline-block;
+    min-width: 0.42em;
+    text-align: center;
+    color: #94a3b8;
 }
 
-.guided-slot.guided-revealed {
+.guided-glyph.guided-pending {
+    font-weight: 500;
+}
+
+.guided-glyph.guided-revealed {
     color: #5e35b1;
-    border-color: #7c4dff;
-    background: rgba(124, 77, 255, 0.08);
+    font-weight: 600;
 }
 
-.guided-sentence-target.guided-shake {
-    animation: buildSourceShake 0.4s ease;
+.guided-glyph-space {
+    min-width: 0.35em;
+}
+
+.guided-space-gap {
+    display: inline-block;
+    min-width: 0.35em;
+}
+
+.guided-proxy-input {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 12px;
+    opacity: 0;
+    cursor: text;
+    font-size: 16px; /* avoids iOS zoom on focus */
+    z-index: 2;
+    background: transparent;
 }
 
 /* Reset / clear button under the target */
