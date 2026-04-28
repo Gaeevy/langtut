@@ -23,7 +23,9 @@ class LearningMode(StrEnum):
     WRITE_EXAMPLE = "write_example"
 
 
-# Global mode order -- queue is always built in this order so easier modes come first.
+# Canonical difficulty order for mixed-level sessions: `build_task_queue` runs one round
+# per mode in this order (all cards that include that mode). Per-card *which* modes apply
+# still comes from `LEVEL_PIPELINES`; this list does not need to match pipeline order.
 GLOBAL_MODE_ORDER: list[LearningMode] = [
     LearningMode.PICK_TRANSLATION,
     LearningMode.PICK_ONE,

@@ -202,15 +202,21 @@
 
     {% elif question_mode == 'type_example_guided' %}
     <div class="guided-sentence-area">
-        <div id="guided-target" class="build-target guided-sentence-target" aria-label="Type to reveal each character">
-            {% for ch in mode_data.guided_glyphs %}
-            <span class="guided-slot {% if ch == ' ' %}guided-slot-space{% endif %} guided-pending" data-idx="{{ loop.index0 }}">{% if ch == ' ' %}&nbsp;{% else %}·{% endif %}</span>
-            {% endfor %}
+        <label for="guided-proxy-input" class="form-label visually-hidden">Reveal the example sentence</label>
+        <div class="guided-sentence-shell" role="group" aria-label="Type to reveal each character">
+            <div id="guided-display" class="guided-sentence-display" aria-live="polite" aria-atomic="true">
+                {% for ch in mode_data.guided_glyphs %}
+                <span class="guided-glyph {% if ch == ' ' %}guided-glyph-space{% endif %} guided-pending" data-idx="{{ loop.index0 }}">{% if ch == ' ' %}<span class="guided-space-gap" aria-hidden="true"></span>{% else %}*{% endif %}</span>
+                {% endfor %}
+            </div>
+            <input type="text" id="guided-proxy-input" class="guided-proxy-input" tabindex="0"
+                   autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+                   inputmode="text">
         </div>
         <div class="text-center mb-2">
             <button type="button" id="guided-reset" class="build-reset-btn">Clear</button>
         </div>
-        <p class="text-center text-muted small build-type-hint mb-0">Type the sentence. Wrong keys are ignored.</p>
+        <p class="text-center text-muted small build-type-hint mb-0">Tap the box and type. Wrong keys are ignored.</p>
         <div class="d-grid mt-3">
             <button type="button" id="guided-submit" class="btn btn-primary btn-lg" disabled>Check</button>
         </div>
