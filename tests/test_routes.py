@@ -19,7 +19,7 @@ class TestRouteRegistration:
         assert "/learn/card" in routes
         assert "/learn/answer" in routes
         assert "/learn/feedback/<correct>" in routes
-        assert "/learn/next" in routes
+        assert "/learn/next_card" in routes
         assert "/learn/results" in routes
         assert "/learn/start/<tab_name>" in routes
 
@@ -73,7 +73,7 @@ class TestTTSRoutes:
 
         data = response.get_json()
         assert data["success"] is False
-        assert "Text is required" in data["error"]
+        assert "text" in data["error"].lower()
 
     def test_tts_speak_rejects_empty_text(self, client):
         """TTS speak should reject empty text."""

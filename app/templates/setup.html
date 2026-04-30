@@ -10,14 +10,10 @@
 
             <div class="alert alert-success mb-4">
                 <h5>✅ You're logged in with Google!</h5>
-                <p>Now let's link your vocabulary spreadsheet to start learning.</p>
+                <p>Link your vocabulary spreadsheet below to start learning.</p>
             </div>
 
-            <div class="mb-4">
-                <a href="{{ url_for('settings.settings') }}" class="btn btn-primary btn-lg">
-                    📊 Link My Spreadsheet
-                </a>
-            </div>
+            {% include "_spreadsheet_toolbar.html" %}
 
             <!-- Instructions -->
             <div class="card mt-4">

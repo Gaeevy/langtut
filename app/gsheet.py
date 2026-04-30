@@ -43,6 +43,11 @@ def extract_spreadsheet_id(url_or_id: str) -> str:
     return url_or_id.strip()
 
 
+def spreadsheet_editor_url(spreadsheet_id: str) -> str:
+    """Return the Google Sheets editor URL for a spreadsheet ID."""
+    return f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}"
+
+
 def validate_spreadsheet_access(spreadsheet_id: str) -> str:
     """Validate spreadsheet access and return spreadsheet name.
 

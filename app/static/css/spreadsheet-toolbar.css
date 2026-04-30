@@ -1,0 +1,55 @@
+/* Home / setup spreadsheet picker — matches Bootstrap + app primary #4a6da7 */
+
+.spreadsheet-toolbar {
+    border: 1px solid rgba(74, 109, 167, 0.2);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.spreadsheet-toolbar .card-body {
+    text-align: left;
+}
+
+.spreadsheet-toolbar-select {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.spreadsheet-toolbar-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 100%;
+    min-height: 2.25rem;
+    padding: 0;
+    border-radius: 8px;
+}
+
+.spreadsheet-toolbar-icon-group .btn {
+    border-radius: 8px;
+}
+
+.spreadsheet-toolbar-icon-group .btn + .btn {
+    margin-left: 0.25rem;
+}
+
+.spreadsheet-add-toggle {
+    color: #4a6da7;
+    font-weight: 500;
+}
+
+.spreadsheet-add-toggle:hover {
+    color: #3a5a8f;
+}
+
+@media (max-width: 576px) {
+    .spreadsheet-toolbar-row {
+        flex-direction: column;
+        align-items: stretch !important;
+    }
+
+    .spreadsheet-toolbar-icon-group {
+        display: flex;
+        justify-content: flex-end;
+    }
+}

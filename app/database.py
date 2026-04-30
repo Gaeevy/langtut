@@ -135,12 +135,12 @@ class User(db.Model):
 
         return None
 
-    def rename_spreadsheet(self, spreadsheet_id, new_name):
+    def rename_spreadsheet(self, spreadsheet_id, new_name: str | None):
         """Rename a spreadsheet for user's account.
 
         Args:
-            spreadsheet_id: Google Sheets spreadsheet ID to remove
-            new_name: New name for spreadsheet
+            spreadsheet_id: Google Sheets spreadsheet ID to rename
+            new_name: New display name, or None to clear the custom name
 
         Returns:
             True if renamed successfully, False if not found

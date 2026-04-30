@@ -1,0 +1,85 @@
+{# expects: is_authenticated, spreadsheets, spreadsheet_toolbar_setup_mode (bool) #}
+{% if is_authenticated %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/spreadsheet-toolbar.css') }}">
+<div
+    id="spreadsheet-toolbar"
+    class="spreadsheet-toolbar card mb-3"
+    data-setup-mode="{{ 'true' if spreadsheet_toolbar_setup_mode else 'false' }}"
+    data-validate-url="{{ url_for('settings.validate_spreadsheet') }}"
+    data-activate-url="{{ url_for('settings.activate_spreadsheet') }}"
+    data-settings-url="{{ url_for('settings.settings') }}"
+>
+    <div class="card-body py-3">
+        {% if spreadsheets and spreadsheets|length > 0 %}
+        <div class="d-flex flex-wrap align-items-stretch gap-2 spreadsheet-toolbar-row">
+            <label class="visually-hidden" for="spreadsheet-selector">Spreadsheet</label>
+            <select id="spreadsheet-selector" class="form-select form-select-sm flex-grow-1 spreadsheet-toolbar-select" aria-label="Active spreadsheet">
+                {% for s in spreadsheets %}
+                <option
+                    value="{{ s.spreadsheet_id }}"
+                    data-sheet-url="{{ s.spreadsheet_url or ('https://docs.google.com/spreadsheets/d/' ~ s.spreadsheet_id) }}"
+                    {% if s.is_active %}selected{% endif %}
+                >
+                    {{ s.spreadsheet_name or s.spreadsheet_id }}
+                </option>
+                {% endfor %}
+            </select>
+            <div class="btn-group spreadsheet-toolbar-icon-group" role="group" aria-label="Spreadsheet actions">
+                <a
+                    href="{{ url_for('settings.settings') }}"
+                    class="btn btn-outline-primary btn-sm spreadsheet-toolbar-icon-btn"
+                    id="spreadsheet-open-settings"
+                    title="Spreadsheet settings"
+                >
+                    <i class="bi bi-gear-fill" aria-hidden="true"></i>
+                </a>
+                <a
+                    href="#"
+                    class="btn btn-outline-primary btn-sm spreadsheet-toolbar-icon-btn"
+                    id="spreadsheet-open-external"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Open in Google Sheets"
+                >
+                    <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="{% if spreadsheets and spreadsheets|length > 0 %}mt-2{% endif %}">
+            <button
+                class="btn btn-link btn-sm text-decoration-none p-0 spreadsheet-add-toggle"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#spreadsheet-add-collapse"
+                aria-expanded="{% if spreadsheet_toolbar_setup_mode or not spreadsheets or spreadsheets|length == 0 %}true{% else %}false{% endif %}"
+                aria-controls="spreadsheet-add-collapse"
+            >
+                <i class="bi bi-plus-lg" aria-hidden="true"></i> Add spreadsheet
+            </button>
+            <div
+                id="spreadsheet-add-collapse"
+                class="collapse {% if spreadsheet_toolbar_setup_mode or not spreadsheets or spreadsheets|length == 0 %}show{% endif %}"
+            >
+                <div class="input-group input-group-sm mt-2">
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="spreadsheet-add-input"
+                        autocomplete="off"
+                        placeholder="Google Sheets URL or ID"
+                        aria-label="Spreadsheet URL or ID"
+                    >
+                    <button type="button" class="btn btn-primary" id="spreadsheet-add-submit">
+                        <span class="spreadsheet-add-label">Add</span>
+                        <span class="spinner-border spinner-border-sm ms-1 d-none spreadsheet-add-spinner" role="status" aria-hidden="true"></span>
+                    </button>
+                </div>
+                <div id="spreadsheet-add-feedback" class="form-text small mt-1"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/spreadsheets.js') }}"></script>
+{% endif %}
