@@ -44,7 +44,13 @@ def home():
     # If no spreadsheet set, show setup screen
     if not user_spreadsheet_id:
         logger.info("No spreadsheet configured, showing setup screen")
-        return render_template("setup.html", is_authenticated=user_is_authenticated)
+        spreadsheets = user.get_all_spreadsheets() if user else []
+        return render_template(
+            "setup.html",
+            is_authenticated=user_is_authenticated,
+            spreadsheets=spreadsheets,
+            spreadsheet_toolbar_setup_mode=True,
+        )
 
     # Set target language in session
     user_spreadsheet = user.get_active_spreadsheet()
@@ -65,9 +71,13 @@ def home():
         logger.error(f"Error reading card sets from spreadsheet {user_spreadsheet_id}: {e}")
         card_sets = []
 
+    spreadsheets = user.get_all_spreadsheets()
+
     return render_template(
         "index.html",
         is_authenticated=user_is_authenticated,
         tabs=card_sets,
         user_spreadsheet_id=user_spreadsheet_id,
+        spreadsheets=spreadsheets,
+        spreadsheet_toolbar_setup_mode=False,
     )

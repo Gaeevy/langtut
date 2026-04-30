@@ -4,6 +4,7 @@
 
 {% block content %}
 <div class="text-center">
+    {% include "_spreadsheet_toolbar.html" %}
 
     <div class="row row-cols-1 row-cols-md-2 g-4 mb-4">
         {% for tab in tabs %}
@@ -153,13 +154,11 @@
         </div>
     </div>
 
-    <!-- Spreadsheet Status -->
+    <!-- Account -->
     {% if is_authenticated %}
         <div class="alert alert-light border-0 mt-4">
-            <small class="text-muted">📊 Using spreadsheet: <code>{{ user_spreadsheet_id[:20] }}...</code></small>
-            <div class="mt-2">
-                <a href="{{ url_for('settings.settings') }}" class="btn btn-primary btn-sm me-2">Settings</a>
-                <a href="{{ url_for('auth.clear_credentials') }}" class="btn btn-secondary btn-sm">Log Out</a>
+            <div class="d-flex flex-wrap gap-2 justify-content-center align-items-center">
+                <a href="{{ url_for('auth.clear_credentials') }}" class="btn btn-secondary btn-sm">Log out</a>
             </div>
         </div>
     {% else %}

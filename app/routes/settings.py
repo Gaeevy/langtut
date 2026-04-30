@@ -4,10 +4,29 @@ Settings routes for the Language Learning Flashcard App.
 Handles user settings and spreadsheet configuration.
 """
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 
-from app.gsheet import extract_spreadsheet_id, read_all_card_sets, validate_spreadsheet_access
+from app.database import UserSpreadsheet
+from app.gsheet import (
+    extract_spreadsheet_id,
+    read_all_card_sets,
+    spreadsheet_editor_url,
+    validate_spreadsheet_access,
+)
+from app.language_config import get_ui_language_codes, label_for_code
 from app.services.auth_manager import auth_manager
+
+
+def _spreadsheet_summary(user_spreadsheet: UserSpreadsheet) -> dict:
+    """Build a JSON-serializable summary for the client's spreadsheet picker."""
+    sid = user_spreadsheet.spreadsheet_id
+    return {
+        "spreadsheet_id": sid,
+        "spreadsheet_name": user_spreadsheet.spreadsheet_name,
+        "spreadsheet_url": user_spreadsheet.spreadsheet_url or spreadsheet_editor_url(sid),
+        "is_active": user_spreadsheet.is_active,
+    }
+
 
 # Create blueprint
 settings_bp = Blueprint("settings", __name__)
@@ -21,17 +40,18 @@ def settings():
     user = auth_manager.user
 
     active_spreadsheet = user.get_active_spreadsheet()
-    current_spreadsheet_id = active_spreadsheet.spreadsheet_id if active_spreadsheet else None
-    current_spreadsheet_name = active_spreadsheet.spreadsheet_name if active_spreadsheet else None
+    if not active_spreadsheet:
+        return redirect(url_for("index.home"))
 
-    spreadsheets = user.get_all_spreadsheets()
+    language_codes = get_ui_language_codes()
+    language_labels = {code: label_for_code(code) for code in language_codes}
 
     return render_template(
         "settings.html",
         user=user,
-        current_spreadsheet_id=current_spreadsheet_id,
-        current_spreadsheet_name=current_spreadsheet_name,
-        spreadsheets=spreadsheets,
+        active_spreadsheet=active_spreadsheet,
+        language_codes=language_codes,
+        language_labels=language_labels,
     )
 
 
@@ -68,6 +88,7 @@ def validate_spreadsheet():
         return jsonify(
             {
                 "success": True,
+                "spreadsheet": _spreadsheet_summary(user_spreadsheet),
                 "id": user_spreadsheet.id,
                 "spreadsheet_id": spreadsheet_id,
                 "spreadsheet_name": spreadsheet_name,
@@ -119,7 +140,13 @@ def activate_spreadsheet():
         spreadsheet = user.activate_spreadsheet(spreadsheet_id)
 
         if spreadsheet:
-            return jsonify({"success": True, "message": "Spreadsheet activated successfully"})
+            return jsonify(
+                {
+                    "success": True,
+                    "message": "Spreadsheet activated successfully",
+                    "spreadsheet": _spreadsheet_summary(spreadsheet),
+                }
+            )
         else:
             return jsonify({"success": False, "error": "Spreadsheet not found in user's list"})
 
@@ -132,22 +159,20 @@ def activate_spreadsheet():
 def rename_spreadsheet():
     """Rename a spreadsheet in user's list."""
     spreadsheet_id = request.json.get("spreadsheet_id", "").strip()
-    new_name = request.json.get("new_name", "").strip()
+    new_name_raw = request.json.get("new_name", "")
+    new_name_stripped = new_name_raw.strip()
+    new_name = new_name_stripped if new_name_stripped else None
 
     if not spreadsheet_id:
         return jsonify({"success": False, "error": "Spreadsheet ID is required"})
 
-    if not new_name:
-        return jsonify({"success": False, "error": "New name is required"})
-
     try:
         user = auth_manager.user
 
-        # Remove the spreadsheet
         success = user.rename_spreadsheet(spreadsheet_id, new_name)
 
         if success:
-            return jsonify({"success": True, "message": "Spreadsheet renammed successfully"})
+            return jsonify({"success": True, "message": "Spreadsheet renamed successfully"})
         else:
             return jsonify({"success": False, "error": "Spreadsheet not found in user's list"})
 
