@@ -22,6 +22,7 @@ from .learn import learn_bp
 from .review import review_bp
 from .settings import settings_bp
 from .test import test_bp
+from .verbs import verbs_bp
 
 
 def register_blueprints(app: Flask) -> None:
@@ -32,5 +33,6 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(review_bp)  # Review mode routes
     app.register_blueprint(settings_bp)  # Settings routes
     app.register_blueprint(api_bp)  # API routes
+    app.register_blueprint(verbs_bp)  # Irregular verbs routes
     app.register_blueprint(admin_bp)  # Admin routes
     app.register_blueprint(test_bp)  # Test routes

@@ -12,6 +12,7 @@ from flask import Blueprint
 from .cards import cards_bp
 from .language import language_bp
 from .tts import tts_bp
+from .verbs import verbs_api_bp
 
 # Create main API blueprint
 api_bp = Blueprint("api", __name__, url_prefix="/api")
@@ -26,9 +27,10 @@ def register_api_blueprints(app):
     api_bp.register_blueprint(tts_bp)
     api_bp.register_blueprint(cards_bp)
     api_bp.register_blueprint(language_bp)
+    api_bp.register_blueprint(verbs_api_bp)
 
 
 # Auto-register sub-blueprints when this module is imported
 register_api_blueprints(None)  # Pass None since we register with api_bp, not app
 
-__all__ = ["api_bp", "cards_bp", "language_bp", "tts_bp"]
+__all__ = ["api_bp", "cards_bp", "language_bp", "tts_bp", "verbs_api_bp"]

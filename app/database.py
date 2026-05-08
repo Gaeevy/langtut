@@ -328,6 +328,64 @@ class UserSpreadsheet(db.Model):
         }
 
 
+class VerbInfinitive(db.Model):
+    """Global irregular verb infinitive."""
+
+    __tablename__ = "verb_infinitives"
+
+    id = Column(Integer, primary_key=True)
+    value = Column(String(255), nullable=False, unique=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    forms = relationship("VerbForm", back_populates="infinitive", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<VerbInfinitive {self.value}>"
+
+
+class VerbTense(db.Model):
+    """Global irregular verb tense."""
+
+    __tablename__ = "verb_tenses"
+
+    id = Column(Integer, primary_key=True)
+    value = Column(String(255), nullable=False, unique=True, index=True)
+    display_order = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    forms = relationship("VerbForm", back_populates="tense", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<VerbTense {self.value}>"
+
+
+class VerbForm(db.Model):
+    """Irregular form value for one infinitive, tense, and person slot."""
+
+    __tablename__ = "verb_forms"
+
+    id = Column(Integer, primary_key=True)
+    infinitive_id = Column(Integer, ForeignKey("verb_infinitives.id"), nullable=False, index=True)
+    tense_id = Column(Integer, ForeignKey("verb_tenses.id"), nullable=False, index=True)
+    person = Column(Integer, nullable=False)  # 1..5: eu, tu, ele, nos, eles
+    value = Column(String(255), nullable=False)
+    differs_from_regular = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    infinitive = relationship("VerbInfinitive", back_populates="forms")
+    tense = relationship("VerbTense", back_populates="forms")
+
+    __table_args__ = (
+        db.UniqueConstraint("infinitive_id", "tense_id", "person", name="unique_verb_form"),
+    )
+
+    def __repr__(self):
+        return (
+            f"<VerbForm infinitive={self.infinitive_id} tense={self.tense_id} person={self.person}>"
+        )
+
+
 # Simple flag to track if tables have been created
 _tables_created = False
 
@@ -355,11 +413,9 @@ def ensure_tables():
         return
 
     try:
-        # Quick check if tables exist
-        User.query.first()
-        RefreshToken.query.first()
-        _tables_created = True
-    except:
-        # Tables don't exist, create them
+        # Idempotent call: creates only missing tables and keeps existing ones.
+        # This also ensures newly added models are materialized in older databases.
         db.create_all()
+        _tables_created = True
+    except Exception:
         _tables_created = True

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Irregular Verbs{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">Irregular Verbs</h4>
+        <a href="{{ url_for('index.home') }}" class="btn btn-outline-secondary btn-sm">Back to Home</a>
+    </div>
+
+    <form method="get" action="{{ url_for('verbs.index') }}" class="mb-4 text-start">
+        <label for="tense_id" class="form-label">Choose tense</label>
+        <div class="input-group">
+            <select id="tense_id" name="tense_id" class="form-select">
+                {% for tense in tenses %}
+                <option value="{{ tense.id }}" {% if tense.id == selected_tense_id %}selected{% endif %}>
+                    {{ tense.value }} ({{ tense.forms_count }} forms)
+                </option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary">Load</button>
+        </div>
+    </form>
+
+    {% if not tenses %}
+    <div class="alert alert-warning text-start">
+        No irregular verbs data yet. Use the import API to add forms.
+    </div>
+    {% elif not infinitives %}
+    <div class="alert alert-info text-start">
+        No verbs found for this tense yet.
+    </div>
+    {% else %}
+    <div class="list-group text-start">
+        {% for infinitive in infinitives %}
+        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+           href="{{ url_for('verbs.practice', tense_id=selected_tense_id, infinitive_id=infinitive.id) }}">
+            <span>{{ infinitive.value }}</span>
+            <span class="badge text-bg-light">Practice</span>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
