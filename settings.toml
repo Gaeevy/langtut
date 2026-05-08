@@ -2,6 +2,9 @@
 # Shared settings across all environments
 max_cards_per_session = 5
 spreadsheet_id = "15_PsHfMb440wtUgZ0d1aJmu5YIXoo9JKytlJINxOV8Q"
+verbs_import_api_key = ""
+verbs_import_local_url = "http://127.0.0.1:8080"
+verbs_import_production_url = ""
 
 # Google OAuth
 scopes = [

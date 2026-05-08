@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Verb Practice{% endblock %}
+
+{% block content %}
+<div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">Verb Practice</h4>
+        <a href="{{ url_for('verbs.index', tense_id=context.tense_id) }}" class="btn btn-outline-secondary btn-sm">Back</a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <p class="mb-1"><strong>Infinitive:</strong> {{ context.infinitive }}</p>
+            <p class="mb-0"><strong>Tense:</strong> {{ context.tense }}</p>
+        </div>
+    </div>
+
+    {% if result %}
+    <div class="alert {% if result.is_fully_correct %}alert-success{% else %}alert-warning{% endif %}">
+        Score: {{ result.total_correct }}/5
+    </div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('verbs.submit_practice', tense_id=context.tense_id, infinitive_id=context.infinitive_id) }}">
+        {% for person in person_order %}
+        <div class="mb-3">
+            <label for="form_{{ person }}" class="form-label">{{ person_labels[person] }}</label>
+            <input
+                id="form_{{ person }}"
+                name="form_{{ person }}"
+                type="text"
+                class="form-control {% if result and result.per_person_correct[person] %}is-valid{% elif result %}is-invalid{% endif %}"
+                value="{% if result %}{{ result.submitted_forms[person] }}{% endif %}"
+                autocomplete="off"
+                required
+            >
+            {% if result %}
+            <div class="{% if result.per_person_correct[person] %}valid-feedback{% else %}invalid-feedback{% endif %}">
+                {% if result.per_person_correct[person] %}
+                Correct
+                {% else %}
+                Correct: {{ result.expected_forms[person] }}
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <button type="submit" class="btn btn-primary">Check</button>
+    </form>
+</div>
+{% endblock %}

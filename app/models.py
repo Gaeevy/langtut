@@ -10,7 +10,7 @@ import random
 from datetime import datetime, timedelta
 from enum import Enum
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 NEVER_SHOWN = datetime(1970, 1, 1)  # Unix epoch start date
 
@@ -228,3 +228,55 @@ class UserSpreadsheetProperty(BaseModel):
     def set_language_dict(self, language_dict: dict[str, str]) -> None:
         """Set language settings from dictionary for backward compatibility."""
         self.language = SpreadsheetLanguages.from_dict(language_dict)
+
+
+class VerbFormInput(BaseModel):
+    """Input payload for one person form in import requests."""
+
+    value: str = Field(min_length=1, max_length=255)
+    differs_from_regular: bool = True
+
+
+class VerbImportRequest(BaseModel):
+    """Denormalized import payload for one infinitive and tense."""
+
+    infinitive: str = Field(min_length=1, max_length=255)
+    tense: str = Field(min_length=1, max_length=255)
+    forms: dict[int, VerbFormInput]
+
+    @model_validator(mode="after")
+    def validate_required_forms(self):
+        """Ensure exactly five forms are provided for persons 1..5."""
+        required_people = {1, 2, 3, 4, 5}
+        provided_people = set(self.forms.keys())
+        if provided_people != required_people:
+            msg = "forms must contain exactly persons 1..5"
+            raise ValueError(msg)
+        return self
+
+
+class VerbPracticeContext(BaseModel):
+    """Renderable context for one practice screen."""
+
+    infinitive_id: int
+    infinitive: str
+    tense_id: int
+    tense: str
+    forms: dict[int, str]
+    person_labels: dict[int, str]
+
+
+class VerbPracticeResult(BaseModel):
+    """Practice grading result for five person forms."""
+
+    infinitive: str
+    tense: str
+    expected_forms: dict[int, str]
+    submitted_forms: dict[int, str]
+    per_person_correct: dict[int, bool]
+    total_correct: int
+
+    @property
+    def is_fully_correct(self) -> bool:
+        """Return True when all five forms are correct."""
+        return self.total_correct == 5

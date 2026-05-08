@@ -79,6 +79,9 @@ class Config(BaseSettings):
     secret_key: str | None = _settings.get("SECRET_KEY")
     max_cards_per_session: int = _settings["max_cards_per_session"]
     spreadsheet_id: str = _settings["spreadsheet_id"]
+    verbs_import_api_key: str = _settings.get("verbs_import_api_key", "")
+    verbs_import_local_url: str = _settings.get("verbs_import_local_url", "http://127.0.0.1:8080")
+    verbs_import_production_url: str = _settings.get("verbs_import_production_url", "")
 
     # Database
     database_path: str = _settings["database_path"]
