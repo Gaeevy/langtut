@@ -39,6 +39,7 @@ uv run pytest
 - Install hooks once per clone:
   ```bash
   uv run pre-commit install
+  uv run pre-commit install -t pre-commit -t pre-push
   ```
 - Pre-commit handles lint/format/security basics.
 - Pre-push runs the test suite.

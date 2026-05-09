@@ -7,7 +7,7 @@ Practical guide for day-to-day development. Keep this short and operational.
 git clone <repository-url>
 cd langtut
 uv sync
-uv run pre-commit install
+uv run pre-commit install -t pre-commit -t pre-push
 ```
 
 Start server:
