@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from flask_sqlalchemy import SQLAlchemy
@@ -6,6 +6,11 @@ from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, T
 from sqlalchemy.orm import relationship
 
 db = SQLAlchemy()
+
+
+def utc_now() -> datetime:
+    """Return timezone-aware UTC timestamp."""
+    return datetime.now(UTC)
 
 
 class User(db.Model):
@@ -17,8 +22,8 @@ class User(db.Model):
     google_user_id = Column(String(255), unique=True, nullable=False, index=True)
     email = Column(String(255))
     name = Column(String(255))
-    created_at = Column(DateTime, default=datetime.utcnow)
-    last_login = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    last_login = Column(DateTime, default=utc_now)
 
     # Relationship to user spreadsheets
     spreadsheets = relationship(
@@ -73,7 +78,7 @@ class User(db.Model):
 
         if existing:
             # Update existing spreadsheet
-            existing.last_used = datetime.utcnow()
+            existing.last_used = utc_now()
             if spreadsheet_url:
                 existing.spreadsheet_url = spreadsheet_url
             if not existing.spreadsheet_name:
@@ -132,7 +137,7 @@ class User(db.Model):
 
         if target_spreadsheet:
             target_spreadsheet.is_active = True
-            target_spreadsheet.last_used = datetime.utcnow()
+            target_spreadsheet.last_used = utc_now()
             db.session.commit()
             return target_spreadsheet
 
@@ -204,9 +209,9 @@ class RefreshToken(db.Model):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     token_encrypted = Column(Text, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    last_used = Column(DateTime, nullable=False, default=datetime.utcnow)
-    last_rotated = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    last_used = Column(DateTime, nullable=False, default=utc_now)
+    last_rotated = Column(DateTime, nullable=False, default=utc_now)
 
     # Relationship to user
     user = relationship("User", backref=db.backref("refresh_tokens", lazy=True))
@@ -249,15 +254,15 @@ class RefreshToken(db.Model):
         from app.utils import encrypt_token
 
         self.token_encrypted = encrypt_token(new_token)
-        self.last_rotated = datetime.utcnow()
-        self.last_used = datetime.utcnow()
+        self.last_rotated = utc_now()
+        self.last_used = utc_now()
 
     def touch(self) -> None:
         """Update last_used timestamp.
 
         Called when the refresh token is used to obtain a new access token.
         """
-        self.last_used = datetime.utcnow()
+        self.last_used = utc_now()
 
 
 class UserSpreadsheet(db.Model):
@@ -271,8 +276,8 @@ class UserSpreadsheet(db.Model):
     spreadsheet_name = Column(String(255))  # User-defined name (future feature)
     spreadsheet_url = Column(Text)  # Full URL for reference
     is_active = Column(Boolean, default=False, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    last_used = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    last_used = Column(DateTime, default=utc_now)
     properties = Column(Text)  # JSON string storage
 
     # Relationship to user
@@ -338,7 +343,7 @@ class VerbInfinitive(db.Model):
 
     id = Column(Integer, primary_key=True)
     value = Column(String(255), nullable=False, unique=True, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     forms = relationship("VerbForm", back_populates="infinitive", cascade="all, delete-orphan")
 
@@ -354,7 +359,7 @@ class VerbTense(db.Model):
     id = Column(Integer, primary_key=True)
     value = Column(String(255), nullable=False, unique=True, index=True)
     display_order = Column(Integer, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     forms = relationship("VerbForm", back_populates="tense", cascade="all, delete-orphan")
 
@@ -373,8 +378,8 @@ class VerbForm(db.Model):
     person = Column(Integer, nullable=False)  # 1..5: eu, tu, ele, nos, eles
     value = Column(String(255), nullable=False)
     differs_from_regular = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
     infinitive = relationship("VerbInfinitive", back_populates="forms")
     tense = relationship("VerbTense", back_populates="forms")
@@ -398,10 +403,10 @@ class UserVerbInteraction(db.Model):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     infinitive_id = Column(Integer, ForeignKey("verb_infinitives.id"), nullable=False, index=True)
     tense_id = Column(Integer, ForeignKey("verb_tenses.id"), nullable=False, index=True)
-    last_shown = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_shown = Column(DateTime, nullable=False, default=utc_now)
     shown_count = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
     user = relationship("User", back_populates="verb_interactions")
     infinitive = relationship("VerbInfinitive")

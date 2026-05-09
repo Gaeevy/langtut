@@ -22,9 +22,8 @@ tts_audio_encoding = "MP3"
 gcs_audio_bucket = "langtut-tts"
 
 # Flask Session
-session_type = "filesystem"
+session_type = "cachelib"
 session_permanent = false
-session_use_signer = true
 session_cookie_httponly = true
 session_cookie_samesite = "Lax"
 
