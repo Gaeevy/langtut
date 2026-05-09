@@ -22,8 +22,9 @@ tts_audio_encoding = "MP3"
 gcs_audio_bucket = "langtut-tts"
 
 # Flask Session
-session_type = "cachelib"
+session_type = "filesystem"
 session_permanent = false
+session_use_signer = true
 session_cookie_httponly = true
 session_cookie_samesite = "Lax"
 
@@ -34,8 +35,10 @@ json_as_ascii = false
 debug = true
 session_cookie_secure = false
 database_path = "data/app.db"
+session_file_dir = "flask_session"
 
 [production]
 debug = false
 session_cookie_secure = true
 database_path = "/app/data/app.db"
+session_file_dir = "/app/data/flask_session"

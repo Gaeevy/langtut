@@ -6,8 +6,8 @@ aspect of application setup.
 """
 
 import os
+from pathlib import Path
 
-from cachelib import SimpleCache
 from flask import Flask
 
 from app.config import config
@@ -30,11 +30,18 @@ def configure_app(app: Flask) -> None:
     # Session configuration
     app.config["SESSION_TYPE"] = config.session_type
     app.config["SESSION_PERMANENT"] = config.session_permanent
+    app.config["SESSION_USE_SIGNER"] = config.session_use_signer
     app.config["SESSION_COOKIE_SECURE"] = config.session_cookie_secure
     app.config["SESSION_COOKIE_HTTPONLY"] = config.session_cookie_httponly
     app.config["SESSION_COOKIE_SAMESITE"] = config.session_cookie_samesite
-    if config.session_type == "cachelib":
-        app.config["SESSION_CACHELIB"] = SimpleCache(default_timeout=60 * 60 * 24 * 7)
+
+    # Filesystem sessions need a shared, persistent directory so that all
+    # Gunicorn workers see the same session state. Create the directory eagerly
+    # to avoid a race during the first request.
+    if config.session_type == "filesystem":
+        session_file_dir = Path(config.session_file_dir).resolve()
+        session_file_dir.mkdir(parents=True, exist_ok=True)
+        app.config["SESSION_FILE_DIR"] = str(session_file_dir)
 
     # JSON configuration
     app.config["JSON_AS_ASCII"] = config.json_as_ascii
