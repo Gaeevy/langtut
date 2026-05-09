@@ -46,4 +46,4 @@ if config.environment == Environment.LOCAL:
 if __name__ == "__main__":
     logger.warning("🐛 Running Flask development server directly (debugging mode)")
     logger.warning("⚠️  For production, use: uv run gunicorn --bind 0.0.0.0:8080 run:app")
-    app.run(host="0.0.0.0", port=8080, debug=True)
+    app.run(host="127.0.0.1", port=8080, debug=True)

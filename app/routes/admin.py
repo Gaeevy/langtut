@@ -198,7 +198,7 @@ def volume_check() -> dict[str, Any]:
             total_bytes = statvfs.f_frsize * statvfs.f_blocks
         except AttributeError:
             # Windows doesn't have statvfs
-            total_bytes, used_bytes, free_bytes = shutil.disk_usage(current_dir)
+            total_bytes, _used_bytes, free_bytes = shutil.disk_usage(current_dir)
 
         # List files in data directory
         data_files = []
