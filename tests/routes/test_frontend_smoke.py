@@ -41,6 +41,20 @@ def test_base_template_keeps_script_block_and_mobile_script() -> None:
 def test_service_worker_offline_fallback_and_core_assets_are_declared() -> None:
     """Service worker keeps offline fallback and core assets in cache list."""
     text = (STATIC / "sw.js").read_text(encoding="utf-8")
-    assert "caches.match('/offline.html')" in text
+    assert "caches.match('/static/offline.html')" in text
+    assert "/static/offline.html" in text
     assert "/static/css/style.css" in text
     assert "/static/js/mobile.js" in text
+
+
+def test_offline_fallback_file_exists() -> None:
+    """Offline fallback file should exist as static asset."""
+    assert (STATIC / "offline.html").exists()
+
+
+def test_index_template_uses_bootstrap_icons_only_for_listening_controls() -> None:
+    """Listening controls should use Bootstrap icon classes, not Font Awesome."""
+    text = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    assert "bi bi-volume-up" in text
+    assert "bi bi-play-fill" in text
+    assert "fas fa-" not in text

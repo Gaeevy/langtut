@@ -3,6 +3,7 @@
 const CACHE_NAME = 'langtut-v1';
 const urlsToCache = [
     '/',
+    '/static/offline.html',
     '/static/css/style.css',
     '/static/css/mobile.css',
     '/static/css/level-indicators.css',
@@ -54,7 +55,7 @@ self.addEventListener('fetch', (event) => {
             .catch(() => {
                 // Return offline page for navigation requests
                 if (event.request.destination === 'document') {
-                    return caches.match('/offline.html');
+                    return caches.match('/static/offline.html');
                 }
             })
     );

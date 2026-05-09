@@ -111,6 +111,7 @@ Docker + `uv`.
   `fix`, `refactor`, `docs`, `style`, `test`, `chore`.
 - All code must pass pre-commit (ruff lint/format, bandit, file checks) before
   commit.
+- Pre-push must run and pass tests (`uv run pytest`) before pushing.
 
 ## Further Reading
 - `docs/architecture.md` — detailed architecture & auth flow

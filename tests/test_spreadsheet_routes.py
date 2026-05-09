@@ -100,11 +100,11 @@ def test_validate_spreadsheet_adds_sheet_and_returns_spreadsheet_payload(app_wit
         lambda: True,
     )
     monkeypatch.setattr(
-        "app.routes.settings.validate_spreadsheet_access",
+        "app.services.settings_service.validate_spreadsheet_access",
         lambda sid: "Mock Title",
     )
     monkeypatch.setattr(
-        "app.routes.settings.read_all_card_sets",
+        "app.services.settings_service.read_all_card_sets",
         lambda sid: [SimpleNamespace(name="Tab1", cards=[1, 2])],
     )
 

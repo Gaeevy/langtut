@@ -83,6 +83,7 @@ def get_spreadsheet(spreadsheet_id: str = None) -> Spreadsheet | None:
     """Get spreadsheet by ID, falls back to default if not provided"""
     creds = auth_manager.get_credentials()
     if not creds:
+        logger.warning("No Google credentials available for spreadsheet access")
         return None
 
     # Use provided ID or fall back to default
@@ -92,8 +93,16 @@ def get_spreadsheet(spreadsheet_id: str = None) -> Spreadsheet | None:
         gc = gspread.authorize(creds)
         spreadsheet = gc.open_by_key(sheet_id)
         return spreadsheet
+    except gspread.SpreadsheetNotFound:
+        logger.warning(f"Spreadsheet not found or inaccessible: {sheet_id}")
+        return None
+    except gspread.APIError as e:
+        logger.error(
+            f"Google Sheets API error accessing spreadsheet {sheet_id}: {e}", exc_info=True
+        )
+        return None
     except Exception as e:
-        print(f"Error accessing spreadsheet {sheet_id} with auth using creds {creds}: {e}")
+        logger.error(f"Error accessing spreadsheet {sheet_id}: {e}", exc_info=True)
         return None
 
 
@@ -106,8 +115,16 @@ def get_worksheet(worksheet_name, spreadsheet_id: str = None) -> Worksheet | Non
     try:
         worksheet = spreadsheet.worksheet(worksheet_name)
         return worksheet
+    except gspread.WorksheetNotFound:
+        logger.warning(f"Worksheet not found: {worksheet_name}")
+        return None
+    except gspread.APIError as e:
+        logger.error(
+            f"Google Sheets API error accessing worksheet {worksheet_name}: {e}", exc_info=True
+        )
+        return None
     except Exception as e:
-        print(f"Error accessing worksheet {worksheet_name}: {e}")
+        logger.error(f"Error accessing worksheet {worksheet_name}: {e}", exc_info=True)
         return None
 
 
@@ -185,7 +202,7 @@ def read_cards_from_worksheet(worksheet) -> list[Card]:
             )
             cards.append(card)
         except Exception as e:
-            print(f"Error processing row {row}: {e}")
+            logger.warning(f"Error processing worksheet row {row}: {e}")
             continue
 
     return cards

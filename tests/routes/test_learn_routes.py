@@ -63,8 +63,26 @@ def test_answer_ajax_returns_feedback_payload(client, monkeypatch, is_correct: b
     assert response.status_code == 200
 
     payload = response.get_json()
+    assert set(payload.keys()) == {
+        "success",
+        "correct",
+        "card",
+        "question_mode",
+        "task_index",
+        "task_total",
+        "progress_sections",
+        "spreadsheet_id",
+        "sheet_gid",
+    }
     assert payload["success"] is True
     assert payload["correct"] is is_correct
+    assert set(payload["card"].keys()) == {
+        "word",
+        "translation",
+        "example",
+        "example_translation",
+        "level",
+    }
     assert payload["card"]["word"] == "ola"
     assert payload["card"]["level"] == 3
     assert payload["question_mode"] == "type_answer"

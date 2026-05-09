@@ -18,6 +18,63 @@ logger = logging.getLogger(__name__)
 learn_bp = Blueprint("learn", __name__, url_prefix="/learn")
 
 
+def _set_target_language_from_active_spreadsheet(user) -> None:
+    """Persist target language from active spreadsheet to session."""
+    user_spreadsheet = user.get_active_spreadsheet()
+    if not user_spreadsheet:
+        return
+    language_settings = user_spreadsheet.get_language_settings()
+    target_lang = language_settings.get("target", "pt")
+    sm = SessionManager()
+    sm.set(SessionKeys.TARGET_LANGUAGE, target_lang)
+
+
+def _build_answer_ajax_payload(result, context, user) -> dict:
+    """Build stable JSON payload for AJAX answer submissions."""
+    card = context.card if context else {}
+    level_val = card.get("level", 0)
+    if hasattr(level_val, "value"):
+        level_val = level_val.value
+    return {
+        "success": True,
+        "correct": result.is_correct,
+        "card": {
+            "word": card.get("word", ""),
+            "translation": card.get("translation", ""),
+            "example": card.get("example"),
+            "example_translation": card.get("example_translation"),
+            "level": level_val,
+        },
+        "question_mode": context.mode if context else "type_answer",
+        "task_index": context.task_index if context else 0,
+        "task_total": context.task_total if context else 0,
+        "progress_sections": context.progress_sections if context else [],
+        "spreadsheet_id": user.get_active_spreadsheet_id() if user else None,
+        "sheet_gid": context.sheet_gid if context else None,
+    }
+
+
+def _render_results_template(result, ended_early: bool = False):
+    """Render results page using shared context fields."""
+    context = {
+        "total": result.total_answered,
+        "correct": result.correct_answers,
+        "percentage": result.accuracy_percentage,
+        "review_count": result.review_count,
+        "first_attempt_count": result.first_attempt_count,
+        "answers": result.answers,
+        "original_count": result.original_count,
+        "is_authenticated": True,
+        "updated": result.update_successful,
+        "tab_name": result.session_tab,
+        "per_card_breakdown": result.per_card_breakdown,
+    }
+    if ended_early:
+        context["ended_early"] = True
+        context["cards_remaining"] = result.cards_remaining
+    return render_template("results.html", **context)
+
+
 @learn_bp.route("/start/<tab_name>", methods=["POST"])
 @auth_manager.require_auth
 def start(tab_name: str):
@@ -32,12 +89,7 @@ def start(tab_name: str):
         logger.warning(f"Failed to start learn session: {result.error}")
         return redirect(url_for("index.home"))
 
-    user_spreadsheet = user.get_active_spreadsheet()
-    if user_spreadsheet:
-        language_settings = user_spreadsheet.get_language_settings()
-        target_lang = language_settings.get("target", "pt")
-        sm = SessionManager()
-        sm.set(SessionKeys.TARGET_LANGUAGE, target_lang)
+    _set_target_language_from_active_spreadsheet(user)
 
     logger.info(f"Learn session started: {result.card_count} cards, {result.task_count} tasks")
     return redirect(url_for("learn.card"))
@@ -103,32 +155,7 @@ def answer():
     if is_ajax:
         context = service.get_current_card_context()
         user = auth_manager.user
-
-        card = context.card if context else {}
-        level_val = card.get("level", 0)
-        if hasattr(level_val, "value"):
-            level_val = level_val.value
-
-        progress_sections = context.progress_sections if context else []
-        return jsonify(
-            {
-                "success": True,
-                "correct": result.is_correct,
-                "card": {
-                    "word": card.get("word", ""),
-                    "translation": card.get("translation", ""),
-                    "example": card.get("example"),
-                    "example_translation": card.get("example_translation"),
-                    "level": level_val,
-                },
-                "question_mode": context.mode if context else "type_answer",
-                "task_index": context.task_index if context else 0,
-                "task_total": context.task_total if context else 0,
-                "progress_sections": progress_sections,
-                "spreadsheet_id": user.get_active_spreadsheet_id() if user else None,
-                "sheet_gid": context.sheet_gid if context else None,
-            }
-        )
+        return jsonify(_build_answer_ajax_payload(result, context, user))
 
     feedback_url = url_for("learn.feedback", correct="yes" if result.is_correct else "no")
     return redirect(feedback_url)
@@ -192,21 +219,7 @@ def results():
         return redirect(url_for("index.home"))
 
     result = service.end_session(early=False)
-
-    return render_template(
-        "results.html",
-        total=result.total_answered,
-        correct=result.correct_answers,
-        percentage=result.accuracy_percentage,
-        review_count=result.review_count,
-        first_attempt_count=result.first_attempt_count,
-        answers=result.answers,
-        original_count=result.original_count,
-        is_authenticated=True,
-        updated=result.update_successful,
-        tab_name=result.session_tab,
-        per_card_breakdown=result.per_card_breakdown,
-    )
+    return _render_results_template(result)
 
 
 @learn_bp.route("/end")
@@ -219,20 +232,4 @@ def end_early():
         return redirect(url_for("index.home"))
 
     result = service.end_session(early=True)
-
-    return render_template(
-        "results.html",
-        total=result.total_answered,
-        correct=result.correct_answers,
-        percentage=result.accuracy_percentage,
-        review_count=result.review_count,
-        first_attempt_count=result.first_attempt_count,
-        answers=result.answers,
-        original_count=result.original_count,
-        ended_early=True,
-        cards_remaining=result.cards_remaining,
-        is_authenticated=True,
-        updated=result.update_successful,
-        tab_name=result.session_tab,
-        per_card_breakdown=result.per_card_breakdown,
-    )
+    return _render_results_template(result, ended_early=True)

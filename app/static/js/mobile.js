@@ -151,7 +151,9 @@ class MobileEnhancements {
 
     // Mobile keyboard handling
     setupKeyboardHandling() {
-        const answerInput = document.getElementById('answer');
+        const answerInput = document.querySelector(
+            'input[name="user_answer"], textarea[name="user_answer"], #guided-proxy-input'
+        );
         if (!answerInput) return;
 
         // Handle virtual keyboard
@@ -173,12 +175,6 @@ class MobileEnhancements {
             }
         });
 
-        // Auto-capitalize first letter
-        answerInput.addEventListener('input', (e) => {
-            if (e.target.value.length === 1) {
-                e.target.value = e.target.value.charAt(0).toUpperCase() + e.target.value.slice(1);
-            }
-        });
     }
 
     // Basic offline support
