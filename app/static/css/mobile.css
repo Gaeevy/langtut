@@ -1,5 +1,15 @@
 /* Mobile-First Responsive Design */
 
+.app-mode-footer {
+    position: sticky;
+    bottom: 0;
+    padding: 0.6rem 0;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(4px);
+    z-index: 20;
+}
+
 /* Compact learn layout — fit more on one iPhone screen */
 @media (max-width: 768px) {
     .app-header {
@@ -8,6 +18,13 @@
 
     .container {
         padding-top: 0.25rem;
+    }
+
+    .app-mode-footer {
+        margin-left: -0.3rem;
+        margin-right: -0.3rem;
+        padding-left: 0.3rem;
+        padding-right: 0.3rem;
     }
 
     .learn-progress-wrap.mb-4 {

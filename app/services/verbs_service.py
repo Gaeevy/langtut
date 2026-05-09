@@ -1,6 +1,10 @@
 """Service layer for irregular verbs feature."""
 
-from app.database import VerbForm, VerbInfinitive, VerbTense, db
+from datetime import datetime
+
+from sqlalchemy import and_
+
+from app.database import UserVerbInteraction, VerbForm, VerbInfinitive, VerbTense, db
 from app.models import VerbPracticeContext, VerbPracticeResult
 
 PERSON_LABELS: dict[int, str] = {
@@ -33,6 +37,15 @@ class VerbsService:
             {"id": row.id, "value": row.value, "forms_count": int(row.forms_count or 0)}
             for row in rows
         ]
+
+    def list_tenses_simple(self) -> list[dict]:
+        """Return tenses for UI dropdown without forms counters."""
+        rows = (
+            db.session.query(VerbTense.id, VerbTense.value)
+            .order_by(VerbTense.display_order.asc().nullslast(), VerbTense.value.asc())
+            .all()
+        )
+        return [{"id": row.id, "value": row.value} for row in rows]
 
     def list_infinitives_for_tense(self, tense_id: int) -> list[dict]:
         """Return infinitives that have forms in the selected tense."""
@@ -69,6 +82,58 @@ class VerbsService:
             forms={form.person: form.value for form in forms},
             person_labels=PERSON_LABELS,
         )
+
+    def get_least_recently_shown_infinitive(self, user_id: int, tense_id: int) -> dict | None:
+        """Return the next infinitive by oldest interaction timestamp."""
+        interaction_join = and_(
+            UserVerbInteraction.user_id == user_id,
+            UserVerbInteraction.infinitive_id == VerbInfinitive.id,
+            UserVerbInteraction.tense_id == tense_id,
+        )
+        rows = (
+            db.session.query(
+                VerbInfinitive.id,
+                VerbInfinitive.value,
+                db.func.min(UserVerbInteraction.last_shown).label("last_shown"),
+                db.func.count(db.distinct(VerbForm.person)).label("person_count"),
+            )
+            .join(VerbForm, VerbForm.infinitive_id == VerbInfinitive.id)
+            .outerjoin(UserVerbInteraction, interaction_join)
+            .filter(VerbForm.tense_id == tense_id)
+            .group_by(VerbInfinitive.id, VerbInfinitive.value)
+            .having(db.func.count(db.distinct(VerbForm.person)) == 5)
+            .order_by(
+                db.func.coalesce(
+                    db.func.min(UserVerbInteraction.last_shown),
+                    datetime(1970, 1, 1),
+                ).asc(),
+                VerbInfinitive.value.asc(),
+            )
+            .first()
+        )
+        if not rows:
+            return None
+        return {"id": rows.id, "value": rows.value}
+
+    def mark_practice_completed(self, user_id: int, tense_id: int, infinitive_id: int) -> None:
+        """Upsert last_shown timestamp for completed infinitive+tense practice."""
+        interaction = UserVerbInteraction.query.filter_by(
+            user_id=user_id,
+            tense_id=tense_id,
+            infinitive_id=infinitive_id,
+        ).first()
+        now = datetime.utcnow()
+        if interaction:
+            interaction.last_shown = now
+        else:
+            interaction = UserVerbInteraction(
+                user_id=user_id,
+                tense_id=tense_id,
+                infinitive_id=infinitive_id,
+                last_shown=now,
+            )
+            db.session.add(interaction)
+        db.session.commit()
 
     def check_answers(
         self,

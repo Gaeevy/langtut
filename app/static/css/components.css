@@ -734,3 +734,73 @@
 .task-progress-bar {
     background-color: #4db6ac !important;
 }
+
+/* ==========================================================================
+   Verbs Practice
+   ========================================================================== */
+
+.verbs-practice-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding-bottom: 5rem;
+}
+
+.verbs-practice-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 24px;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.verbs-person-btn {
+    text-align: left;
+    color: #2c3e50;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.verbs-answer-input {
+    border: none;
+    border-bottom: 2px solid #cbd5e1;
+    border-radius: 0;
+    padding: 0.45rem 0.15rem;
+    background: transparent;
+    box-shadow: none !important;
+}
+
+.verbs-answer-input:focus {
+    border-bottom-color: #4a6da7;
+}
+
+.verbs-practice-row.is-correct .verbs-answer-input {
+    border-bottom-color: #198754;
+    color: #198754;
+}
+
+.verbs-row-check {
+    visibility: hidden;
+    color: #198754;
+    font-weight: 700;
+}
+
+.verbs-practice-row.is-correct .verbs-row-check {
+    visibility: visible;
+}
+
+.verbs-practice-footer {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.9rem 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), #fff);
+}
+
+@media (max-width: 768px) {
+    .verbs-practice-row {
+        grid-template-columns: 95px 1fr 24px;
+    }
+}
