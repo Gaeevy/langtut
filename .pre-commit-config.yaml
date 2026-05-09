@@ -73,6 +73,14 @@ repos:
           - pre-merge-commit
         pass_filenames: false
         always_run: true
+      - id: pytest-pre-push
+        name: run pytest before push
+        entry: uv run pytest
+        language: system
+        stages:
+          - pre-push
+        pass_filenames: false
+        always_run: true
 
   # Security checks
   - repo: https://github.com/PyCQA/bandit
@@ -93,7 +101,7 @@ default_language_version:
   python: python3.13
 
 # Performance: run hooks in parallel when possible
-default_stages: [pre-commit]
+default_stages: [pre-commit, pre-push]
 
 # Fail fast - stop on first failure
 fail_fast: false

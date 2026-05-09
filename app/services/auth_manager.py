@@ -6,7 +6,7 @@ authentication lifecycle for the Language Learning Flashcard App.
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from functools import wraps
 
 from flask import jsonify, redirect, request, url_for
@@ -175,8 +175,8 @@ class AuthManager:
     - Multiple refresh tokens per user allow multi-device sessions
     """
 
-    # OAuth token refresh buffer - refresh 5 minutes before expiry
-    TOKEN_REFRESH_BUFFER = timedelta(minutes=5)
+    # OAuth token refresh buffer - refresh 10 minutes before expiry
+    TOKEN_REFRESH_BUFFER = timedelta(minutes=10)
 
     def __init__(self):
         """Initialize AuthManager and load OAuth client configuration."""
@@ -347,7 +347,7 @@ class AuthManager:
             logger.info(f"New user created: {email} (ID: {user.id})")
         else:
             # Update existing user
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(UTC)
             if email and user.email != email:
                 user.email = email
             if name and user.name != name:
@@ -470,7 +470,8 @@ class AuthManager:
         if isinstance(expiry, str):
             expiry = datetime.fromisoformat(expiry)
 
-        return datetime.utcnow() >= expiry - self.TOKEN_REFRESH_BUFFER
+        expiry_utc = expiry if expiry.tzinfo else expiry.replace(tzinfo=UTC)
+        return datetime.now(UTC) >= expiry_utc - self.TOKEN_REFRESH_BUFFER
 
     def _refresh_credentials(self, user_id: int) -> bool:
         """Refresh access token using refresh token from database.
@@ -488,7 +489,7 @@ class AuthManager:
             # Try to get the specific refresh token for THIS session
             refresh_token_id = sm.get(sk.REFRESH_TOKEN_ID)
             if refresh_token_id:
-                refresh_token_obj = RefreshToken.query.get(refresh_token_id)
+                refresh_token_obj = db.session.get(RefreshToken, refresh_token_id)
                 if refresh_token_obj and refresh_token_obj.user_id == user_id:
                     logger.debug(f"Using session-specific refresh token {refresh_token_id}")
                 else:
@@ -773,7 +774,7 @@ class AuthManager:
         """
         user_id = sm.get(sk.USER_ID)
         if user_id:
-            return User.query.get(user_id)
+            return db.session.get(User, user_id)
         return None
 
     # Session Methods
@@ -813,7 +814,7 @@ class AuthManager:
                     logger.info(f"All refresh tokens deleted for user {user_id} ({count} tokens)")
                 elif refresh_token_id:
                     # Delete only THIS session's refresh token (single device logout)
-                    token = RefreshToken.query.get(refresh_token_id)
+                    token = db.session.get(RefreshToken, refresh_token_id)
                     if token and token.user_id == user_id:
                         db.session.delete(token)
                         db.session.commit()

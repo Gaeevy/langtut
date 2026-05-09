@@ -1,6 +1,6 @@
 """Service layer for irregular verbs feature."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import and_
 
@@ -156,7 +156,7 @@ class VerbsService:
             tense_id=tense_id,
             infinitive_id=infinitive_id,
         ).first()
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         if interaction:
             interaction.last_shown = now
             interaction.shown_count += 1
