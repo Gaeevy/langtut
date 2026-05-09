@@ -94,6 +94,16 @@ Docker + `uv`.
 ### Testing
 - Tests live in `tests/`, mirroring `app/` structure. Use pytest + fixtures in
   `tests/conftest.py`. Testing env uses in-memory SQLite and disabled TTS.
+- Design tests as **MECE** behavior partitions:
+  - split scenarios into non-overlapping categories (happy-path, edge, errors),
+  - ensure the full behavior surface is covered across those categories.
+- Keep tests **DRY**:
+  - extract shared setup into fixtures/factories/helpers,
+  - avoid copy-paste assertions and repeated request scaffolding.
+- Prefer `pytest.mark.parametrize` for matrix-like behavior (validation branches,
+  mode permutations, error variants) instead of many near-identical tests.
+- Use scenario-driven test names that communicate behavior and expected outcome
+  (e.g. `test_cards_api_returns_404_when_tab_missing`).
 
 ### Git & Pre-commit
 - Feature branches only — `master`/`main` are blocked by pre-commit.

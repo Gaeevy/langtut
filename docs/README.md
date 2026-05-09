@@ -1,5 +1,7 @@
 # Documentation Index
 
+This file is intentionally an index and should stay lightweight.
+
 ## Docs
 
 ### [Architecture & Configuration](./architecture.md)
@@ -9,7 +11,7 @@ System design: Flask blueprints, configuration, dual-store (Google Sheets + SQLi
 TTS, audio playback, mobile autoplay, caching, and listening mode -- all in one place.
 
 ### [Development Guide](./development-guide.md)
-Setup, code quality rules, testing, debugging, mobile testing with ngrok, deployment.
+Daily development workflow, commands, quality gates, and concise operational notes.
 
 ## Quick Reference
 
@@ -20,7 +22,7 @@ uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload run:app
 
 ### Mobile Testing
 ```bash
-ngrok http 8080 --url=evette-nontransposing-barabara.ngrok-free.dev
+ngrok http 8080 --url=your-name.ngrok-free.dev
 ```
 See [Development Guide](./development-guide.md#mobile-testing-with-ngrok) for full setup.
 

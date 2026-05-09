@@ -7,37 +7,40 @@ This Flask-based language learning application follows a modular blueprint archi
 
 ### Application Structure
 ```
-app.py                          # Entry point - creates Flask app
-src/                           # Main application module
+run.py                         # Gunicorn entry point (`run:app`)
+app/                           # Main application package
 ├── __init__.py               # Flask app factory with blueprint registration
 ├── routes/                   # Blueprint-based route organization
 │   ├── __init__.py          # Blueprint registration
 │   ├── auth.py              # OAuth authentication routes
-│   ├── flashcard.py         # Core learning functionality
+│   ├── index.py             # Home/dashboard routes
+│   ├── learn.py             # Learn mode routes
+│   ├── review.py            # Review mode routes
 │   ├── settings.py          # User settings & spreadsheet config
-│   ├── api.py               # TTS and API endpoints
 │   ├── admin.py             # Database administration
-│   └── test.py              # Testing & debugging routes
+│   ├── test.py              # Testing & debugging routes
+│   ├── verbs.py             # Irregular verbs routes
+│   └── api/                 # API endpoints (cards, tts, language, verbs)
 ├── services/                # Service layer
 │   └── auth_manager.py      # Centralized authentication manager
 ├── config.py                # Unified configuration management
 ├── database.py              # SQLAlchemy database models
 ├── session_manager.py       # Centralized session management
-├── user_manager.py          # User management utilities
 ├── gsheet.py                # Google Sheets API integration
-├── tts_service.py           # Text-to-Speech service
+├── tts.py                   # Text-to-Speech service
 ├── models.py                # Pydantic data models
-├── utils.py                 # Helper utilities (includes token encryption)
-└── request_logger.py        # Request logging middleware
+└── logging.py               # Request logging middleware
 ```
 
 ### Blueprint Organization
 The application uses Flask blueprints for modular route organization:
 
 - **Auth Blueprint** (`/auth`, `/oauth2callback`, `/clear`) - OAuth authentication
-- **Flashcard Blueprint** (`/`, `/card`, `/answer`, `/feedback`) - Core learning
+- **Index Blueprint** (`/`) - Dashboard and tab selection
+- **Learn Blueprint** (`/learn/*`) - Study session flow
+- **Review Blueprint** (`/review/*`) - Review session flow
 - **Settings Blueprint** (`/settings`, `/validate-spreadsheet`) - User configuration
-- **API Blueprint** (`/api/tts`, `/api/cards`, `/api/language-settings`) - API endpoints
+- **API Blueprints** (`/api/tts`, `/api/cards`, `/api/language-settings`, `/api/verbs`) - API endpoints
 - **Admin Blueprint** (`/admin`, `/admin/users`) - Administrative interface
 - **Test Blueprint** (`/test`) - Development and debugging
 
@@ -134,7 +137,8 @@ Centralized session management with enumerated keys:
 class SessionKeys(Enum):
     # Auth namespace
     AUTH_STATE = 'auth.state'
-    AUTH_CREDENTIALS = 'auth.credentials'
+    ACCESS_TOKEN = 'auth.access_token'
+    REFRESH_TOKEN_ID = 'auth.refresh_token_id'
 
     # User namespace
     USER_ID = 'user.id'
@@ -209,7 +213,7 @@ uv run pytest
 
 ### Authentication System
 
-**Centralized AuthManager**: All authentication logic is managed by `AuthManager` class in `src/services/auth_manager.py`.
+**Centralized AuthManager**: All authentication logic is managed by `AuthManager` class in `app/services/auth_manager.py`.
 
 **Token Storage Strategy**:
 - **Access Tokens** (short-lived, ~1 hour): Stored in Flask session

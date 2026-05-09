@@ -122,3 +122,7 @@ quote-style = "double"
 indent-style = "space"
 # Don't format docstrings
 docstring-code-format = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers --strict-config -q"
