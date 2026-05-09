@@ -28,7 +28,7 @@ def index():
         selected_tense_id = tenses[0]["id"]
 
     infinitives = (
-        service.list_infinitives_for_tense(selected_tense_id)
+        service.for_user(user.id).list_infinitives_for_tense(selected_tense_id)
         if selected_tense_id is not None
         else []
     )

@@ -19,6 +19,9 @@ PERSON_LABELS: dict[int, str] = {
 class VerbsService:
     """Business logic for irregular verbs browse and practice."""
 
+    def __init__(self) -> None:
+        self._user_id: int | None = None
+
     def list_tenses(self) -> list[dict]:
         """Return all tenses with forms count."""
         rows = (
@@ -49,15 +52,46 @@ class VerbsService:
 
     def list_infinitives_for_tense(self, tense_id: int) -> list[dict]:
         """Return infinitives that have forms in the selected tense."""
+        user_id = self._user_id
+
+        if user_id is None:
+            rows = (
+                db.session.query(VerbInfinitive.id, VerbInfinitive.value)
+                .join(VerbForm, VerbForm.infinitive_id == VerbInfinitive.id)
+                .filter(VerbForm.tense_id == tense_id)
+                .group_by(VerbInfinitive.id, VerbInfinitive.value)
+                .order_by(VerbInfinitive.value.asc())
+                .all()
+            )
+            return [{"id": row.id, "value": row.value, "shown_count": 0} for row in rows]
+
         rows = (
-            db.session.query(VerbInfinitive.id, VerbInfinitive.value)
+            db.session.query(
+                VerbInfinitive.id,
+                VerbInfinitive.value,
+                db.func.coalesce(
+                    db.func.max(UserVerbInteraction.shown_count),
+                    0,
+                ).label("shown_count"),
+            )
             .join(VerbForm, VerbForm.infinitive_id == VerbInfinitive.id)
+            .outerjoin(
+                UserVerbInteraction,
+                and_(
+                    UserVerbInteraction.infinitive_id == VerbInfinitive.id,
+                    UserVerbInteraction.tense_id == tense_id,
+                    UserVerbInteraction.user_id == user_id,
+                ),
+            )
             .filter(VerbForm.tense_id == tense_id)
             .group_by(VerbInfinitive.id, VerbInfinitive.value)
             .order_by(VerbInfinitive.value.asc())
             .all()
         )
-        return [{"id": row.id, "value": row.value} for row in rows]
+        return [
+            {"id": row.id, "value": row.value, "shown_count": int(row.shown_count or 0)}
+            for row in rows
+        ]
 
     def get_practice_context(self, tense_id: int, infinitive_id: int) -> VerbPracticeContext | None:
         """Build one practice page context for infinitive + tense."""
@@ -125,15 +159,22 @@ class VerbsService:
         now = datetime.utcnow()
         if interaction:
             interaction.last_shown = now
+            interaction.shown_count += 1
         else:
             interaction = UserVerbInteraction(
                 user_id=user_id,
                 tense_id=tense_id,
                 infinitive_id=infinitive_id,
                 last_shown=now,
+                shown_count=1,
             )
             db.session.add(interaction)
         db.session.commit()
+
+    def for_user(self, user_id: int) -> "VerbsService":
+        """Return a user-scoped service instance for list queries."""
+        self._user_id = user_id
+        return self
 
     def check_answers(
         self,

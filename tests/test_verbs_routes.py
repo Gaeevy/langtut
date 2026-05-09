@@ -152,7 +152,8 @@ def test_verbs_index_hides_form_count_and_has_localstorage_script(monkeypatch):
     assert response.status_code == 200
     assert b"(5 forms)" not in response.data
     assert b"verbs_index.js" in response.data
-    assert b">Practice<" in response.data
+    assert b"Practice" in response.data
+    assert b">Load<" not in response.data
 
 
 def test_verbs_progress_endpoint_updates_interaction(monkeypatch):
@@ -192,3 +193,35 @@ def test_verbs_progress_endpoint_updates_interaction(monkeypatch):
             tense_id=seed["tense_id"],
         ).first()
         assert row is not None
+        assert row.shown_count == 1
+
+
+def test_verbs_index_shows_shown_count_badge(monkeypatch):
+    """Verbs list renders shown_count badge and no Practice row badge."""
+    template_folder = Path(__file__).resolve().parents[1] / "app" / "templates"
+    app = Flask(__name__, template_folder=str(template_folder))
+    app.config["TESTING"] = True
+    app.config["SECRET_KEY"] = "test-secret"
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    db.init_app(app)
+    register_blueprints(app)
+    monkeypatch.setattr(auth_manager, "is_authenticated", lambda: True)
+    monkeypatch.setattr(type(auth_manager), "user", property(lambda self: SimpleNamespace(id=9)))
+
+    with app.app_context():
+        db.create_all()
+        seed = _seed_verbs()
+        row = UserVerbInteraction(
+            user_id=9,
+            infinitive_id=seed["infinitive_id"],
+            tense_id=seed["tense_id"],
+            shown_count=3,
+        )
+        db.session.add(row)
+        db.session.commit()
+
+    client = app.test_client()
+    response = client.get("/verbs")
+    assert response.status_code == 200
+    assert b">3<" in response.data

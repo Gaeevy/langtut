@@ -164,3 +164,31 @@ def test_mark_practice_completed_upserts_one_row():
         ).all()
         assert len(rows) == 1
         assert rows[0].last_shown >= first_last_shown
+        assert rows[0].shown_count == 2
+
+
+def test_list_infinitives_for_tense_returns_shown_count_for_user():
+    """Infinitive list exposes shown_count from user interaction."""
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    db.init_app(app)
+
+    with app.app_context():
+        db.create_all()
+        payload = upsert_from_import_payload(_create_payload())
+        user = User(google_user_id="u-3", email="u3@example.com")
+        db.session.add(user)
+        db.session.commit()
+
+        service = VerbsService()
+        service.mark_practice_completed(
+            user_id=user.id,
+            tense_id=payload["tense_id"],
+            infinitive_id=payload["infinitive_id"],
+        )
+
+        infinitives = service.for_user(user.id).list_infinitives_for_tense(payload["tense_id"])
+        assert len(infinitives) == 1
+        assert infinitives[0]["shown_count"] == 1

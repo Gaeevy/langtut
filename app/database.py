@@ -399,6 +399,7 @@ class UserVerbInteraction(db.Model):
     infinitive_id = Column(Integer, ForeignKey("verb_infinitives.id"), nullable=False, index=True)
     tense_id = Column(Integer, ForeignKey("verb_tenses.id"), nullable=False, index=True)
     last_shown = Column(DateTime, nullable=False, default=datetime.utcnow)
+    shown_count = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
