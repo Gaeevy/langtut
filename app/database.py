@@ -24,6 +24,9 @@ class User(db.Model):
     spreadsheets = relationship(
         "UserSpreadsheet", back_populates="user", cascade="all, delete-orphan"
     )
+    verb_interactions = relationship(
+        "UserVerbInteraction", back_populates="user", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<User {self.email}>"
@@ -383,6 +386,40 @@ class VerbForm(db.Model):
     def __repr__(self):
         return (
             f"<VerbForm infinitive={self.infinitive_id} tense={self.tense_id} person={self.person}>"
+        )
+
+
+class UserVerbInteraction(db.Model):
+    """Per-user practice tracking for one infinitive+tense pair."""
+
+    __tablename__ = "user_verb_interactions"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    infinitive_id = Column(Integer, ForeignKey("verb_infinitives.id"), nullable=False, index=True)
+    tense_id = Column(Integer, ForeignKey("verb_tenses.id"), nullable=False, index=True)
+    last_shown = Column(DateTime, nullable=False, default=datetime.utcnow)
+    shown_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="verb_interactions")
+    infinitive = relationship("VerbInfinitive")
+    tense = relationship("VerbTense")
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "user_id",
+            "infinitive_id",
+            "tense_id",
+            name="unique_user_verb_interaction",
+        ),
+    )
+
+    def __repr__(self):
+        return (
+            "<UserVerbInteraction "
+            f"user={self.user_id} infinitive={self.infinitive_id} tense={self.tense_id}>"
         )
 
 

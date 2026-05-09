@@ -53,3 +53,40 @@ def list_tenses() -> dict[str, Any]:
     """List available tenses with counts."""
     service = VerbsService()
     return jsonify({"success": True, "tenses": service.list_tenses()})
+
+
+@verbs_api_bp.route("/progress", methods=["POST"])
+@auth_manager.require_auth_api
+def save_progress() -> tuple[dict[str, Any], int] | dict[str, Any]:
+    """Persist completion timestamp for one infinitive+tense pair."""
+    data = request.get_json() or {}
+    infinitive_id = data.get("infinitive_id")
+    tense_id = data.get("tense_id")
+    completed = bool(data.get("completed"))
+
+    if not isinstance(infinitive_id, int) or not isinstance(tense_id, int):
+        return jsonify(
+            {"success": False, "error": "infinitive_id and tense_id must be integers"}
+        ), 400
+    if not completed:
+        return jsonify({"success": False, "error": "completed flag is required"}), 400
+
+    service = VerbsService()
+    context = service.get_practice_context(tense_id=tense_id, infinitive_id=infinitive_id)
+    if not context:
+        return jsonify({"success": False, "error": "Practice target not found"}), 404
+    user = auth_manager.user
+    if not user:
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+
+    service.mark_practice_completed(
+        user_id=user.id,
+        tense_id=tense_id,
+        infinitive_id=infinitive_id,
+    )
+    next_item = service.get_least_recently_shown_infinitive(
+        user_id=user.id,
+        tense_id=tense_id,
+    )
+
+    return jsonify({"success": True, "next_infinitive_id": next_item["id"] if next_item else None})

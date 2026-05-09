@@ -6,15 +6,6 @@
 <div class="text-center">
     {% include "_spreadsheet_toolbar.html" %}
 
-    <ul class="nav nav-pills justify-content-center mb-4">
-        <li class="nav-item">
-            <span class="nav-link active" aria-current="page">Study</span>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('verbs.index') }}">Verbs</a>
-        </li>
-    </ul>
-
     <div class="row row-cols-1 row-cols-md-2 g-4 mb-4">
         {% for tab in tabs %}
         <div class="col">
@@ -55,6 +46,17 @@
             </div>
         </div>
         {% endfor %}
+    </div>
+
+    <div class="app-mode-footer mb-4">
+        <ul class="nav nav-pills justify-content-center">
+            <li class="nav-item">
+                <span class="nav-link active" aria-current="page">Study</span>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('verbs.index') }}">Verbs</a>
+            </li>
+        </ul>
     </div>
 
     <!-- Listening Progress Modal -->

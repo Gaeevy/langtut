@@ -3,7 +3,11 @@
 {% block title %}Verb Practice{% endblock %}
 
 {% block content %}
-<div>
+<div class="verbs-practice-page"
+     data-infinitive-id="{{ context.infinitive_id }}"
+     data-tense-id="{{ context.tense_id }}"
+     data-progress-url="{{ url_for('api.verbs_api.save_progress') }}"
+     data-next-url="{{ next_practice_url }}">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="mb-0">Verb Practice</h4>
         <a href="{{ url_for('verbs.index', tense_id=context.tense_id) }}" class="btn btn-outline-secondary btn-sm">Back</a>
@@ -16,38 +20,40 @@
         </div>
     </div>
 
-    {% if result %}
-    <div class="alert {% if result.is_fully_correct %}alert-success{% else %}alert-warning{% endif %}">
-        Score: {{ result.total_correct }}/5
+    <div class="alert alert-light border mb-4">
+        <span id="verbs-live-score">Score: 0/5</span>
     </div>
-    {% endif %}
 
-    <form method="post" action="{{ url_for('verbs.submit_practice', tense_id=context.tense_id, infinitive_id=context.infinitive_id) }}">
+    <div class="verbs-practice-list">
         {% for person in person_order %}
-        <div class="mb-3">
-            <label for="form_{{ person }}" class="form-label">{{ person_labels[person] }}</label>
+        <div class="verbs-practice-row" data-person="{{ person }}">
+            <button type="button"
+                    class="btn btn-link p-0 verbs-person-btn"
+                    data-person="{{ person }}">
+                {{ person_labels[person] }}
+            </button>
             <input
                 id="form_{{ person }}"
-                name="form_{{ person }}"
                 type="text"
-                class="form-control {% if result and result.per_person_correct[person] %}is-valid{% elif result %}is-invalid{% endif %}"
-                value="{% if result %}{{ result.submitted_forms[person] }}{% endif %}"
+                class="form-control verbs-answer-input"
+                data-person="{{ person }}"
                 autocomplete="off"
-                required
+                autocapitalize="off"
+                spellcheck="false"
             >
-            {% if result %}
-            <div class="{% if result.per_person_correct[person] %}valid-feedback{% else %}invalid-feedback{% endif %}">
-                {% if result.per_person_correct[person] %}
-                Correct
-                {% else %}
-                Correct: {{ result.expected_forms[person] }}
-                {% endif %}
-            </div>
-            {% endif %}
+            <span class="verbs-row-check" data-person="{{ person }}" aria-hidden="true">✓</span>
         </div>
         {% endfor %}
+    </div>
 
-        <button type="submit" class="btn btn-primary">Check</button>
-    </form>
+    <div class="verbs-practice-footer">
+        <div class="small text-muted" id="verbs-footer-progress">0/5 correct</div>
+        <button id="verbs-next-btn" type="button" class="btn btn-primary btn-lg d-none">Next</button>
+    </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script id="verbs-answers-data" type="application/json">{{ context.forms|tojson }}</script>
+<script src="{{ url_for('static', filename='js/verbs_practice.js') }}"></script>
 {% endblock %}
