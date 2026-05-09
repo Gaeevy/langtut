@@ -64,11 +64,14 @@ def test_get_cards_error_partitions(
 ):
     """MECE error matrix for missing sheet, missing set, empty set, and invalid cards."""
     _patch_auth(monkeypatch, authenticated=True, spreadsheet_id=spreadsheet_id)
-    monkeypatch.setattr("app.routes.api.cards.read_card_set", lambda **kwargs: card_set)
+    monkeypatch.setattr(
+        "app.services.listening_cards_service.read_card_set", lambda **kwargs: card_set
+    )
 
     response = client.get("/api/cards/Daily")
     assert response.status_code == expected_status
     payload = response.get_json()
+    assert set(payload.keys()) == {"success", "error"}
     assert payload["success"] is False
     assert error_fragment in payload["error"]
 
@@ -86,13 +89,25 @@ def test_get_cards_returns_filtered_shuffled_payload(client, monkeypatch):
             _card(3, "adeus", "até logo"),
         ],
     )
-    monkeypatch.setattr("app.routes.api.cards.read_card_set", lambda **kwargs: card_set)
-    monkeypatch.setattr("app.routes.api.cards.random.shuffle", lambda items: items.reverse())
+    monkeypatch.setattr(
+        "app.services.listening_cards_service.read_card_set", lambda **kwargs: card_set
+    )
+    monkeypatch.setattr(
+        "app.services.listening_cards_service.random.shuffle", lambda items: items.reverse()
+    )
 
     response = client.get("/api/cards/Daily")
     assert response.status_code == 200
 
     payload = response.get_json()
+    assert set(payload.keys()) == {
+        "success",
+        "tab_name",
+        "sheet_gid",
+        "cards",
+        "total_count",
+        "original_count",
+    }
     assert payload["success"] is True
     assert payload["tab_name"] == "Daily"
     assert payload["sheet_gid"] == 991
@@ -111,10 +126,11 @@ def test_get_cards_handles_unexpected_exception(client, monkeypatch):
     def _boom(**kwargs):
         raise RuntimeError("gsheet down")
 
-    monkeypatch.setattr("app.routes.api.cards.read_card_set", _boom)
+    monkeypatch.setattr("app.services.listening_cards_service.read_card_set", _boom)
 
     response = client.get("/api/cards/Daily")
     assert response.status_code == 500
     payload = response.get_json()
+    assert set(payload.keys()) == {"success", "error"}
     assert payload["success"] is False
     assert "Failed to fetch cards" in payload["error"]

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline - LangTutor</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            min-height: 100vh;
+            align-items: center;
+            justify-content: center;
+            background: #f8f9fa;
+            color: #333;
+        }
+        .card {
+            max-width: 460px;
+            background: #fff;
+            border: 1px solid #dce2e8;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+        }
+        .actions {
+            margin-top: 16px;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        .btn {
+            border: 1px solid #4a6da7;
+            background: #4a6da7;
+            color: #fff;
+            border-radius: 8px;
+            padding: 8px 12px;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .btn.secondary {
+            background: #fff;
+            color: #4a6da7;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>You're offline</h2>
+        <p>Reconnect to continue syncing and loading new content.</p>
+        <div class="actions">
+            <button class="btn" onclick="window.location.reload()">Try again</button>
+            <a class="btn secondary" href="/">Go home</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -36,8 +36,8 @@ Frontend (Vanilla JS + Bootstrap)
 └── modes.js         → pick_one / build_sentence / build_word UI
 
 Backend (Flask + Blueprints)
-├── Routes: auth, learn, review, index, settings, admin, api/tts
-├── Services: TTS, Google Sheets, auth, learning
+├── Routes: auth, learn, review, index, settings, admin, api/{tts,cards,language,verbs}
+├── Services: TTS, Google Sheets, auth, learning, settings, listening cards
 ├── Models: Pydantic + SQLAlchemy
 └── Config: Dynaconf (settings.toml / .secrets.toml)
 

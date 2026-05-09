@@ -22,7 +22,10 @@ app/                           # Main application package
 │   ├── verbs.py             # Irregular verbs routes
 │   └── api/                 # API endpoints (cards, tts, language, verbs)
 ├── services/                # Service layer
-│   └── auth_manager.py      # Centralized authentication manager
+│   ├── auth_manager.py      # Centralized authentication manager
+│   ├── settings_service.py  # Spreadsheet settings flows
+│   ├── listening_cards_service.py  # Listening cards shaping/filtering
+│   └── learning/            # Learn/review domain services
 ├── config.py                # Unified configuration management
 ├── database.py              # SQLAlchemy database models
 ├── session_manager.py       # Centralized session management
@@ -119,7 +122,7 @@ class User(db.Model):
     google_id = Column(String(255), unique=True, nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     name = Column(String(255))
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     last_login = Column(DateTime)
 
 class UserSpreadsheet(db.Model):
