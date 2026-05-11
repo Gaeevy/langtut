@@ -24,7 +24,7 @@ async function unlockAudioOnFirstInteraction() {
     console.log('🔓 Attempting to unlock audio on first interaction...');
 
     try {
-        const success = await window.ttsManager.unlockAudio();
+        const success = await window.ttsManager.ensureUnlockedFromGesture();
         if (success) {
             console.log('✅ Audio unlocked successfully on first interaction');
             // After unlocking, retry TTS auto-play if card data is available
@@ -127,7 +127,7 @@ function setupTTS(cardData) {
         speakButton.addEventListener('click', async function() {
             if (!window.ttsManager.isUnlocked()) {
                 console.log('🔓 Unlocking audio from button click...');
-                await window.ttsManager.unlockAudio();
+                await window.ttsManager.ensureUnlockedFromGesture();
             }
             // Wait for TTS service to be ready
             const ready = await window.ttsManager.waitForService();

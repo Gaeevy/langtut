@@ -16,10 +16,30 @@ STATIC = ROOT / "app" / "static"
     [
         (
             "index.html",
-            ['{% extends "base.html" %}', "js/tts.js", "js/listening.js", "js/index.js"],
+            [
+                '{% extends "base.html" %}',
+                "js/tts.js",
+                "js/listening.js",
+                "js/index.js",
+                'id="unlockAudioBtn"',
+                'id="startListeningBtn"',
+                'id="pauseResumeBtn"',
+            ],
         ),
-        ("card.html", ['{% extends "base.html" %}', "window.cardContext", "js/card.js"]),
-        ("feedback.html", ['{% extends "base.html" %}', 'id="card-data"', "js/feedback.js"]),
+        (
+            "card.html",
+            [
+                '{% extends "base.html" %}',
+                "window.cardContext",
+                "window.cardData",
+                "js/tts.js",
+                "js/card.js",
+            ],
+        ),
+        (
+            "feedback.html",
+            ['{% extends "base.html" %}', 'id="card-data"', "js/tts.js", "js/feedback.js"],
+        ),
     ],
 )
 def test_templates_include_expected_script_wiring(
@@ -58,3 +78,40 @@ def test_index_template_uses_bootstrap_icons_only_for_listening_controls() -> No
     assert "bi bi-volume-up" in text
     assert "bi bi-play-fill" in text
     assert "fas fa-" not in text
+
+
+_TTS_JS_REQUIRED_SYMBOLS = (
+    "unlockAudio",
+    "unlockChromeIOS",
+    "unlockMobile",
+    "speakCard",
+    "fetchAudio",
+    "playAudio",
+    "waitForService",
+    "resetAudioSystem",
+    "clearCache",
+    "getCacheStats",
+    "ensureUnlockedFromGesture",
+)
+
+
+def test_tts_js_exports_public_api_for_callers() -> None:
+    """TTSManager must keep methods used by card, feedback, and listening scripts."""
+    text = (STATIC / "js" / "tts.js").read_text(encoding="utf-8")
+    for name in _TTS_JS_REQUIRED_SYMBOLS:
+        assert f"{name}(" in text or f" async {name}(" in text or f"{name} (" in text
+
+
+_LISTENING_FORBIDDEN_SNIPPETS = (
+    "unlockAudioContext",
+    "unlockAudioForChromeIOS",
+    "primedAudioForChromeIOS =",
+    "audioUnlocked = true",
+)
+
+
+def test_listening_js_delegates_unlock_to_tts_manager() -> None:
+    """Listening mode must not duplicate Chrome iOS priming or mutating ttsManager internals."""
+    text = (STATIC / "js" / "listening.js").read_text(encoding="utf-8")
+    for snippet in _LISTENING_FORBIDDEN_SNIPPETS:
+        assert snippet not in text

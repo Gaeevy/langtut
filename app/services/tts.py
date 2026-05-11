@@ -9,7 +9,6 @@ import base64
 import hashlib
 import logging
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 
 import yaml
@@ -19,13 +18,6 @@ from app.config import config
 from app.session_manager import SessionKeys, SessionManager
 
 logger = logging.getLogger(__name__)
-
-
-class SupportedLanguage(Enum):
-    """Supported TTS languages."""
-
-    PT = "pt"
-    EN = "en"
 
 
 @dataclass
@@ -73,6 +65,7 @@ class TTSService:
 
         except Exception as e:
             logger.error(f"Failed to load languages.yaml: {e}")
+            return {}
 
     @property
     def voice_name(self) -> str:
@@ -184,21 +177,6 @@ class TTSService:
         except Exception as e:
             logger.error(f"TTS generation failed: {e}")
             return None
-
-    def generate_speech_base64(self, text: str) -> str | None:
-        """
-        Generate speech and encode as base64.
-
-        Args:
-            text: Text to convert to speech
-
-        Returns:
-            Base64-encoded audio string or None
-        """
-        audio_bytes = self.generate_speech(text)
-        if audio_bytes:
-            return base64.b64encode(audio_bytes).decode("utf-8")
-        return None
 
     def text_to_speech(
         self, text: str, spreadsheet_id: str = None, sheet_gid: str = None

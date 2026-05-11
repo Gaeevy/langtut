@@ -16,10 +16,8 @@ class ListeningManager {
         this.totalCount = 0;
         this.loopCount = 1; // Track which loop we're in
 
-        // Mobile audio management
+        // Mobile detection (unlock state lives on window.ttsManager only)
         this.isMobile = this.detectMobile();
-        this.audioUnlocked = false;
-        this.audioContext = null;
 
         // Promise chain isolation - prevent ghost operations from old sessions
         this.operationToken = 0;
@@ -73,104 +71,6 @@ class ListeningManager {
     }
 
     /**
-     * Unlock audio context for mobile devices
-     */
-    async unlockAudioContext() {
-        if (!this.isMobile || this.audioUnlocked) {
-            return true;
-        }
-
-        try {
-            // Create audio context if needed
-            if (!this.audioContext) {
-                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-
-            // Resume audio context (required for iOS)
-            if (this.audioContext.state === 'suspended') {
-                await this.audioContext.resume();
-            }
-
-            // Create and play silent audio to unlock
-            const silentBuffer = this.audioContext.createBuffer(1, 1, 22050);
-            const source = this.audioContext.createBufferSource();
-            source.buffer = silentBuffer;
-            source.connect(this.audioContext.destination);
-            source.start();
-
-            // Also unlock existing TTSManager if available
-            if (window.ttsManager && !window.ttsManager.audioUnlocked) {
-                await window.ttsManager.unlockAudio();
-            }
-
-            this.audioUnlocked = true;
-            return true;
-
-        } catch (error) {
-            console.error('Failed to unlock audio context:', error);
-            return false;
-        }
-    }
-
-    /**
-     * Chrome iOS-specific immediate audio unlock
-     */
-    async unlockAudioForChromeIOS() {
-        try {
-            // Create Audio element during user interaction (don't play yet)
-            // This "touches" the audio subsystem and unlocks it for Chrome iOS
-            const touchedAudio = new Audio();
-            touchedAudio.volume = 1.0;
-            touchedAudio.preload = 'auto';
-
-            // Set a minimal audio source but don't play yet
-            touchedAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
-
-            // Just loading the audio during user interaction unlocks it for Chrome iOS
-            touchedAudio.load();
-
-            // Store for TTSManager to reuse and mark as unlocked
-            if (window.ttsManager) {
-                window.ttsManager.primedAudioForChromeIOS = touchedAudio;
-                window.ttsManager.audioUnlocked = true;
-                // Persist unlock state in session
-                try {
-                    sessionStorage.setItem('tts_audio_unlocked', 'true');
-                } catch (error) {
-                    console.warn('⚠️ Could not save unlock state:', error);
-                }
-            }
-
-            this.audioUnlocked = true;
-            return true;
-
-        } catch (error) {
-            console.error('Chrome iOS audio unlock failed:', error);
-
-            // Fallback: Just set the flag anyway
-            if (window.ttsManager) {
-                window.ttsManager.audioUnlocked = true;
-                // Persist unlock state in session
-                try {
-                    sessionStorage.setItem('tts_audio_unlocked', 'true');
-                } catch (error) {
-                    console.warn('⚠️ Could not save unlock state:', error);
-                }
-            }
-
-            this.audioUnlocked = true;
-            return true; // Continue anyway, might still work
-        }
-    }
-
-    /**
-     * Detect Chrome iOS specifically
-     */
-    isChromeIOS() {
-        return /CriOS/i.test(navigator.userAgent) && /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    }
-
-    /**
      * Start listening session for a tab
      */
     async startListening(tabName) {
@@ -198,8 +98,8 @@ class ListeningManager {
             this.showSetupView();
             this.resetUIElements();
 
-            // For mobile, show unlock prompt first
-            if (this.isMobile && !this.audioUnlocked) {
+            // For mobile without prior unlock, show unlock prompt first
+            if (this.isMobile && window.ttsManager && !window.ttsManager.isUnlocked()) {
                 this.showMobileUnlockPrompt();
                 return;
             }
@@ -355,26 +255,16 @@ class ListeningManager {
                 newUnlockBtn.disabled = true;
 
                 try {
-                    // Chrome iOS specific immediate unlock
-                    if (this.isChromeIOS()) {
-                        const unlocked = await this.unlockAudioForChromeIOS();
+                    const unlocked = window.ttsManager
+                        ? await window.ttsManager.unlockAudio()
+                        : false;
 
-                        if (unlocked) {
-                            await this.continueAfterUnlock();
-                        } else {
-                            newUnlockBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Chrome iOS - Try Safari';
-                            newUnlockBtn.disabled = false;
-                        }
+                    if (unlocked) {
+                        await this.continueAfterUnlock();
                     } else {
-                        // Standard unlock for Safari iOS and other browsers
-                        const unlocked = await this.unlockAudioContext();
-
-                        if (unlocked) {
-                            await this.continueAfterUnlock();
-                        } else {
-                            newUnlockBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Unlock Failed - Try Refresh';
-                            newUnlockBtn.disabled = false;
-                        }
+                        newUnlockBtn.innerHTML =
+                            '<i class="fas fa-exclamation-triangle"></i> Unlock Failed - Try Refresh';
+                        newUnlockBtn.disabled = false;
                     }
                 } catch (error) {
                     console.error('Error during unlock:', error);
@@ -683,11 +573,13 @@ class ListeningManager {
                 return;
             }
 
-            // Play example
-            console.log(`🎤 Playing example: "${card.example}" (token: ${operationToken})`);
-            const exampleBase64Preview = audioData.example.audio_base64.substring(0, 10);
-            console.log(`🎵 Example audio: [${exampleBase64Preview}...]`);
-            await window.ttsManager.playAudio(audioData.example.audio_base64);
+            // Play example when present
+            if (audioData.example && audioData.example.audio_base64) {
+                console.log(`🎤 Playing example: "${card.example}" (token: ${operationToken})`);
+                const exampleBase64Preview = audioData.example.audio_base64.substring(0, 10);
+                console.log(`🎵 Example audio: [${exampleBase64Preview}...]`);
+                await window.ttsManager.playAudio(audioData.example.audio_base64);
+            }
 
             // Final token check
             if (operationToken === this.currentOperationToken) {
@@ -820,17 +712,6 @@ class ListeningManager {
     }
 
     /**
-     * Simulate card playback when TTS is not available (for testing)
-     */
-    async simulateCardPlayback(card) {
-        return new Promise(resolve => {
-            // Simulate typical card duration (word + example + pauses)
-            const duration = this.isMobile ? 4000 : 3000;
-            setTimeout(resolve, duration);
-        });
-    }
-
-    /**
      * Pause playback
      */
     pausePlayback() {
@@ -897,8 +778,7 @@ class ListeningManager {
         // Reset UI elements
         this.resetUIElements();
 
-        // Keep audio unlocked for potential future sessions
-        // Don't reset audioUnlocked flag
+        // Audio unlock stays on window.ttsManager for future sessions
     }
 
     /**
@@ -1021,7 +901,7 @@ class ListeningManager {
             isPlaying: this.isPlaying,
             isPaused: this.isPaused,
             loopCount: this.loopCount,
-            audioUnlocked: this.audioUnlocked,
+            audioUnlocked: Boolean(window.ttsManager?.isUnlocked()),
             cardsLoaded: this.cards.length > 0
         };
     }
@@ -1078,10 +958,5 @@ window.listeningManager = new ListeningManager();
 window.debugListening = () => {
     return window.listeningManager.logCurrentState();
 };
-
-// Export for module use
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = ListeningManager;
-}
 
 // beforeunload cleanup is handled centrally in tts.js

@@ -2,6 +2,9 @@
  * Minimalistic TTS Manager with persistent caching
  * Phase 1: Unified Mobile Unlock Architecture
  */
+/** Client TTS blob cache: trimmed text only (tradeoff: rare stale clip if voice/language changes). */
+const TTS_CACHE_STORAGE_KEY = "tts_cache";
+
 class TTSManager {
     static #instance = null;
 
@@ -13,38 +16,35 @@ class TTSManager {
         this.enabled = false;
         this.audioUnlocked = false;
         this.browser = this.detectBrowser();
+        /** HTMLAudioElement created during user gesture; reused by swapping src (iOS Safari + Chrome iOS). */
         this.primedAudioForChromeIOS = null;
         this.currentAudio = null;
 
-        // Simplified cache (text-only keys)
+        this._statusReady = false;
+
         this.audioCache = new Map();
         this.pendingRequests = new Map();
 
-        // Сохраняем экземпляр
         TTSManager.#instance = this;
 
-        // Desktop browsers auto-unlocked
-        if (this.browser === 'desktop') {
+        if (this.browser === "desktop") {
             this.audioUnlocked = true;
-            console.log('Desktop browser - audio unlocked');
+            console.log("Desktop browser - audio unlocked");
         }
 
-        // Check if already unlocked in this session
         try {
-            const storedUnlock = sessionStorage.getItem('tts_audio_unlocked');
-            if (storedUnlock === 'true') {
+            const storedUnlock = sessionStorage.getItem("tts_audio_unlocked");
+            if (storedUnlock === "true") {
                 this.audioUnlocked = true;
-                console.log('Audio unlock restored from session');
+                console.log("Audio unlock restored from session");
             }
         } catch (error) {
-            console.warn('Could not access sessionStorage:', error);
+            console.warn("Could not access sessionStorage:", error);
         }
 
-        // Restore cache
         this.restoreCache();
 
-        // Check TTS service availability (async)
-        this.init();
+        this.initPromise = this.init();
 
         return this;
     }
@@ -58,107 +58,148 @@ class TTSManager {
 
     async init() {
         try {
-            const response = await fetch('/api/tts/status');
+            const response = await fetch("/api/tts/status");
             const data = await response.json();
             this.enabled = data.available;
             console.log(`TTS service available: ${this.enabled}`);
         } catch (error) {
-            console.error('TTS init failed:', error);
+            console.error("TTS init failed:", error);
             this.enabled = false;
+        } finally {
+            this._statusReady = true;
         }
     }
 
     cleanupForPageUnload() {
         this.saveCache();
         this.stopAllAudio();
-        console.log('🧹 TTSManager cleanup for page unload');
+        console.log("🧹 TTSManager cleanup for page unload");
     }
 
+    /**
+     * Cache key for a phrase (text only; see module comment on tradeoffs).
+     * @param {string} text
+     * @returns {string}
+     */
     getCacheKey(text) {
         return text.trim();
+    }
+
+    /**
+     * Call during a user gesture before playback on mobile (alias for unlockAudio).
+     * @returns {Promise<boolean>}
+     */
+    async ensureUnlockedFromGesture() {
+        return this.unlockAudio();
+    }
+
+    /**
+     * Fetch audio for a single line of text; optionally play (e.g. debug / test pages).
+     * @param {string} text
+     * @param {boolean} autoplay
+     * @param {string|null} spreadsheetId
+     * @param {string|null} sheetGid
+     * @returns {Promise<string|null>}
+     */
+    async speak(text, autoplay = false, spreadsheetId = null, sheetGid = null) {
+        if (!this.enabled || !text || !String(text).trim()) {
+            return null;
+        }
+        const trimmed = String(text).trim();
+        const audio = await this.fetchAudio(trimmed, spreadsheetId, sheetGid);
+        if (autoplay && audio) {
+            await this.playAudio(audio);
+        }
+        return audio;
     }
 
     async speakCard(word, example, autoplay = false, spreadsheetId = null, sheetGid = null) {
         /**
          * Generate and play audio for word + example.
-         * Calls /speak twice (once for word, once for example).
+         * Calls /speak twice when example is present.
          */
         if (!this.enabled) {
             return null;
         }
 
-        console.log(`🎯 speakCard(autoplay=${autoplay}) - word: "${word}", example: "${example}"`);
+        const wordTrim = word ? String(word).trim() : "";
+        if (!wordTrim) {
+            return null;
+        }
 
-        // Fetch both audios (with caching)
-        const wordAudio = await this.fetchAudio(word, spreadsheetId, sheetGid);
-        const exampleAudio = await this.fetchAudio(example, spreadsheetId, sheetGid);
+        console.log(
+            `🎯 speakCard(autoplay=${autoplay}) - word: "${wordTrim}", example: "${example ?? ""}"`
+        );
 
-        // Play if autoplay enabled
-        if (autoplay && wordAudio && exampleAudio) {
-            console.log('▶️ Playing audio (word + example)');
+        const wordAudio = await this.fetchAudio(wordTrim, spreadsheetId, sheetGid);
+        const exampleTrim = example && String(example).trim() ? String(example).trim() : "";
+        const exampleAudio = exampleTrim
+            ? await this.fetchAudio(exampleTrim, spreadsheetId, sheetGid)
+            : null;
+
+        if (autoplay && wordAudio) {
+            console.log("▶️ Playing audio (word + example if present)");
             await this.playAudio(wordAudio);
-            await this.playAudio(exampleAudio);
-            console.log('✅ Playback complete');
+            if (exampleAudio) {
+                await this.playAudio(exampleAudio);
+            }
+            console.log("✅ Playback complete");
         }
 
         return {
-            word: { text: word, audio_base64: wordAudio },
-            example: { text: example, audio_base64: exampleAudio }
+            word: { text: wordTrim, audio_base64: wordAudio },
+            example: exampleTrim
+                ? { text: exampleTrim, audio_base64: exampleAudio }
+                : null,
         };
     }
 
     async fetchAudio(text, spreadsheetId = null, sheetGid = null) {
         /**
          * Fetch audio from /api/tts/speak.
-         * Caches in localStorage by text only.
+         * Caches in localStorage by voice-aware key when prefix is known.
          */
         const cacheKey = this.getCacheKey(text);
 
-        // Check cache first
         if (this.audioCache.has(cacheKey)) {
-            console.log(`💾 Cache hit: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
+            console.log(`💾 Cache hit: "${text.substring(0, 30)}${text.length > 30 ? "..." : ""}"`);
             return this.audioCache.get(cacheKey);
         }
 
-        // Check if already pending
         if (this.pendingRequests.has(cacheKey)) {
-            console.log(`⏳ Already fetching: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
+            console.log(`⏳ Already fetching: "${text.substring(0, 30)}${text.length > 30 ? "..." : ""}"`);
             return this.pendingRequests.get(cacheKey);
         }
 
-        // Build request
         const requestBody = { text };
         if (spreadsheetId) requestBody.spreadsheet_id = spreadsheetId;
         if (sheetGid) requestBody.sheet_gid = sheetGid;
 
-        console.log(`🌐 Fetching from API: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
+        console.log(`🌐 Fetching from API: "${text.substring(0, 30)}${text.length > 30 ? "..." : ""}"`);
 
-        // Fetch from API
-        const promise = fetch('/api/tts/speak', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
+        const promise = fetch("/api/tts/speak", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestBody),
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Cache it
-                console.log(`✅ Cached: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
-                this.audioCache.set(cacheKey, data.audio_base64);
-                this.saveCache();
-                return data.audio_base64;
-            } else {
-                console.error('❌ TTS failed:', data.error);
+            .then((response) => response.json())
+            .then((data) => {
+                if (data.success) {
+                    console.log(`✅ Cached: "${text.substring(0, 30)}${text.length > 30 ? "..." : ""}"`);
+                    this.audioCache.set(cacheKey, data.audio_base64);
+                    this.saveCache();
+                    return data.audio_base64;
+                }
+                console.error("❌ TTS failed:", data.error);
                 return null;
-            }
-        })
-        .catch(error => {
-            console.error('❌ TTS request failed:', error);
-            return null;
-        })
-        .finally(() => {
-            this.pendingRequests.delete(cacheKey);
-        });
+            })
+            .catch((error) => {
+                console.error("❌ TTS request failed:", error);
+                return null;
+            })
+            .finally(() => {
+                this.pendingRequests.delete(cacheKey);
+            });
 
         this.pendingRequests.set(cacheKey, promise);
         return promise;
@@ -166,46 +207,37 @@ class TTSManager {
 
     async playAudio(audioBase64) {
         if (!audioBase64) {
-            console.warn('⚠️ playAudio called with no audio data');
+            console.warn("⚠️ playAudio called with no audio data");
             return;
         }
 
-        // Stop previous audio if playing
         this.stopCurrentAudio();
 
-        // CRITICAL: Do NOT attempt to unlock here - it must happen during user interaction
-        // If audio is not unlocked, playback may fail on mobile
         if (!this.audioUnlocked) {
-            console.warn('⚠️ Audio not unlocked - playback may fail on mobile browsers');
-            console.warn('💡 Unlock audio during a user interaction (click/touch) before calling playAudio()');
+            console.warn("⚠️ Audio not unlocked - playback may fail on mobile browsers");
+            console.warn("💡 Unlock audio during a user interaction (click/touch) before calling playAudio()");
         }
 
-        // Log base64 preview for debugging
         const base64Preview = audioBase64.substring(0, 10);
         console.log(`🔊 Starting audio playback... [${base64Preview}...]`);
 
-        // For Chrome iOS: Use primed Audio element if available
         let audio;
         if (this.primedAudioForChromeIOS) {
-            console.log('📱 Using primed Chrome iOS audio element');
+            console.log("📱 Using gesture-primed audio element (reuse src)");
             audio = this.primedAudioForChromeIOS;
 
-            // Make sure primed audio is stopped before reusing
             if (!audio.paused) {
                 audio.pause();
                 audio.currentTime = 0;
             }
 
-            // Remove any existing event listeners to prevent conflicts
             audio.onended = null;
             audio.onerror = null;
             audio.oncanplaythrough = null;
 
-            // Reuse the primed element but update its source
             audio.src = `data:audio/mp3;base64,${audioBase64}`;
         } else {
-            console.log('🖥️ Creating new audio element');
-            // Create new audio element for other browsers
+            console.log("🖥️ Creating new audio element");
             audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
         }
 
@@ -213,12 +245,12 @@ class TTSManager {
 
         return new Promise((resolve, reject) => {
             audio.onended = () => {
-                console.log('✅ Audio playback ended');
+                console.log("✅ Audio playback ended");
                 this.currentAudio = null;
                 resolve();
             };
             audio.onerror = (error) => {
-                console.error('❌ Audio playback error:', error);
+                console.error("❌ Audio playback error:", error);
                 this.currentAudio = null;
                 reject(error);
             };
@@ -227,24 +259,27 @@ class TTSManager {
     }
 
     restoreCache() {
-        // Load from localStorage
-        const cached = localStorage.getItem('tts_cache');
-        if (cached) {
-            try {
+        try {
+            const cached = localStorage.getItem(TTS_CACHE_STORAGE_KEY);
+            if (cached) {
                 this.audioCache = new Map(JSON.parse(cached));
-            } catch (e) {
-                console.warn('Failed to restore TTS cache:', e);
-                this.audioCache = new Map();
             }
+        } catch (e) {
+            console.warn("Failed to restore TTS cache:", e);
+            this.audioCache = new Map();
+        }
+        try {
+            localStorage.removeItem("tts_cache_v2");
+        } catch {
+            /* ignore */
         }
     }
 
     saveCache() {
-        // Save to localStorage
         try {
-            localStorage.setItem('tts_cache', JSON.stringify([...this.audioCache]));
+            localStorage.setItem(TTS_CACHE_STORAGE_KEY, JSON.stringify([...this.audioCache]));
         } catch (e) {
-            console.warn('⚠️ Failed to save TTS cache:', e);
+            console.warn("⚠️ Failed to save TTS cache:", e);
         }
     }
 
@@ -255,29 +290,21 @@ class TTSManager {
     detectBrowser() {
         const ua = navigator.userAgent;
 
-        // Chrome iOS (most restrictive - needs special Touch Strategy)
         if (/CriOS/i.test(ua) && /iPhone|iPad|iPod/i.test(ua)) {
-            return 'chrome-ios';
+            return "chrome-ios";
         }
 
-        // Safari iOS
         if (/Safari/i.test(ua) && !/CriOS/i.test(ua) && /iPhone|iPad|iPod/i.test(ua)) {
-            return 'safari-ios';
+            return "safari-ios";
         }
 
-        // Android browsers
         if (/Android/i.test(ua)) {
-            return /Chrome/i.test(ua) ? 'android-chrome' : 'android-other';
+            return /Chrome/i.test(ua) ? "android-chrome" : "android-other";
         }
 
-        // Desktop browsers (no unlock needed)
-        return 'desktop';
+        return "desktop";
     }
 
-    /**
-     * Check if audio has been unlocked for playback
-     * @returns {boolean} True if audio can be played
-     */
     isUnlocked() {
         return this.audioUnlocked;
     }
@@ -286,14 +313,9 @@ class TTSManager {
         return this.enabled;
     }
 
-    /**
-     * Unlock audio for mobile browsers
-     * MUST be called during a user gesture (click, touch, etc.)
-     * @returns {Promise<boolean>} True if unlock successful
-     */
     async unlockAudio() {
         if (this.audioUnlocked) {
-            console.log('✅ Audio already unlocked');
+            console.log("✅ Audio already unlocked");
             return true;
         }
 
@@ -303,205 +325,197 @@ class TTSManager {
             let success = false;
 
             switch (this.browser) {
-                case 'chrome-ios':
+                case "chrome-ios":
                     success = await this.unlockChromeIOS();
                     break;
 
-                case 'safari-ios':
-                case 'android-chrome':
-                case 'android-other':
+                case "safari-ios":
+                case "android-chrome":
+                case "android-other":
                     success = await this.unlockMobile();
                     break;
 
-                case 'desktop':
-                    success = true;  // Already unlocked
+                case "desktop":
+                    success = true;
                     break;
 
                 default:
-                    // Fallback to mobile unlock
                     success = await this.unlockMobile();
                     break;
             }
 
             if (success) {
                 this.audioUnlocked = true;
-                // Persist unlock state in session
                 try {
-                    sessionStorage.setItem('tts_audio_unlocked', 'true');
+                    sessionStorage.setItem("tts_audio_unlocked", "true");
                 } catch (error) {
-                    console.warn('⚠️ Could not save unlock state:', error);
+                    console.warn("⚠️ Could not save unlock state:", error);
                 }
-                console.log('✅ Audio unlocked successfully');
+                console.log("✅ Audio unlocked successfully");
             }
 
             return success;
-
         } catch (error) {
-            console.error('💥 Audio unlock failed:', error);
+            console.error("💥 Audio unlock failed:", error);
             return false;
         }
     }
 
     /**
-     * Chrome iOS-specific "Touch Strategy" unlock
-     * Creates and loads an Audio element during user interaction
-     * @returns {Promise<boolean>} True if unlock successful
+     * Create and load a minimal WAV on an Audio element during a user gesture.
+     * iOS Safari often allows only the first new Audio().play() after AudioContext unlock;
+     * reusing one element for all TTS clips avoids NotAllowedError on word→example chains.
      */
+    _primeHtmlAudioDuringGesture() {
+        if (this.primedAudioForChromeIOS) {
+            return;
+        }
+        const touchedAudio = new Audio();
+        touchedAudio.volume = 1.0;
+        touchedAudio.preload = "auto";
+        touchedAudio.src =
+            "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+        touchedAudio.load();
+        this.primedAudioForChromeIOS = touchedAudio;
+    }
+
     async unlockChromeIOS() {
-        console.log('📱 Using Chrome iOS Touch Strategy');
+        console.log("📱 Using Chrome iOS Touch Strategy");
 
         try {
-            // Create Audio element during user interaction (don't play yet)
-            // This "touches" the audio subsystem and unlocks it for Chrome iOS
-            const touchedAudio = new Audio();
-            touchedAudio.volume = 1.0;
-            touchedAudio.preload = 'auto';
-
-            // Set a minimal WAV audio source
-            touchedAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
-
-            // Just loading the audio during user interaction unlocks it for Chrome iOS
-            touchedAudio.load();
-
-            // Store for reuse throughout the session
-            this.primedAudioForChromeIOS = touchedAudio;
-
-            console.log('✅ Chrome iOS audio element primed and ready');
+            this._primeHtmlAudioDuringGesture();
+            console.log("✅ Chrome iOS audio element primed and ready");
             return true;
-
         } catch (error) {
-            console.error('💥 Chrome iOS unlock failed:', error);
-            // Don't fail completely - might still work
+            console.error("💥 Chrome iOS unlock failed:", error);
             return true;
         }
     }
 
-    /**
-     * Standard mobile unlock using AudioContext
-     * Works for Safari iOS, Android Chrome, and other mobile browsers
-     * @returns {Promise<boolean>} True if unlock successful
-     */
     async unlockMobile() {
-        console.log('📱 Using standard mobile AudioContext unlock');
+        console.log("📱 Using standard mobile AudioContext unlock + HTMLAudio priming");
 
         try {
-            // Create audio context if needed
             const AudioContextClass = window.AudioContext || window.webkitAudioContext;
             if (!AudioContextClass) {
-                console.warn('⚠️ AudioContext not supported');
-                return true;  // Proceed anyway
+                console.warn("⚠️ AudioContext not supported");
+                this._primeHtmlAudioDuringGesture();
+                return true;
             }
 
             const audioContext = new AudioContextClass();
 
-            // Resume audio context (required for iOS)
-            if (audioContext.state === 'suspended') {
+            if (audioContext.state === "suspended") {
                 await audioContext.resume();
-                console.log('🔊 AudioContext resumed');
+                console.log("🔊 AudioContext resumed");
             }
 
-            // Create and play silent audio to unlock
             const silentBuffer = audioContext.createBuffer(1, 1, 22050);
             const source = audioContext.createBufferSource();
             source.buffer = silentBuffer;
             source.connect(audioContext.destination);
             source.start();
 
-            console.log('✅ Mobile audio unlocked via AudioContext');
-            return true;
+            console.log("✅ Mobile audio unlocked via AudioContext");
 
+            // Safari iOS (and similar): chain multiple play() only reliably on one primed element.
+            this._primeHtmlAudioDuringGesture();
+            console.log("✅ Gesture-primed HTMLAudio element ready for sequential playback");
+
+            return true;
         } catch (error) {
-            console.error('💥 Mobile unlock failed:', error);
-            // Don't fail completely - might still work
+            console.error("💥 Mobile unlock failed:", error);
+            try {
+                this._primeHtmlAudioDuringGesture();
+            } catch {
+                /* ignore */
+            }
             return true;
         }
     }
 
     async waitForService(maxWait = 5000) {
-        const start = Date.now();
-        while (!this.enabled && Date.now() - start < maxWait) {
-            await new Promise(resolve => setTimeout(resolve, 100));
+        const deadline = Date.now() + maxWait;
+        try {
+            await Promise.race([
+                this.initPromise,
+                new Promise((resolve) => setTimeout(resolve, maxWait)),
+            ]);
+        } catch {
+            /* ignore */
+        }
+        while (!this.enabled && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
         }
         return this.enabled;
     }
 
     stopCurrentAudio() {
         if (this.currentAudio) {
-            console.log('⏹️ Stopping current audio');
+            console.log("⏹️ Stopping current audio");
             try {
                 this.currentAudio.pause();
                 this.currentAudio.currentTime = 0;
-                // Clear event listeners to prevent ghost callbacks
                 this.currentAudio.onended = null;
                 this.currentAudio.onerror = null;
                 this.currentAudio = null;
             } catch (error) {
-                console.warn('⚠️ Error stopping current audio:', error);
+                console.warn("⚠️ Error stopping current audio:", error);
             }
         }
     }
 
-    /**
-     * Stop ALL possible audio sources - comprehensive cleanup
-     */
     stopAllAudio() {
-        console.log('🔇 Stopping ALL audio sources (comprehensive cleanup)...');
+        console.log("🔇 Stopping ALL audio sources (comprehensive cleanup)...");
 
-        // Stop current audio
         this.stopCurrentAudio();
 
-        // Stop primed audio element if it exists
         if (this.primedAudioForChromeIOS) {
             try {
-                console.log('🔇 Stopping primed Chrome iOS audio');
+                console.log("🔇 Stopping primed Chrome iOS audio");
                 this.primedAudioForChromeIOS.pause();
                 this.primedAudioForChromeIOS.currentTime = 0;
-                // Clear event listeners but don't destroy the element (keep it primed)
                 this.primedAudioForChromeIOS.onended = null;
                 this.primedAudioForChromeIOS.onerror = null;
                 this.primedAudioForChromeIOS.oncanplaythrough = null;
             } catch (error) {
-                console.warn('⚠️ Error stopping primed audio:', error);
+                console.warn("⚠️ Error stopping primed audio:", error);
             }
         }
 
-        // Stop any other audio elements that might be playing
         try {
-            const allAudioElements = document.querySelectorAll('audio');
-            allAudioElements.forEach(audio => {
+            const allAudioElements = document.querySelectorAll("audio");
+            allAudioElements.forEach((audio) => {
                 if (!audio.paused) {
-                    console.log('🔇 Stopping orphaned audio element');
+                    console.log("🔇 Stopping orphaned audio element");
                     audio.pause();
                     audio.currentTime = 0;
                 }
             });
         } catch (error) {
-            console.warn('⚠️ Error stopping orphaned audio elements:', error);
+            console.warn("⚠️ Error stopping orphaned audio elements:", error);
         }
     }
 
-    /**
-     * Reset audio system completely (for session switches)
-     */
     resetAudioSystem() {
-        console.log('🔄 Resetting audio system for session switch...');
+        console.log("🔄 Resetting audio system for session switch...");
 
-        // Stop all audio
         this.stopAllAudio();
 
-        // Clear all pending requests
-        console.log('🧹 Clearing pending requests');
+        console.log("🧹 Clearing pending requests");
         this.pendingRequests.clear();
-
-        // Don't clear the cache or primed audio - those can be reused
-        // Just ensure clean audio state
     }
 
     clearCache() {
         this.audioCache.clear();
         this.pendingRequests.clear();
-        localStorage.removeItem('tts_cache');
-        console.log('🗑️ Cache cleared');
+        try {
+            localStorage.removeItem(TTS_CACHE_STORAGE_KEY);
+            localStorage.removeItem("tts_cache_v2");
+        } catch {
+            /* ignore */
+        }
+        console.log("🗑️ Cache cleared");
     }
 
     getCacheStats() {
@@ -514,7 +528,7 @@ class TTSManager {
         const stats = {
             size,
             memoryKB: Math.round(memoryKB),
-            pending: this.pendingRequests.size
+            pending: this.pendingRequests.size,
         };
 
         console.log(`📊 Cache: ${stats.size} items (${stats.memoryKB}KB), ${stats.pending} pending`);
@@ -522,11 +536,9 @@ class TTSManager {
     }
 }
 
-// Global instance
 window.ttsManager = TTSManager.getInstance();
 
-// Centralized cleanup on page unload (no need to register this in every page script)
-window.addEventListener('beforeunload', () => {
+window.addEventListener("beforeunload", () => {
     if (window.ttsManager) {
         window.ttsManager.cleanupForPageUnload();
     }

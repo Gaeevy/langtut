@@ -32,7 +32,7 @@ Google Cloud TTS API
 
 - **TTSManager** (`app/static/js/tts.js`) -- singleton that handles:
   - Fetching audio from `/api/tts/speak` with deduplication of in-flight requests
-  - Client-side caching in `localStorage` (base64 keyed by text)
+  - Client-side caching in `localStorage` (base64 keyed by trimmed text only; simple and fast; rare stale clip if target language or voice changes until cache cleared)
   - Audio playback via HTML5 `Audio` elements
   - Mobile browser detection and audio unlock strategies
   - Chrome iOS "primed audio element" reuse
@@ -60,24 +60,21 @@ If the fetch fails, the form falls back to a normal POST (original behavior). Th
 
 ### Listening Mode (primed element approach)
 
-Listening mode uses a modal with an explicit "Start" button. On Chrome iOS, clicking this button creates a "primed" `Audio` element that can be reused for all subsequent playback:
+Listening mode uses a modal with an explicit "Start" button. On mobile, that tap runs `TTSManager.unlockAudio()`, which primes a single `HTMLAudioElement` (silent WAV `load()` during the gesture). All later TTS clips reuse that element by swapping `src` to MP3 data URLs. Without this reuse, **Safari iOS** often allows the first `play()` after an AudioContext-only unlock, then throws `NotAllowedError` on the next `new Audio().play()` (e.g. example after word).
 
 ```
-User taps "Start" → unlockAudioForChromeIOS() → creates Audio element,
-loads silent WAV → stores as primedAudioForChromeIOS → all subsequent
-playAudio() calls reuse this element by swapping its src
+User taps Start → unlockAudio() → AudioContext (where supported) + primed Audio element
+→ playAudio() swaps src on the same element for word, example, and every card
 ```
-
-Other browsers use `AudioContext.resume()` + silent buffer playback.
 
 ### Browser Summary
 
 | Browser | Unlock method | Notes |
 |---------|--------------|-------|
-| Chrome iOS | Primed Audio element during gesture | Most restrictive |
-| Safari iOS | AudioContext resume + silent buffer | Standard mobile pattern |
-| Android Chrome | AudioContext resume | Standard mobile pattern |
-| Desktop | None needed | Auto-unlocked |
+| Chrome iOS | Primed `Audio` during gesture | Required for autoplay |
+| Safari iOS | AudioContext + **same primed `Audio`** | AudioContext alone is not enough for sequential clips |
+| Android Chrome | AudioContext + primed `Audio` | Harmless extra priming |
+| Desktop | None needed | Auto-unlocked; always `new Audio()` |
 
 ## Caching
 
@@ -87,7 +84,7 @@ Audio is cached in a GCS bucket keyed by text + voice + language. Avoids re-call
 
 ### Client-side (localStorage)
 
-`TTSManager` caches base64 audio in `localStorage` keyed by text. This survives page reloads and means repeated cards play instantly without network requests. The `pendingRequests` Map deduplicates concurrent fetches for the same text.
+`TTSManager` caches base64 audio in `localStorage` under key `tts_cache`, keyed by **trimmed text only**. That is a deliberate tradeoff: less bookkeeping on the client than server-side GCS keys (text + voice + language). If the user changes target language or voice, an existing entry for the same string may replay old audio until they clear site data or the entry is evicted. The `pendingRequests` Map deduplicates concurrent fetches for the same text key. The obsolete `tts_cache_v2` key is removed on load/clear when present.
 
 ### Prefetching
 
@@ -127,3 +124,26 @@ gcs_audio_bucket = "langtut-tts"
 ```
 
 Voice is resolved from the user's target language setting stored in session.
+
+## Manual verification checklist
+
+Automated tests cover templates and static JS contracts; they cannot prove iOS Chrome gesture audio. After any audio refactor, verify manually:
+
+**Desktop (Chrome or Firefox)**
+
+1. Learn: open a card, submit an answer — word and example audio play on feedback without clicking the speaker.
+2. Tap the speaker button on feedback — audio plays again.
+3. Home: open Listen for a tab — start playback, pause, resume, close modal — no audio continues after close.
+
+**iOS Safari**
+
+1. Same as desktop; on first visit you may need one tap anywhere to unlock (first-interaction handler).
+2. Refresh on a learn feedback URL — audio may require a tap (expected for non-AJAX loads).
+
+**iOS Chrome (CriOS)**
+
+1. Learn: submit an answer — audio should play immediately after submit (AJAX path + cache prefetch).
+2. If prefetch missed, audio should still play via primed `Audio` fallback after the response.
+3. Listen: tap unlock/start — sequential word → example playback; closing the modal stops audio.
+
+If any step fails, capture user agent and whether the issue is silent playback vs. delayed playback only.

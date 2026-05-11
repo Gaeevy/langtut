@@ -136,12 +136,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.available) {
                     statusDiv.innerHTML = `
                         <div class="text-success">✅ TTS Available</div>
-                        <p><strong>Language:</strong> ${data.language_code}</p>
-                        <p><strong>Voices:</strong> ${data.voices.length}</p>
-                        <p><strong>Credential Source:</strong> ${data.credential_info.source}</p>
+                        <p><strong>Language:</strong> ${data.language ?? '—'}</p>
+                        <p><strong>Voice:</strong> ${data.voice ?? '—'}</p>
                     `;
                 } else {
-                    statusDiv.innerHTML = `<div class="text-danger">❌ TTS Not Available</div>`;
+                    const err = data.error ? `<p class="small text-muted">${data.error}</p>` : '';
+                    statusDiv.innerHTML = `<div class="text-danger">❌ TTS Not Available</div>${err}`;
                 }
             })
             .catch(error => {
@@ -165,23 +165,35 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    document.getElementById('portuguese-test').addEventListener('click', function() {
+    document.getElementById('portuguese-test').addEventListener('click', async function() {
         console.log('🇵🇹 Testing Portuguese TTS...');
-        if (window.ttsManager) {
-            window.ttsManager.speak('Olá, como está?');
-        } else {
+        if (!window.ttsManager) {
             console.error('🇵🇹 TTS Manager not available');
+            return;
         }
+        await window.ttsManager.ensureUnlockedFromGesture();
+        const ready = await window.ttsManager.waitForService(8000);
+        if (!ready) {
+            console.error('🇵🇹 TTS service not ready');
+            return;
+        }
+        await window.ttsManager.speak('Olá, como está?', true);
     });
 
-    document.getElementById('custom-test').addEventListener('click', function() {
+    document.getElementById('custom-test').addEventListener('click', async function() {
         const text = document.getElementById('custom-text').value;
         console.log('🎤 Testing custom text:', text);
-        if (window.ttsManager && text.trim()) {
-            window.ttsManager.speak(text.trim());
-        } else {
+        if (!window.ttsManager || !text.trim()) {
             console.error('🎤 TTS Manager not available or no text provided');
+            return;
         }
+        await window.ttsManager.ensureUnlockedFromGesture();
+        const ready = await window.ttsManager.waitForService(8000);
+        if (!ready) {
+            console.error('🎤 TTS service not ready');
+            return;
+        }
+        await window.ttsManager.speak(text.trim(), true);
     });
 
     document.getElementById('clear-console').addEventListener('click', function() {

@@ -37,15 +37,13 @@ def test() -> dict[str, Any]:
 
         # Test TTS service
         try:
-            tts_configured = tts_service.is_configured()
-            if tts_configured:
-                # Try a simple synthesis test
+            if tts_service.enabled:
                 test_audio = tts_service.generate_speech("teste")
-                tts_status = {"configured": True, "synthesis_test": test_audio is not None}
+                tts_status = {"enabled": True, "synthesis_test": test_audio is not None}
             else:
-                tts_status = {"configured": False, "synthesis_test": False}
+                tts_status = {"enabled": False, "synthesis_test": False}
         except Exception as e:
-            tts_status = {"configured": False, "synthesis_test": False, "error": str(e)}
+            tts_status = {"enabled": False, "synthesis_test": False, "error": str(e)}
 
         # Count total cards
         total_cards = sum(len(cs.cards) for cs in card_sets)
