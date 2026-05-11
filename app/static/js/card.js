@@ -22,7 +22,7 @@ async function unlockAudioOnFirstInteraction() {
     }
     unlockAttempted = true;
     try {
-        await window.ttsManager.unlockAudio();
+        await window.ttsManager.ensureUnlockedFromGesture();
     } catch (error) {
         console.error('Audio unlock error:', error);
     }
@@ -102,7 +102,7 @@ async function submitAnswerAjax(userAnswer) {
 
     // Unlock audio within user gesture context (creates primed element on Chrome iOS)
     if (tts && !tts.isUnlocked()) {
-        await tts.unlockAudio();
+        await tts.ensureUnlockedFromGesture();
     }
 
     // Play audio from prefetch cache immediately (still in gesture context)
@@ -272,7 +272,7 @@ function renderFeedback(data) {
     const speakBtn = document.getElementById('speak-card-btn');
     if (speakBtn && window.ttsManager) {
         speakBtn.addEventListener('click', async () => {
-            if (!window.ttsManager.isUnlocked()) await window.ttsManager.unlockAudio();
+            if (!window.ttsManager.isUnlocked()) await window.ttsManager.ensureUnlockedFromGesture();
             const ready = await window.ttsManager.waitForService();
             if (ready) {
                 window.ttsManager.speakCard(
