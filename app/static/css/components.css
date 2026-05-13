@@ -463,6 +463,11 @@
 }
 
 .pick-one-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 3rem;
     padding: 0.85rem 1rem;
     border-radius: 10px;
     border: 2px solid rgba(0, 0, 0, 0.08);
@@ -474,6 +479,36 @@
     transition: all 0.15s ease;
     text-align: center;
     word-break: break-word;
+}
+
+.pick-one-key {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.45rem;
+    height: 1.45rem;
+    padding: 0 0.3rem;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    color: #5e35b1;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid rgba(124, 77, 255, 0.35);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    pointer-events: none;
+}
+
+.pick-one-label {
+    position: relative;
+    z-index: 1;
+    line-height: 1.25;
+    width: 100%;
 }
 
 .pick-one-btn:hover {
@@ -748,7 +783,7 @@
 
 .verbs-practice-row {
     display: grid;
-    grid-template-columns: 120px 1fr 24px;
+    grid-template-columns: 120px 1fr minmax(1.75rem, auto);
     align-items: center;
     gap: 0.75rem;
 }
@@ -780,12 +815,44 @@
 
 .verbs-row-check {
     visibility: hidden;
-    color: #198754;
+    justify-self: end;
     font-weight: 700;
+    line-height: 1;
+    text-align: center;
 }
 
 .verbs-practice-row.is-correct .verbs-row-check {
     visibility: visible;
+}
+
+/* Irregular: star glyph + solid frame (shape cue, not red/green alone). */
+.verbs-row-check--irregular {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+    padding: 0.1rem 0.15rem;
+    border: 2px solid #0b57d0;
+    border-radius: 4px;
+    color: #0b57d0;
+    background: rgba(11, 87, 208, 0.08);
+    font-size: 1.15rem;
+}
+
+/* Regular: check in dashed ring (different shape from star+square). */
+.verbs-row-check--regular {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+    padding: 0.1rem 0.2rem;
+    border: 2px dashed #1f2937;
+    border-radius: 999px;
+    color: #1f2937;
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 0.95rem;
 }
 
 .verbs-practice-footer {
@@ -801,6 +868,6 @@
 
 @media (max-width: 768px) {
     .verbs-practice-row {
-        grid-template-columns: 95px 1fr 24px;
+        grid-template-columns: 95px 1fr minmax(1.75rem, auto);
     }
 }

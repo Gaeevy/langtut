@@ -114,6 +114,7 @@ class VerbsService:
             tense_id=tense.id,
             tense=tense.value,
             forms={form.person: form.value for form in forms},
+            differs_from_regular={form.person: form.differs_from_regular for form in forms},
             person_labels=PERSON_LABELS,
         )
 

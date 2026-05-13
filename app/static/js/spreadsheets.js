@@ -93,7 +93,7 @@
                 externalLink.classList.add('d-none');
                 return;
             }
-            const url = it.spreadsheet_url || 'https://docs.google.com/spreadsheets/d/' + it.spreadsheet_id;
+            const url = 'https://docs.google.com/spreadsheets/d/' + it.spreadsheet_id;
             externalLink.setAttribute('href', url);
             externalLink.classList.remove('d-none');
         }
