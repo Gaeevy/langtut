@@ -21,26 +21,33 @@ from app.utils import format_timestamp, parse_timestamp
 logger = logging.getLogger(__name__)
 
 
+_SPREADSHEET_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{20,}$")
+
+
 def extract_spreadsheet_id(url_or_id: str) -> str:
-    """Extract spreadsheet ID from Google Sheets URL or return ID if already provided"""
-    # If it's already just an ID (no slashes), return as-is
-    if "/" not in url_or_id:
-        return url_or_id.strip()
+    """Extract spreadsheet ID from Google Sheets URL or return a bare ID if valid."""
+    trimmed = (url_or_id or "").strip()
+    if not trimmed:
+        return ""
 
-    # Extract ID from various Google Sheets URL formats
+    if "/" not in trimmed:
+        return trimmed
+
     patterns = [
-        r"/spreadsheets/d/([a-zA-Z0-9-_]+)",  # Standard URL
-        r"[?&]id=([a-zA-Z0-9-_]+)",  # Query parameter
-        r"/d/([a-zA-Z0-9-_]+)/edit",  # Edit URL
+        r"/spreadsheets/d/([a-zA-Z0-9-_]+)",
+        r"[?&]id=([a-zA-Z0-9-_]+)",
+        r"/d/([a-zA-Z0-9-_]+)/edit",
     ]
-
     for pattern in patterns:
-        match = re.search(pattern, url_or_id)
+        match = re.search(pattern, trimmed)
         if match:
             return match.group(1)
 
-    # If no pattern matches, assume it's already an ID
-    return url_or_id.strip()
+    # Do not treat an arbitrary URL string as an ID (avoids broken /d/<full-url> links).
+    if _SPREADSHEET_ID_RE.fullmatch(trimmed):
+        return trimmed
+    logger.debug("Could not extract spreadsheet id from input")
+    return ""
 
 
 def spreadsheet_editor_url(spreadsheet_id: str) -> str:

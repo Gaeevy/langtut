@@ -61,6 +61,14 @@ def test_check_answers_after_import():
         assert len(infinitives) == 1
         assert infinitives[0]["value"] == "ter"
 
+        practice_ctx = service.get_practice_context(
+            tense_id=import_result["tense_id"],
+            infinitive_id=import_result["infinitive_id"],
+        )
+        assert practice_ctx is not None
+        assert practice_ctx.differs_from_regular[4] is False
+        assert practice_ctx.differs_from_regular[1] is True
+
         check_result = service.check_answers(
             tense_id=import_result["tense_id"],
             infinitive_id=import_result["infinitive_id"],

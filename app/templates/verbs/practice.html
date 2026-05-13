@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Verb Practice{% endblock %}
+{% block title %}{{ context.infinitive }} — {{ context.tense }}{% endblock %}
 
 {% block content %}
 <div class="verbs-practice-page"
@@ -9,15 +9,8 @@
      data-progress-url="{{ url_for('api.verbs_api.save_progress') }}"
      data-next-url="{{ next_practice_url }}">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">Verb Practice</h4>
+        <h4 class="mb-0">{{ context.infinitive }} — {{ context.tense }}</h4>
         <a href="{{ url_for('verbs.index', tense_id=context.tense_id) }}" class="btn btn-outline-secondary btn-sm">Back</a>
-    </div>
-
-    <div class="card mb-3">
-        <div class="card-body">
-            <p class="mb-1"><strong>Infinitive:</strong> {{ context.infinitive }}</p>
-            <p class="mb-0"><strong>Tense:</strong> {{ context.tense }}</p>
-        </div>
     </div>
 
     <div class="alert alert-light border mb-4">
@@ -41,7 +34,12 @@
                 autocapitalize="off"
                 spellcheck="false"
             >
-            <span class="verbs-row-check" data-person="{{ person }}" aria-hidden="true">✓</span>
+            <span
+                class="verbs-row-check"
+                data-person="{{ person }}"
+                data-differs="{{ 'true' if context.differs_from_regular.get(person, True) else 'false' }}"
+                aria-hidden="true"
+            ></span>
         </div>
         {% endfor %}
     </div>

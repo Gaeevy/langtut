@@ -113,10 +113,10 @@
                 <h3 class="card-translation-main text-dark fw-semibold mb-2">{{ card.word }}</h3>
                 <p class="text-secondary mb-3 write-example-translation">{{ card.translation }}</p>
             {% elif question_mode == 'type_example_guided' %}
-                <h3 class="card-translation-main text-dark fw-semibold mb-2">{{ card.word }}</h3>
-                <p class="text-secondary mb-2 write-example-translation">{{ card.translation }}</p>
                 {% if card.example_translation %}
                 <p class="build-sentence-cue-primary mb-3">{{ card.example_translation }}</p>
+                {% else %}
+                <p class="text-secondary mb-3">{{ card.translation }}</p>
                 {% endif %}
             {% else %}
                 <h3 class="card-translation-main text-dark fw-semibold mb-3">{{ card.translation }}</h3>
@@ -161,7 +161,8 @@
     <div class="pick-one-options">
         {% for option in mode_data.options %}
         <button type="button" class="pick-one-btn" data-value="{{ option }}">
-            {{ option }}
+            <span class="pick-one-key" aria-hidden="true">{{ loop.index }}</span>
+            <span class="pick-one-label">{{ option }}</span>
         </button>
         {% endfor %}
     </div>

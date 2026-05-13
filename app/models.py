@@ -128,12 +128,10 @@ class CardSet(BaseModel):
     def get_cards_to_review(
         self, limit: int | None = None, ignore_unshown: bool = False
     ) -> list[Card]:
-        """Returns the number of cards that are due for review."""
+        """Return due cards in random order, optionally capped after shuffle."""
         cards_to_review = self.cards_to_review(ignore_unshown)
-        sorted_cards = sorted(cards_to_review, key=lambda card: card.seconds_to_next_review)
-        cards = sorted_cards[:limit] if limit else sorted_cards
-        random.shuffle(cards)
-        return cards
+        random.shuffle(cards_to_review)
+        return cards_to_review[:limit] if limit else cards_to_review
 
 
 class SpreadsheetLanguages(BaseModel):
@@ -263,6 +261,7 @@ class VerbPracticeContext(BaseModel):
     tense_id: int
     tense: str
     forms: dict[int, str]
+    differs_from_regular: dict[int, bool] = Field(default_factory=dict)
     person_labels: dict[int, str]
 
 

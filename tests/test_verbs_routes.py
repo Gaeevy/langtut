@@ -53,7 +53,8 @@ def test_verbs_routes_render(monkeypatch):
 
     practice_response = client.get(f"/verbs/practice/{seed['tense_id']}/{seed['infinitive_id']}")
     assert practice_response.status_code == 200
-    assert b"Verb Practice" in practice_response.data
+    assert b"dar" in practice_response.data
+    assert b"presente do indicativo" in practice_response.data
     assert b"verbs-answers-data" in practice_response.data
     assert b"verbs_practice.js" in practice_response.data
     assert b"Score: 0/5" in practice_response.data
