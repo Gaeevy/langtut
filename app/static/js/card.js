@@ -80,11 +80,11 @@ function playCardAudioFromCache() {
     const { word, example } = window.cardData;
     if (!word) return false;
 
-    const wordAudio = tts.audioCache.get(tts.getCacheKey(word));
+    const wordAudio = tts.getCachedAudio(word);
     if (!wordAudio) return false;
 
     const exampleAudio = example
-        ? tts.audioCache.get(tts.getCacheKey(example))
+        ? tts.getCachedAudio(example)
         : null;
 
     tts.playAudio(wordAudio)
@@ -252,6 +252,10 @@ function renderFeedback(data) {
                             <button type="button" class="btn btn-primary btn-sm" id="speak-card-btn" title="Listen to pronunciation">
                                 <i class="bi bi-volume-up"></i>
                             </button>
+                            <button type="button" class="btn btn-link btn-sm tts-invalidate-btn" id="invalidate-card-tts-btn" title="Invalidate and regenerate audio" aria-label="Invalidate and regenerate audio">
+                                <i class="bi bi-arrow-clockwise"></i>
+                                <span>Invalidate</span>
+                            </button>
                         </div>
                         <p class="card-translation h5 text-secondary mb-3">${escapeHtml(card.translation)}</p>
                         ${exHtml}
@@ -279,6 +283,32 @@ function renderFeedback(data) {
                     card.word, card.example, true,
                     data.spreadsheet_id, data.sheet_gid
                 );
+            }
+        });
+    }
+
+    const invalidateBtn = document.getElementById('invalidate-card-tts-btn');
+    if (invalidateBtn && window.ttsManager) {
+        invalidateBtn.addEventListener('click', async () => {
+            invalidateBtn.disabled = true;
+            invalidateBtn.classList.add('is-loading');
+            try {
+                if (!window.ttsManager.isUnlocked()) {
+                    await window.ttsManager.ensureUnlockedFromGesture();
+                }
+                const ready = await window.ttsManager.waitForService();
+                if (ready) {
+                    await window.ttsManager.invalidateCard(
+                        card.word, card.example,
+                        data.spreadsheet_id, data.sheet_gid
+                    );
+                }
+            } catch (error) {
+                console.error('TTS invalidation failed:', error);
+                window.alert('Could not regenerate this audio. Please try again.');
+            } finally {
+                invalidateBtn.disabled = false;
+                invalidateBtn.classList.remove('is-loading');
             }
         });
     }

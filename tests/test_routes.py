@@ -1,5 +1,10 @@
 """Tests for route registration and basic route functionality."""
 
+from types import SimpleNamespace
+
+from app.routes.api.tts import tts_service
+from app.services.auth_manager import auth_manager
+
 
 class TestRouteRegistration:
     """Tests for verifying all routes are registered correctly."""
@@ -32,6 +37,7 @@ class TestRouteRegistration:
         # API routes
         assert "/api/tts/status" in routes
         assert "/api/tts/speak" in routes
+        assert "/api/tts/invalidate" in routes
         assert "/api/cards/<tab_name>" in routes
         assert "/api/language-settings" in routes
 
@@ -82,6 +88,60 @@ class TestTTSRoutes:
 
         data = response.get_json()
         assert data["success"] is False
+
+    def test_tts_invalidate_deletes_active_spreadsheet_clip(self, client, monkeypatch):
+        """Authenticated users can invalidate audio only in their active spreadsheet."""
+        monkeypatch.setattr(auth_manager, "is_authenticated", lambda: True)
+        monkeypatch.setattr(
+            type(auth_manager),
+            "user",
+            property(lambda self: SimpleNamespace(get_active_spreadsheet_id=lambda: "sheet-1")),
+        )
+        invalidate_calls = []
+        monkeypatch.setattr(
+            tts_service,
+            "invalidate_cache",
+            lambda text, spreadsheet_id, sheet_gid: invalidate_calls.append(
+                (text, spreadsheet_id, sheet_gid)
+            )
+            or True,
+        )
+
+        response = client.post(
+            "/api/tts/invalidate",
+            json={"text": " olá ", "spreadsheet_id": "sheet-1", "sheet_gid": 42},
+        )
+
+        assert response.status_code == 200
+        assert response.get_json() == {"success": True, "invalidated": True}
+        assert invalidate_calls == [("olá", "sheet-1", "42")]
+
+    def test_tts_invalidate_requires_authentication(self, client):
+        """GCS cache deletion is unavailable to anonymous clients."""
+        response = client.post(
+            "/api/tts/invalidate",
+            json={"text": "olá", "spreadsheet_id": "sheet-1", "sheet_gid": 42},
+        )
+
+        assert response.status_code == 401
+        assert response.get_json()["success"] is False
+
+    def test_tts_invalidate_rejects_non_active_spreadsheet(self, client, monkeypatch):
+        """A client-provided spreadsheet ID cannot invalidate another cache namespace."""
+        monkeypatch.setattr(auth_manager, "is_authenticated", lambda: True)
+        monkeypatch.setattr(
+            type(auth_manager),
+            "user",
+            property(lambda self: SimpleNamespace(get_active_spreadsheet_id=lambda: "sheet-1")),
+        )
+
+        response = client.post(
+            "/api/tts/invalidate",
+            json={"text": "olá", "spreadsheet_id": "sheet-2", "sheet_gid": 42},
+        )
+
+        assert response.status_code == 403
+        assert response.get_json()["success"] is False
 
 
 class TestLanguageSettingsRoutes:

@@ -2,8 +2,11 @@
  * Minimalistic TTS Manager with persistent caching
  * Phase 1: Unified Mobile Unlock Architecture
  */
-/** Client TTS blob cache: trimmed text only (tradeoff: rare stale clip if voice/language changes). */
+/** Client TTS blob cache: trimmed text only, with bounded lifetime and LRU size eviction. */
 const TTS_CACHE_STORAGE_KEY = "tts_cache";
+const TTS_CACHE_VERSION = 2;
+const TTS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const TTS_CACHE_MAX_BYTES = 4 * 1024 * 1024;
 
 class TTSManager {
     static #instance = null;
@@ -24,6 +27,7 @@ class TTSManager {
 
         this.audioCache = new Map();
         this.pendingRequests = new Map();
+        this.cacheInvalidationVersions = new Map();
 
         TTSManager.#instance = this;
 
@@ -83,6 +87,52 @@ class TTSManager {
      */
     getCacheKey(text) {
         return text.trim();
+    }
+
+    _entrySizeBytes(cacheKey, entry) {
+        // localStorage commonly stores UTF-16 strings, so use a conservative two bytes per char.
+        return (cacheKey.length + entry.audioBase64.length + 64) * 2;
+    }
+
+    _isEntryExpired(entry, now = Date.now()) {
+        return now - entry.cachedAt >= TTS_CACHE_TTL_MS;
+    }
+
+    _pruneCache() {
+        const now = Date.now();
+        for (const [cacheKey, entry] of this.audioCache) {
+            if (this._isEntryExpired(entry, now)) {
+                this.audioCache.delete(cacheKey);
+            }
+        }
+
+        let totalBytes = 0;
+        const entriesByRecency = [...this.audioCache.entries()].sort(
+            (left, right) => right[1].lastAccessedAt - left[1].lastAccessedAt
+        );
+        for (const [cacheKey, entry] of entriesByRecency) {
+            const entryBytes = this._entrySizeBytes(cacheKey, entry);
+            if (totalBytes + entryBytes > TTS_CACHE_MAX_BYTES) {
+                this.audioCache.delete(cacheKey);
+            } else {
+                totalBytes += entryBytes;
+            }
+        }
+    }
+
+    getCachedAudio(text) {
+        const cacheKey = this.getCacheKey(text);
+        const entry = this.audioCache.get(cacheKey);
+        if (!entry) return null;
+
+        if (this._isEntryExpired(entry)) {
+            this.audioCache.delete(cacheKey);
+            this.saveCache();
+            return null;
+        }
+
+        entry.lastAccessedAt = Date.now();
+        return entry.audioBase64;
     }
 
     /**
@@ -161,9 +211,10 @@ class TTSManager {
          */
         const cacheKey = this.getCacheKey(text);
 
-        if (this.audioCache.has(cacheKey)) {
+        const cachedAudio = this.getCachedAudio(text);
+        if (cachedAudio) {
             console.log(`💾 Cache hit: "${text.substring(0, 30)}${text.length > 30 ? "..." : ""}"`);
-            return this.audioCache.get(cacheKey);
+            return cachedAudio;
         }
 
         if (this.pendingRequests.has(cacheKey)) {
@@ -173,10 +224,13 @@ class TTSManager {
 
         const requestBody = { text };
         if (spreadsheetId) requestBody.spreadsheet_id = spreadsheetId;
-        if (sheetGid) requestBody.sheet_gid = sheetGid;
+        if (sheetGid !== null && sheetGid !== undefined && String(sheetGid).trim()) {
+            requestBody.sheet_gid = sheetGid;
+        }
 
         console.log(`🌐 Fetching from API: "${text.substring(0, 30)}${text.length > 30 ? "..." : ""}"`);
 
+        const invalidationVersion = this.cacheInvalidationVersions.get(cacheKey) || 0;
         const promise = fetch("/api/tts/speak", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -186,8 +240,15 @@ class TTSManager {
             .then((data) => {
                 if (data.success) {
                     console.log(`✅ Cached: "${text.substring(0, 30)}${text.length > 30 ? "..." : ""}"`);
-                    this.audioCache.set(cacheKey, data.audio_base64);
-                    this.saveCache();
+                    if ((this.cacheInvalidationVersions.get(cacheKey) || 0) === invalidationVersion) {
+                        const now = Date.now();
+                        this.audioCache.set(cacheKey, {
+                            audioBase64: data.audio_base64,
+                            cachedAt: now,
+                            lastAccessedAt: now,
+                        });
+                        this.saveCache();
+                    }
                     return data.audio_base64;
                 }
                 console.error("❌ TTS failed:", data.error);
@@ -198,11 +259,62 @@ class TTSManager {
                 return null;
             })
             .finally(() => {
-                this.pendingRequests.delete(cacheKey);
+                if (this.pendingRequests.get(cacheKey) === promise) {
+                    this.pendingRequests.delete(cacheKey);
+                }
             });
 
         this.pendingRequests.set(cacheKey, promise);
         return promise;
+    }
+
+    async invalidateAudio(text, spreadsheetId = null, sheetGid = null) {
+        const trimmed = text ? String(text).trim() : "";
+        if (!trimmed) return false;
+
+        const cacheKey = this.getCacheKey(trimmed);
+        this.cacheInvalidationVersions.set(
+            cacheKey,
+            (this.cacheInvalidationVersions.get(cacheKey) || 0) + 1
+        );
+        this.audioCache.delete(cacheKey);
+        this.pendingRequests.delete(cacheKey);
+        this.saveCache();
+
+        if (
+            !spreadsheetId ||
+            sheetGid === null ||
+            sheetGid === undefined ||
+            !String(sheetGid).trim()
+        ) {
+            return false;
+        }
+
+        const response = await fetch("/api/tts/invalidate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                text: trimmed,
+                spreadsheet_id: spreadsheetId,
+                sheet_gid: sheetGid,
+            }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || "TTS cache invalidation failed");
+        }
+        return Boolean(data.invalidated);
+    }
+
+    async invalidateCard(word, example, spreadsheetId = null, sheetGid = null) {
+        const texts = [word, example]
+            .map((text) => (text ? String(text).trim() : ""))
+            .filter((text, index, values) => text && values.indexOf(text) === index);
+        this.stopCurrentAudio();
+        await Promise.all(
+            texts.map((text) => this.invalidateAudio(text, spreadsheetId, sheetGid))
+        );
+        return this.speakCard(word, example, true, spreadsheetId, sheetGid);
     }
 
     async playAudio(audioBase64) {
@@ -262,8 +374,23 @@ class TTSManager {
         try {
             const cached = localStorage.getItem(TTS_CACHE_STORAGE_KEY);
             if (cached) {
-                this.audioCache = new Map(JSON.parse(cached));
+                const payload = JSON.parse(cached);
+                if (payload.version === TTS_CACHE_VERSION && Array.isArray(payload.entries)) {
+                    this.audioCache = new Map(
+                        payload.entries.filter((item) => {
+                            const entry = item?.[1];
+                            return (
+                                typeof item?.[0] === "string" &&
+                                typeof entry?.audioBase64 === "string" &&
+                                Number.isFinite(entry?.cachedAt) &&
+                                Number.isFinite(entry?.lastAccessedAt)
+                            );
+                        })
+                    );
+                }
             }
+            this._pruneCache();
+            this.saveCache();
         } catch (e) {
             console.warn("Failed to restore TTS cache:", e);
             this.audioCache = new Map();
@@ -277,7 +404,11 @@ class TTSManager {
 
     saveCache() {
         try {
-            localStorage.setItem(TTS_CACHE_STORAGE_KEY, JSON.stringify([...this.audioCache]));
+            this._pruneCache();
+            localStorage.setItem(
+                TTS_CACHE_STORAGE_KEY,
+                JSON.stringify({ version: TTS_CACHE_VERSION, entries: [...this.audioCache] })
+            );
         } catch (e) {
             console.warn("⚠️ Failed to save TTS cache:", e);
         }
@@ -521,8 +652,8 @@ class TTSManager {
     getCacheStats() {
         const size = this.audioCache.size;
         let memoryKB = 0;
-        for (const [key, value] of this.audioCache) {
-            memoryKB += (key.length * 2 + value.length * 0.75) / 1024;
+        for (const [key, entry] of this.audioCache) {
+            memoryKB += this._entrySizeBytes(key, entry) / 1024;
         }
 
         const stats = {

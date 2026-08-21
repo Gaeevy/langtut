@@ -6,6 +6,7 @@ Handles all text-to-speech related endpoints.
 
 from flask import Blueprint, jsonify, request
 
+from app.services.auth_manager import auth_manager
 from app.services.tts import tts_service
 from app.session_manager import SessionKeys, SessionManager
 
@@ -60,8 +61,10 @@ def speak():
     if not text:
         return jsonify({"success": False, "error": "No text provided"}), 400
 
-    spreadsheet_id = data.get("spreadsheet_id")
-    sheet_gid = data.get("sheet_gid")
+    spreadsheet_value = data.get("spreadsheet_id")
+    sheet_value = data.get("sheet_gid")
+    spreadsheet_id = str(spreadsheet_value).strip() if spreadsheet_value is not None else None
+    sheet_gid = str(sheet_value).strip() if sheet_value is not None else None
 
     try:
         audio_base64 = tts_service.text_to_speech(
@@ -77,3 +80,33 @@ def speak():
         return jsonify({"success": False, "error": str(e)}), 400
     except Exception:
         return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
+@tts_bp.route("/invalidate", methods=["POST"])
+@auth_manager.require_auth_api
+def invalidate():
+    """Delete one clip from the current user's browser/GCS cache namespace."""
+    data = request.get_json(silent=True) or {}
+    text_value = data.get("text")
+    spreadsheet_value = data.get("spreadsheet_id")
+    sheet_value = data.get("sheet_gid")
+    text = str(text_value).strip() if text_value is not None else ""
+    spreadsheet_id = str(spreadsheet_value).strip() if spreadsheet_value is not None else ""
+    sheet_gid = str(sheet_value).strip() if sheet_value is not None else ""
+
+    if not text:
+        return jsonify({"success": False, "error": "No text provided"}), 400
+    if not spreadsheet_id or not sheet_gid:
+        return jsonify({"success": False, "error": "Spreadsheet and sheet are required"}), 400
+
+    user = auth_manager.user
+    if not user or user.get_active_spreadsheet_id() != spreadsheet_id:
+        return jsonify({"success": False, "error": "Spreadsheet is not active"}), 403
+
+    try:
+        invalidated = tts_service.invalidate_cache(text, spreadsheet_id, sheet_gid)
+        return jsonify({"success": True, "invalidated": invalidated})
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception:
+        return jsonify({"success": False, "error": "Cache invalidation failed"}), 500

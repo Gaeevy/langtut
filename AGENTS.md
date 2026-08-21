@@ -83,6 +83,29 @@ the hooks reject commits to `main` and `master`.
   creates the TTS singleton and may initialize Google clients. Unit tests should prefer narrower
   imports and monkeypatch external boundaries.
 
+## Railway credentials and production access
+
+- The production-scoped Railway token is stored in `~/.config/langtut/railway.env`. Use it only by
+  sourcing that file inside the same non-traced shell invocation that runs `railway`:
+
+  ```bash
+  set +x
+  source "$HOME/.config/langtut/railway.env"
+  railway <command>
+  ```
+
+- Never open, read, inspect, print, echo, interpolate, log, copy, summarize, or otherwise expose
+  the credential file or `RAILWAY_TOKEN`. Never include the token in commands, tool output, chat,
+  patches, commits, or diagnostics.
+- Do not run `env`, `printenv`, `set`, `export -p`, or enable shell tracing while the token is
+  loaded. Do not retrieve or display Railway variable values unless the user explicitly requests
+  that exact operation.
+- If authentication fails, report only the failure. Do not inspect or display the token; ask the
+  user to replace it.
+- Read-only production inspection such as status, logs, and metrics is allowed when relevant.
+  Require explicit user confirmation immediately before deployments, redeployments, variable or
+  service changes, environment changes, or any other production mutation.
+
 ## Testing expectations
 
 - Add or update tests for behavior changes. Prefer behavior-oriented names, shared fixtures, and

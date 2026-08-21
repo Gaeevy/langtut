@@ -179,7 +179,7 @@ class TTSService:
             return None
 
     def text_to_speech(
-        self, text: str, spreadsheet_id: str = None, sheet_gid: str = None
+        self, text: str, spreadsheet_id: str | None = None, sheet_gid: str | None = None
     ) -> str | None:
         """
         Generate speech with GCS caching.
@@ -226,6 +226,27 @@ class TTSService:
         except Exception as e:
             logger.error(f"TTS generation failed: {e}")
             return None
+
+    def invalidate_cache(self, text: str, spreadsheet_id: str, sheet_gid: str) -> bool:
+        """Delete one generated clip from the GCS cache.
+
+        Returns ``True`` when a cached blob existed and was deleted. A missing bucket or blob is a
+        successful no-op and returns ``False`` so callers can still clear their browser cache.
+        """
+        if not text or not spreadsheet_id or not sheet_gid or not self.bucket:
+            return False
+
+        cache_key = self._get_cache_key(text, self.voice_name, self.language_code)
+        blob_name = f"{spreadsheet_id}/{sheet_gid}/{cache_key}.mp3"
+        blob = self.bucket.blob(blob_name)
+
+        if not blob.exists():
+            logger.info(f"TTS cache invalidation skipped; blob missing: {blob_name}")
+            return False
+
+        blob.delete()
+        logger.info(f"TTS cache invalidated: {blob_name}")
+        return True
 
     def _get_cache_key(self, text: str, voice_name: str, language_code: str) -> str:
         """Generate cache key hash."""
