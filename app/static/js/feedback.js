@@ -138,6 +138,31 @@ function setupTTS(cardData) {
             }
         });
     }
+
+    const invalidateButton = document.getElementById('invalidate-card-tts-btn');
+    if (invalidateButton) {
+        invalidateButton.addEventListener('click', async function() {
+            invalidateButton.disabled = true;
+            invalidateButton.classList.add('is-loading');
+            try {
+                if (!window.ttsManager.isUnlocked()) {
+                    await window.ttsManager.ensureUnlockedFromGesture();
+                }
+                const ready = await window.ttsManager.waitForService();
+                if (ready) {
+                    await window.ttsManager.invalidateCard(
+                        word, example, spreadsheetId, sheetGid
+                    );
+                }
+            } catch (error) {
+                console.error('TTS invalidation failed:', error);
+                window.alert('Could not regenerate this audio. Please try again.');
+            } finally {
+                invalidateButton.disabled = false;
+                invalidateButton.classList.remove('is-loading');
+            }
+        });
+    }
 }
 
 /**

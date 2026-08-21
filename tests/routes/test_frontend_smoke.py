@@ -102,6 +102,28 @@ def test_tts_js_exports_public_api_for_callers() -> None:
         assert f"{name}(" in text or f" async {name}(" in text or f"{name} (" in text
 
 
+def test_tts_cache_is_ttl_bounded_and_feedback_can_invalidate_it() -> None:
+    """Browser clips expire, stay size-bounded, and expose per-card regeneration controls."""
+    tts_text = (STATIC / "js" / "tts.js").read_text(encoding="utf-8")
+    feedback_text = (TEMPLATES / "feedback.html").read_text(encoding="utf-8")
+    card_text = (STATIC / "js" / "card.js").read_text(encoding="utf-8")
+
+    assert "TTS_CACHE_TTL_MS = 24 * 60 * 60 * 1000" in tts_text
+    assert "TTS_CACHE_MAX_BYTES" in tts_text
+    assert "invalidateCard(" in tts_text
+    assert 'id="invalidate-card-tts-btn"' in feedback_text
+    assert "window.ttsManager.invalidateCard(" in card_text
+
+
+def test_verbs_practice_focuses_first_form() -> None:
+    """Every newly loaded verb starts with the caret in its first form."""
+    template_text = (TEMPLATES / "verbs" / "practice.html").read_text(encoding="utf-8")
+    script_text = (STATIC / "js" / "verbs_practice.js").read_text(encoding="utf-8")
+
+    assert "{% if loop.first %}autofocus{% endif %}" in template_text
+    assert "inputs[0].focus()" in script_text
+
+
 _LISTENING_FORBIDDEN_SNIPPETS = (
     "unlockAudioContext",
     "unlockAudioForChromeIOS",

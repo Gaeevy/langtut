@@ -27,6 +27,7 @@ Google Cloud TTS API
 - **API endpoints** (`app/routes/api/tts.py`):
   - `GET /api/tts/status` -- check if TTS is available
   - `POST /api/tts/speak` -- generate audio for a text string. Request: `{"text": "olá"}`. Response: `{"success": true, "audio_base64": "..."}`
+  - `POST /api/tts/invalidate` -- delete one authenticated user's cached GCS clip so the next speak request regenerates it
 
 ### Frontend
 
@@ -86,7 +87,9 @@ identifiers still generate audio, but do not use the GCS cache.
 
 ### Client-side (localStorage)
 
-`TTSManager` caches base64 audio in `localStorage` under key `tts_cache`, keyed by **trimmed text only**. That is a deliberate tradeoff: less bookkeeping on the client than server-side GCS keys (text + voice + language). If the user changes target language or voice, an existing entry for the same string may replay old audio until they clear site data or the entry is evicted. The `pendingRequests` Map deduplicates concurrent fetches for the same text key. The obsolete `tts_cache_v2` key is removed on load/clear when present.
+`TTSManager` caches base64 audio in `localStorage` under key `tts_cache`, keyed by **trimmed text only**. Entries expire after 24 hours and are evicted least-recently-used when their estimated localStorage footprint exceeds 4 MiB. The versioned payload discards the old metadata-free, unbounded cache on upgrade. The `pendingRequests` Map deduplicates concurrent fetches for the same text key.
+
+The feedback card's small regenerate control removes both the word and example from the browser cache, calls the authenticated invalidation endpoint for their voice-specific GCS objects, and immediately fetches and plays fresh clips. Missing GCS objects are treated as an idempotent no-op.
 
 ### Prefetching
 
