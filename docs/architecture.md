@@ -1,261 +1,146 @@
 # Architecture & Configuration
 
-## Overview
-This Flask-based language learning application follows a modular blueprint architecture with unified configuration management. The app provides ANKI-style flashcards with European Portuguese text-to-speech, Google Sheets integration, and user management.
+## System overview
 
-## Core Architecture
+LangTut is a server-rendered Flask application with a small vanilla-JavaScript frontend. Users
+authenticate with Google, choose a Google Sheets workbook as their vocabulary source, and study or
+review cards. SQLite stores application-owned state; Google Cloud TTS and Cloud Storage provide and
+cache audio.
 
-### Application Structure
-```
-run.py                         # Gunicorn entry point (`run:app`)
-app/                           # Main application package
-├── __init__.py               # Flask app factory with blueprint registration
-├── routes/                   # Blueprint-based route organization
-│   ├── __init__.py          # Blueprint registration
-│   ├── auth.py              # OAuth authentication routes
-│   ├── index.py             # Home/dashboard routes
-│   ├── learn.py             # Learn mode routes
-│   ├── review.py            # Review mode routes
-│   ├── settings.py          # User settings & spreadsheet config
-│   ├── admin.py             # Database administration
-│   ├── test.py              # Testing & debugging routes
-│   ├── verbs.py             # Irregular verbs routes
-│   └── api/                 # API endpoints (cards, tts, language, verbs)
-├── services/                # Service layer
-│   ├── auth_manager.py      # Centralized authentication manager
-│   ├── settings_service.py  # Spreadsheet settings flows
-│   ├── listening_cards_service.py  # Listening cards shaping/filtering
-│   └── learning/            # Learn/review domain services
-├── config.py                # Unified configuration management
-├── database.py              # SQLAlchemy database models
-├── session_manager.py       # Centralized session management
-├── gsheet.py                # Google Sheets API integration
-├── tts.py                   # Text-to-Speech service
-├── models.py                # Pydantic data models
-└── logging.py               # Request logging middleware
+```text
+Browser (Jinja + vanilla JS)
+        |
+        v
+Flask blueprints -> services -> Pydantic domain models
+        |                |
+        |                +-> Google Sheets (cards and learning progress)
+        +-> SQLAlchemy/SQLite (users, auth tokens, sheet links, verbs)
+        +-> filesystem sessions
+        +-> Google TTS -> GCS audio cache
 ```
 
-### Blueprint Organization
-The application uses Flask blueprints for modular route organization:
+## Runtime composition
 
-- **Auth Blueprint** (`/auth`, `/oauth2callback`, `/clear`) - OAuth authentication
-- **Index Blueprint** (`/`) - Dashboard and tab selection
-- **Learn Blueprint** (`/learn/*`) - Study session flow
-- **Review Blueprint** (`/review/*`) - Review session flow
-- **Settings Blueprint** (`/settings`, `/validate-spreadsheet`) - User configuration
-- **API Blueprints** (`/api/tts`, `/api/cards`, `/api/language-settings`, `/api/verbs`) - API endpoints
-- **Admin Blueprint** (`/admin`, `/admin/users`) - Administrative interface
-- **Test Blueprint** (`/test`) - Development and debugging
+`run.py` is the Gunicorn entry point. Importing it:
 
-## Configuration System
+1. calls `app.create_app()`;
+2. applies Dynaconf-backed Flask/session settings;
+3. initializes Flask-Session, request logging, and all blueprints;
+4. binds Flask-SQLAlchemy and calls `db.create_all()` through `ensure_tables()`.
 
-### Environment Detection
-The app automatically detects environments based on runtime conditions:
+The app factory itself does not initialize the database; callers that bypass `run.py` must do that
+explicitly when they need database access. `create_all()` is useful for new installations and new
+tables, but is not a migration system for existing columns.
 
-```python
-def get_environment() -> str:
-    """Environment detection using Railway's automatic variables"""
+## Code organization
 
-    # Testing environment
-    if (os.getenv('PYTEST_CURRENT_TEST') is not None or
-        os.getenv('ENVIRONMENT') == 'testing' or
-        'pytest' in sys.modules):
-        return 'testing'
-
-    # Production environment - Railway sets RAILWAY_ENVIRONMENT automatically
-    if os.getenv('RAILWAY_ENVIRONMENT') == 'production':
-        return 'production'
-
-    # Default to local development
-    return 'local'
+```text
+run.py
+app/
+├── __init__.py                 app factory
+├── config.py                   Dynaconf -> typed Config object
+├── database.py                 SQLAlchemy models and initialization
+├── gsheet.py                   card reads and progress writes
+├── models.py                   Pydantic domain/request models
+├── session_manager.py          namespaced session access
+├── routes/
+│   ├── auth.py                 Google OAuth entry/callback/logout
+│   ├── index.py                login, setup, and dashboard
+│   ├── learn.py                study flow and AJAX/form answer paths
+│   ├── review.py               browse/flip review flow
+│   ├── settings.py             linked spreadsheet management
+│   ├── verbs.py                irregular-verb pages
+│   ├── admin.py, test.py       operational/debug endpoints
+│   └── api/                    cards, TTS, languages, verbs
+├── services/
+│   ├── auth_manager.py         OAuth, refresh, and route protection
+│   ├── learning/               sessions, queues, modes, statistics
+│   ├── listening_cards_service.py
+│   ├── settings_service.py
+│   ├── tts.py
+│   └── verbs_service.py
+├── templates/                  server-rendered UI
+└── static/                     vanilla JS/CSS and PWA files
 ```
 
-### Configuration Files
-- **`settings.toml`** - Main configuration with environment sections
-- **`.secrets.toml`** - Sensitive settings (excluded from git)
-- **`railway.toml`** - Railway deployment configuration
-- **`pyproject.toml`** - Python dependencies (PEP 621) and development tools
+Blueprints are registered in `app/routes/__init__.py`. API sub-blueprints are nested below the
+`/api` prefix in `app/routes/api/__init__.py`.
 
-### Environment-Specific Settings
+## Request and domain flows
 
-#### Local Development
-- Debug mode enabled
-- Database: `data/app.db`
-- OAuth insecure transport enabled
-- TTS fully enabled
+### Learn and review
 
-#### Production (Railway)
-- Debug mode disabled
-- Database: `/app/data/app.db`
-- Secure session cookies
-- Environment variables for credentials
+`LearnService` reads due cards from the active workbook, creates a level-dependent task pipeline,
+and stores the serialized queue/state in the `learning.*` session namespace. Answer processing
+updates per-card statistics and writes completed session progress back to the sheet in a batch.
 
-#### Testing
-- Debug mode disabled
-- Database: `:memory:`
-- TTS disabled for faster tests
-- Reduced card limits
+`ReviewService` loads all cards for a tab and uses the separate `review.*` namespace for navigation.
+`CardSessionManager` provides the common serialized-card session behavior.
 
-### Credential Management
-The app uses dual credential handling:
+The learn answer route supports both normal form POST/redirect and JSON/AJAX. The AJAX path renders
+feedback in place so mobile audio remains in the same page and gesture context. Keep both paths
+working.
 
-**Local Development:**
-- `client_secret.json` - OAuth credentials file
-- `google-cloud-service-account.json` - TTS service account
+### Listening and TTS
 
-**Production:**
-- `LANGTUT_CLIENT_SECRETS_JSON` - OAuth credentials as environment variable
-- `LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON` - TTS service account as environment variable
+`GET /api/cards/<tab_name>` uses `ListeningCardsService` to load and shuffle cards that have both a
+word and example. `POST /api/tts/speak` selects a voice from the session's target language, checks
+the GCS cache when workbook and sheet identifiers are provided, and returns base64 MP3. See
+[`audio.md`](./audio.md) for the browser-side playback details.
 
-## Data Architecture
+### Irregular verbs
 
-### Dual-Store System
-The application uses a dual-store architecture:
+Verb forms and per-user practice history are application-owned, so this feature uses SQLite rather
+than Google Sheets. HTML routes live in `routes/verbs.py`; JSON/import endpoints live in
+`routes/api/verbs.py`; persistence and selection behavior is in `VerbsService` and
+`app/import_verbs/`.
 
-1. **Google Sheets** - Content management (vocabulary, cards, learning material)
-2. **SQLite Database** - Application data (users, sessions, authentication state)
+## Persistence boundaries
 
-### Database Models
-```python
-class User(db.Model):
-    id = Column(Integer, primary_key=True)
-    google_id = Column(String(255), unique=True, nullable=False)
-    email = Column(String(255), unique=True, nullable=False)
-    name = Column(String(255))
-    created_at = Column(DateTime, default=utc_now)
-    last_login = Column(DateTime)
+| Store | Owned data | Main access point |
+|---|---|---|
+| Google Sheets | card text, examples, counters, levels, last-shown time | `app/gsheet.py` |
+| SQLite | users, linked workbooks and language settings, encrypted refresh tokens, verb data | `app/database.py` + services |
+| Filesystem session | OAuth access token/state and refresh-token row ID, active learn/review queues, target language | `SessionManager` |
+| Google Cloud Storage | generated MP3 cache | `TTSService` |
+| Browser localStorage | base64 TTS cache keyed by trimmed text | `TTSManager` |
 
-class UserSpreadsheet(db.Model):
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
-    spreadsheet_id = Column(String(255), nullable=False)
-    properties = Column(Text)  # JSON string for language settings
-    is_active = Column(Boolean, default=False)
-```
+The SQLite models are `User`, `RefreshToken`, `UserSpreadsheet`, `VerbInfinitive`, `VerbTense`,
+`VerbForm`, and `UserVerbInteraction`. `UserSpreadsheet.properties` stores validated language
+settings as JSON.
 
-### Session Management
-Centralized session management with enumerated keys:
+Each vocabulary worksheet has a header row followed by ten positional columns: ID, word,
+translation, equivalent, example, example translation, shown count, correct count, level, and last
+shown. Reads skip invalid rows; progress writes update only the final four statistics columns (G:J).
 
-```python
-class SessionKeys(Enum):
-    # Auth namespace
-    AUTH_STATE = 'auth.state'
-    ACCESS_TOKEN = 'auth.access_token'
-    REFRESH_TOKEN_ID = 'auth.refresh_token_id'
+## Authentication and session state
 
-    # User namespace
-    USER_ID = 'user.id'
-    USER_GOOGLE_ID = 'user.google_id'
+`AuthManager` owns OAuth flow creation, callbacks, credential refresh, and logout:
 
-    # Learning namespace
-    LEARNING_CARDS = 'learning.cards'
-    LEARNING_CURRENT_INDEX = 'learning.current_index'
-```
+1. the login route stores OAuth state and redirect URI in the session;
+2. the callback identifies or creates the SQLite user;
+3. the short-lived access token and expiry live in the filesystem-backed session;
+4. the refresh token is Fernet-encrypted in SQLite and referenced by its row ID from the session;
+5. protected requests refresh credentials transparently when needed.
 
-## Key Design Decisions
+HTML routes use `@auth_manager.require_auth` (redirect on failure). JSON endpoints use
+`@auth_manager.require_auth_api` (JSON `401`). Session state goes through `SessionManager` and the
+namespaced `SessionKeys` enum; current namespaces are `auth`, `user`, `learning`, `review`, `tts`,
+and `test`.
 
-### 1. Blueprint-Based Architecture
-**Rationale:** Prevents monolithic code growth, enables feature-based organization, and improves maintainability.
+## Configuration and deployment
 
-### 2. Unified Configuration System
-**Rationale:** Single source of truth for all settings, environment-aware configuration, and simplified deployment.
+Dynaconf reads `settings.toml`, then gitignored `.secrets.toml`, with `LANGTUT_*` environment values
+taking precedence. There are two runtime environments:
 
-### 3. Dual-Store Architecture
-**Rationale:** Google Sheets provides easy content management for educators, while SQLite handles application state efficiently.
+- `local` by default: `data/app.db`, `flask_session/`, insecure OAuth transport enabled by `run.py`;
+- `production` when `RAILWAY_ENVIRONMENT=production`: `/app/data/app.db`,
+  `/app/data/flask_session`, secure session cookies.
 
-### 4. Session Management Centralization
-**Rationale:** Prevents session key typos, enables refactoring-safe access, and provides clear namespacing.
+Local credential files are configured in `.secrets.toml`. Railway supplies OAuth and service-account
+JSON through `LANGTUT_CLIENT_SECRETS_JSON` and
+`LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON`. `LANGTUT_ENCRYPTION_KEY` is required to decrypt stored
+refresh tokens; `LANGTUT_SECRET_KEY` should be stable so sessions remain valid across restarts.
 
-### 5. Pydantic Data Models
-**Rationale:** Type safety, automatic validation, and clear data contracts between components.
-
-## Development Workflow
-
-### Local Development
-```bash
-# Install dependencies
-uv sync
-
-# Start development server
-uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload run:app
-
-# Run tests
-uv run pytest
-```
-
-### Code Quality
-- Pre-commit hooks with ruff linting/formatting
-- Type hints required for all functions
-- Comprehensive error handling and logging
-- Security scanning with bandit
-
-### Deployment
-- Railway deployment with automatic environment detection
-- uv manages dependencies with locked versions (uv.lock)
-- Fast, reproducible builds using uv
-- Environment variables for production credentials
-
-## Performance Considerations
-
-### TTS Optimization
-- Audio caching in Google Cloud Storage
-- Base64 encoding for client-side audio playback
-- Mobile-optimized audio unlock strategies
-
-### Database Optimization
-- Indexed foreign keys for user relationships
-- Batch updates for card statistics
-- Session-based caching for frequently accessed data
-
-### API Rate Limiting
-- Google Sheets API rate limiting handling
-- TTS API caching to reduce calls
-- Batch operations where possible
-
-## Security Features
-
-### Authentication System
-
-**Centralized AuthManager**: All authentication logic is managed by `AuthManager` class in `app/services/auth_manager.py`.
-
-**Token Storage Strategy**:
-- **Access Tokens** (short-lived, ~1 hour): Stored in Flask session
-- **Refresh Tokens** (long-lived): Encrypted and stored in database (`RefreshToken` table)
-- **Encryption**: Refresh tokens encrypted using Fernet symmetric encryption
-- **Rotation**: Refresh tokens rotated on re-authentication and when Google provides new tokens
-
-**Authentication Flow**:
-1. User redirected to Google OAuth consent screen
-2. OAuth callback receives access token, refresh token, and ID token
-3. User identified/created using `google_user_id` from ID token
-4. Refresh token encrypted and stored in database
-5. Access token stored in session for API calls
-6. Automatic token refresh when access token expires
-
-**Route Protection**:
-- Protected routes use `@auth_manager.require_auth` decorator
-- Decorator automatically redirects to login if not authenticated
-- Transparent token refresh - users don't see expired token errors
-
-**Key Components**:
-- `AuthManager` - Centralized auth logic (OAuth flow, token management, auth state)
-- `RefreshToken` model - Database storage for encrypted refresh tokens
-- `SessionManager` - Session key management with namespaces
-- Token encryption utilities in `utils.py`
-
-### Legacy Authentication
-- `AUTH_CREDENTIALS` session key deprecated (previously stored full credentials in session)
-- Replaced with separate `ACCESS_TOKEN` (session) and refresh token (encrypted database)
-- Google OAuth 2.0 integration
-- Secure session management
-- CSRF protection via Flask-WTF
-
-### Data Protection
-- Environment-specific security settings
-- Secure session cookies in production
-- Input validation via Pydantic models
-
-### API Security
-- Rate limiting on API endpoints
-- Input sanitization for XSS prevention
-- Audit logging for sensitive operations
+Railway builds the `Dockerfile`, runs Gunicorn, and expects a persistent volume mounted at
+`/app/data`. Language-to-voice mappings are configured separately in `config/languages.yaml`.
