@@ -19,7 +19,7 @@ Flask app for learning European Portuguese with Google Sheets-backed card conten
 ```bash
 git clone <repository-url>
 cd langtut
-uv sync
+uv sync --extra dev
 cp .secrets.toml.example .secrets.toml
 ```
 
@@ -36,6 +36,8 @@ uv run pytest
 ```
 
 ## Developer workflow
+- Read [`AGENTS.md`](./AGENTS.md) for the project map, architectural constraints, and verification
+  expectations.
 - Install hooks once per clone:
   ```bash
   uv run pre-commit install -t pre-commit -t pre-push
@@ -56,4 +58,3 @@ See [`docs/architecture.md`](./docs/architecture.md) for details.
 - [`docs/README.md`](./docs/README.md) (index)
 - [`docs/architecture.md`](./docs/architecture.md)
 - [`docs/audio.md`](./docs/audio.md)
-- [`docs/development-guide.md`](./docs/development-guide.md)

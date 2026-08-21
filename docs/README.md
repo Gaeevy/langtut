@@ -10,8 +10,8 @@ System design: Flask blueprints, configuration, dual-store (Google Sheets + SQLi
 ### [Audio System](./audio.md)
 TTS, audio playback, mobile autoplay, caching, and listening mode -- all in one place.
 
-### [Development Guide](./development-guide.md)
-Daily development workflow, commands, quality gates, and concise operational notes.
+### [Agent & Development Guide](../AGENTS.md)
+Project map, architecture constraints, commands, testing expectations, and quality gates.
 
 ## Quick Reference
 
@@ -24,7 +24,8 @@ uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload run:app
 ```bash
 ngrok http 8080 --url=your-name.ngrok-free.dev
 ```
-See [Development Guide](./development-guide.md#mobile-testing-with-ngrok) for full setup.
+Add the HTTPS forwarding URL to the Google OAuth client's authorized redirect URIs as
+`https://your-name.ngrok-free.dev/oauth2callback`.
 
 ### Architecture
 
@@ -37,7 +38,7 @@ Frontend (Vanilla JS + Bootstrap)
 
 Backend (Flask + Blueprints)
 ├── Routes: auth, learn, review, index, settings, admin, api/{tts,cards,language,verbs}
-├── Services: TTS, Google Sheets, auth, learning, settings, listening cards
+├── Services: TTS, auth, learning, settings, listening cards, verbs
 ├── Models: Pydantic + SQLAlchemy
 └── Config: Dynaconf (settings.toml / .secrets.toml)
 

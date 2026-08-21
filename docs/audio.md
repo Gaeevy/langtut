@@ -23,7 +23,7 @@ Google Cloud TTS API
 
 ### Backend
 
-- **TTS Service** (`app/services/tts.py`) -- wraps Google Cloud TTS API, caches audio in a GCS bucket (`langtut-tts`), returns base64-encoded MP3
+- **TTS Service** (`app/services/tts.py`) -- wraps Google Cloud TTS API, caches audio in the configured GCS bucket, returns base64-encoded MP3
 - **API endpoints** (`app/routes/api/tts.py`):
   - `GET /api/tts/status` -- check if TTS is available
   - `POST /api/tts/speak` -- generate audio for a text string. Request: `{"text": "olá"}`. Response: `{"success": true, "audio_base64": "..."}`
@@ -80,7 +80,9 @@ User taps Start → unlockAudio() → AudioContext (where supported) + primed Au
 
 ### Server-side (GCS)
 
-Audio is cached in a GCS bucket keyed by text + voice + language. Avoids re-calling Google Cloud TTS for previously generated audio.
+When the request includes both a spreadsheet ID and sheet GID, audio is cached below
+`<spreadsheet-id>/<sheet-gid>/` using a hash of text + voice + language. Requests without both
+identifiers still generate audio, but do not use the GCS cache.
 
 ### Client-side (localStorage)
 
@@ -124,6 +126,10 @@ gcs_audio_bucket = "langtut-tts"
 ```
 
 Voice is resolved from the user's target language setting stored in session.
+
+Supported language/voice pairs live in `config/languages.yaml`. The target language is copied to
+the `tts.*` session namespace from the active spreadsheet's language settings when the dashboard,
+learn flow, or review flow is entered.
 
 ## Manual verification checklist
 
