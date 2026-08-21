@@ -66,6 +66,8 @@ the hooks reject commits to `main` and `master`.
   `auth_manager.get_credentials()` for Google API clients.
 - Use Pydantic models for structured input/domain data and typed result objects for service
   boundaries. Preserve type hints on changed function signatures.
+- Use absolute imports rooted at `app` for application modules (for example,
+  `from app.services.learning.statistics import CardStatistics`); do not add relative imports.
 - Keep external calls observable with a module logger (`logging.getLogger(__name__)`) and avoid
   logging credentials, tokens, or full secret payloads.
 - The frontend has no build step. Preserve Jinja-to-JavaScript contracts and test both the HTML

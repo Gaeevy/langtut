@@ -56,4 +56,4 @@ data/*.db
 .railway/
 
 # Local import payloads
-verbs.json
+verbs*.json

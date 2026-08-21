@@ -2,6 +2,8 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from app.models import Levels
 from app.services.learning.card_session import CardSessionManager
 from app.services.learning.learn_service import LearnService
@@ -9,6 +11,27 @@ from app.services.learning.mode_config import LearningMode
 from app.session_manager import SessionKeys as sk
 from app.session_manager import SessionManager as sm
 from tests.conftest import make_card
+
+
+class TestUniformAnswerComparison:
+    """Every learning mode uses the same processed-token comparison."""
+
+    @pytest.mark.parametrize(
+        ("mode", "user_answer"),
+        [
+            (LearningMode.PICK_ONE, '"OLÁ"'),
+            (LearningMode.PICK_TRANSLATION, "HELLO!!!"),
+            (LearningMode.BUILD_SENTENCE, "qwe asd"),
+            (LearningMode.BUILD_WORD, "OLÁ"),
+            (LearningMode.TYPE_ANSWER, "olá..."),
+            (LearningMode.TYPE_EXAMPLE_GUIDED, "QWE / ASD"),
+            (LearningMode.WRITE_EXAMPLE, "qwe; asd?"),
+        ],
+    )
+    def test_mode_ignores_symbols_and_case(self, mode, user_answer, request_context):
+        card = make_card(word="Olá!", translation="Hello.", example="qwe \\\\\\ asd")
+
+        assert LearnService()._check_answer_for_mode(user_answer, card.model_dump(), mode) is True
 
 
 class TestLearnServiceLevelBumpAtPipelineEnd:
