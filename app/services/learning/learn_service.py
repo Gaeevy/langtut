@@ -397,24 +397,22 @@ class LearnService:
         )
 
     def _check_answer_for_mode(self, user_answer: str, card: dict, mode: str) -> bool:
-        """Dispatch answer checking to the appropriate method for the mode."""
+        """Resolve the expected text, then use the shared comparison for every mode."""
         if mode == LearningMode.PICK_ONE:
-            return self.stats.check_answer_choice(user_answer, card.get("word", ""))
+            expected_answer = card.get("word", "")
+        elif mode == LearningMode.PICK_TRANSLATION:
+            expected_answer = card.get("translation", "")
+        elif mode in (
+            LearningMode.BUILD_SENTENCE,
+            LearningMode.WRITE_EXAMPLE,
+            LearningMode.TYPE_EXAMPLE_GUIDED,
+        ):
+            expected_answer = card.get("example", "")
+        else:
+            # build_word and type_answer both check against the target word.
+            expected_answer = card.get("word", "")
 
-        if mode == LearningMode.PICK_TRANSLATION:
-            return self.stats.check_answer_choice(user_answer, card.get("translation", ""))
-
-        if mode == LearningMode.BUILD_SENTENCE:
-            return self.stats.check_answer_ordered(user_answer, card.get("example", ""))
-
-        if mode == LearningMode.WRITE_EXAMPLE:
-            return self.stats.check_answer_ordered(user_answer, card.get("example", ""))
-
-        if mode == LearningMode.TYPE_EXAMPLE_GUIDED:
-            return self.stats.check_answer_ordered(user_answer, card.get("example", ""))
-
-        # build_word and type_answer both check against the target word
-        return self.stats.check_answer(user_answer, card.get("word", ""))
+        return self.stats.check_answer(user_answer, expected_answer)
 
     @staticmethod
     def _create_answer_record(

@@ -1,9 +1,48 @@
 """Tests for CardStatistics service."""
 
 from app.models import Levels
+from app.services.learning.answer_processing import answers_match, process_answer
 from app.services.learning.statistics import AnswerResult, CardStatistics, SessionStats
 
 from .conftest import make_card
+
+
+class TestAnswerProcessing:
+    """Tests for the shared answer tokenization and comparison rules."""
+
+    def test_process_answer_removes_symbols_and_lowercases_tokens(self):
+        assert process_answer('"ASD", or QWE \\\\\\ asd.') == ["asd", "or", "qwe", "asd"]
+
+    def test_process_answer_treats_every_symbol_as_a_separator(self):
+        assert process_answer("one/two\\three.four,five;six?seven&eight_nine") == [
+            "one",
+            "two",
+            "three",
+            "four",
+            "five",
+            "six",
+            "seven",
+            "eight",
+            "nine",
+        ]
+
+    def test_process_answer_preserves_unicode_letters_and_digits(self):
+        assert process_answer("ÀS VEZES, OLÁ! CORAÇÃO 123") == [
+            "às",
+            "vezes",
+            "olá",
+            "coração",
+            "123",
+        ]
+
+    def test_answers_match_preserves_diacritic_distinctions(self):
+        assert answers_match("à", "À") is True
+        assert answers_match("a", "à") is False
+
+    def test_answers_match_requires_identical_ordered_token_arrays(self):
+        assert answers_match("HELLO / there!", "hello there") is True
+        assert answers_match("there hello", "hello there") is False
+        assert answers_match("hellothere", "hello/there") is False
 
 
 class TestCheckAnswer:
@@ -26,6 +65,11 @@ class TestCheckAnswer:
     def test_wrong_answer(self):
         """Wrong answer should return False."""
         assert CardStatistics.check_answer("goodbye", "hello") is False
+
+    def test_symbols_are_ignored(self):
+        """Punctuation and symbol differences should not affect correctness."""
+        assert CardStatistics.check_answer('"asd"', "asd") is True
+        assert CardStatistics.check_answer("qwe asd", "qwe \\\\\\ asd") is True
 
     def test_empty_strings(self):
         """Empty strings should match each other."""

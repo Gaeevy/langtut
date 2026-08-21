@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass
 
 from app.models import Card
+from app.services.learning.answer_processing import answers_match, process_answer
 from app.utils import get_timestamp
 
 logger = logging.getLogger(__name__)
@@ -72,11 +73,9 @@ class CardStatistics:
             correct_answer: Expected correct answer
 
         Returns:
-            True if answers match (case-insensitive, trimmed)
+            True if their lowercase alphanumeric token arrays match
         """
-        normalized_user = user_answer.strip().lower()
-        normalized_correct = correct_answer.strip().lower()
-        return normalized_user == normalized_correct
+        return answers_match(user_answer, correct_answer)
 
     @staticmethod
     def check_answer_multiple(user_answer: str, correct_answers: list[str]) -> bool:
@@ -89,8 +88,8 @@ class CardStatistics:
         Returns:
             True if user answer matches any correct answer
         """
-        normalized_user = user_answer.strip().lower()
-        return any(normalized_user == correct.strip().lower() for correct in correct_answers)
+        input_processed = process_answer(user_answer)
+        return any(input_processed == process_answer(correct) for correct in correct_answers)
 
     @staticmethod
     def check_answer_choice(selected: str, correct: str) -> bool:
@@ -101,9 +100,9 @@ class CardStatistics:
             correct: The card's correct translation
 
         Returns:
-            True if they match (case-insensitive, trimmed)
+            True if their lowercase alphanumeric token arrays match
         """
-        return selected.strip().lower() == correct.strip().lower()
+        return answers_match(selected, correct)
 
     @staticmethod
     def check_answer_ordered(user_answer: str, correct_answer: str) -> bool:
@@ -111,20 +110,16 @@ class CardStatistics:
 
         For build_sentence the user submits words joined by spaces;
         for build_word the user submits letters joined without separator.
-        Both are compared against the canonical string after normalizing whitespace.
+        Both are compared as lowercase alphanumeric token arrays.
 
         Args:
             user_answer: Joined string submitted by the user
             correct_answer: The canonical sentence or word from the card
 
         Returns:
-            True if strings match (case-insensitive, whitespace-normalized)
+            True if their lowercase alphanumeric token arrays match
         """
-
-        def normalize(s: str) -> str:
-            return " ".join(s.lower().split())
-
-        return normalize(user_answer) == normalize(correct_answer)
+        return answers_match(user_answer, correct_answer)
 
     @staticmethod
     def update_on_answer(card: Card, is_correct: bool) -> AnswerResult:
