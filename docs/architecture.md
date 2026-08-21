@@ -123,6 +123,10 @@ shown. Reads skip invalid rows; progress writes update only the final four stati
 4. the refresh token is Fernet-encrypted in SQLite and referenced by its row ID from the session;
 5. protected requests refresh credentials transparently when needed.
 
+Server-side sessions are written only when modified by default
+(`session_refresh_each_request = false`). This prevents slower, read-only background requests such
+as TTS prefetches from overwriting newer authentication or learning state with an older snapshot.
+
 HTML routes use `@auth_manager.require_auth` (redirect on failure). JSON endpoints use
 `@auth_manager.require_auth_api` (JSON `401`). Session state goes through `SessionManager` and the
 namespaced `SessionKeys` enum; current namespaces are `auth`, `user`, `learning`, `review`, `tts`,

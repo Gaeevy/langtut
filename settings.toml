@@ -25,6 +25,7 @@ gcs_audio_bucket = "langtut-tts"
 session_type = "filesystem"
 session_permanent = false
 session_use_signer = true
+session_refresh_each_request = false
 session_cookie_httponly = true
 session_cookie_samesite = "Lax"
 

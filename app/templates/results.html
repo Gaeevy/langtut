@@ -78,6 +78,9 @@
     {% endif %}
 
     <div class="d-grid gap-2 pt-1">
+        {% if not updated %}
+        <a href="{{ url_for('learn.end_early' if ended_early else 'learn.results') }}" class="btn btn-warning btn-lg">Retry save</a>
+        {% endif %}
         <a href="{{ url_for('index.home') }}" class="btn btn-primary btn-lg">Start again</a>
     </div>
 </div>

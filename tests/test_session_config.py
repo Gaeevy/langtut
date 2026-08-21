@@ -34,19 +34,36 @@ def test_session_file_dir_is_configured() -> None:
     )
 
 
+def test_session_refresh_each_request_defaults_to_false() -> None:
+    """Read-only requests must not overwrite newer shared session snapshots."""
+    assert config.session_refresh_each_request is False
+
+
 def test_configure_app_sets_filesystem_session_dir(tmp_path, monkeypatch) -> None:
     """configure_app wires SESSION_FILE_DIR and creates the directory."""
     target_dir = tmp_path / "flask_session"
     monkeypatch.setattr(config, "session_type", "filesystem")
     monkeypatch.setattr(config, "session_file_dir", str(target_dir))
+    monkeypatch.setattr(config, "session_refresh_each_request", False)
 
     app = Flask(__name__)
     configure_app(app)
 
     assert app.config["SESSION_TYPE"] == "filesystem"
     assert app.config["SESSION_USE_SIGNER"] is True
+    assert app.config["SESSION_REFRESH_EACH_REQUEST"] is config.session_refresh_each_request
     assert Path(app.config["SESSION_FILE_DIR"]) == target_dir.resolve()
     assert target_dir.is_dir(), "Session directory must be created eagerly"
+
+
+def test_configure_app_uses_session_refresh_setting(monkeypatch) -> None:
+    """The Flask setting follows the typed application configuration."""
+    monkeypatch.setattr(config, "session_refresh_each_request", True)
+
+    app = Flask(__name__)
+    configure_app(app)
+
+    assert app.config["SESSION_REFRESH_EACH_REQUEST"] is True
 
 
 def test_create_app_uses_shared_filesystem_session_interface(tmp_path, monkeypatch) -> None:
