@@ -189,6 +189,7 @@ class LearnService:
 
             sm.set(sk.LEARNING_ANSWERS, [])
             sm.set(sk.LEARNING_ORIGINAL_COUNT, len(cards))
+            sm.set(sk.LEARNING_FINALIZED, False)
 
             logger.info(
                 f"Learn session started: {len(cards)} cards, {len(task_queue)} tasks from '{tab_name}'"
@@ -228,8 +229,11 @@ class LearnService:
             task_index = sm.get(sk.LEARNING_TASK_INDEX, 0)
             cards_remaining = max(0, len(task_queue) - task_index)
 
-        sm.clear_namespace("learning")
-        logger.info("Learn session ended, data cleared")
+        if update_successful:
+            sm.clear_namespace("learning")
+            logger.info("Learn session ended, progress saved and data cleared")
+        else:
+            logger.warning("Learn session save failed; retaining data for retry")
 
         return SessionEndResult(
             total_answered=stats.total_answered,
@@ -460,6 +464,10 @@ class LearnService:
 
     def _finalize_pipeline_outcomes(self) -> None:
         """Increment cnt_corr_answers and adjust level for cards that completed their pipeline."""
+        if sm.get(sk.LEARNING_FINALIZED, False):
+            logger.debug("Learning outcomes already finalized; skipping duplicate finalization")
+            return
+
         session_state = self.session.get_state()
         if not session_state:
             return
@@ -499,6 +507,8 @@ class LearnService:
                 f"Finalized card {idx}: retries={retries}, max={max_allowed_retries}, "
                 f"level {original_level}→{card_obj.level.value}"
             )
+
+        sm.set(sk.LEARNING_FINALIZED, True)
 
     def _build_per_card_breakdown(self, answers: list[dict]) -> list[dict]:
         """Build per-word stats for the session results screen."""

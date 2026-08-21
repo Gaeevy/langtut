@@ -100,6 +100,56 @@ class TestLearnServiceLevelBumpAtPipelineEnd:
         assert by_mode["pick_translation"]["first_ok"] is False
         assert by_mode["pick_translation"]["final_ok"] is True
 
+    def test_finalize_pipeline_outcomes_is_idempotent(self, request_context):
+        card = make_card(id=1, level=Levels.LEVEL_0)
+        manager = CardSessionManager("learn")
+        manager.initialize([card], "TestTab", 1)
+        sm.set(sk.LEARNING_CARD_PIPELINES, {"0": [LearningMode.PICK_ONE]})
+        sm.set(sk.LEARNING_CARD_MODES_DONE, {"0": [LearningMode.PICK_ONE]})
+        sm.set(sk.LEARNING_CARD_RETRIES, {})
+        sm.set(sk.LEARNING_FINALIZED, False)
+
+        service = LearnService()
+        service._finalize_pipeline_outcomes()
+        service._finalize_pipeline_outcomes()
+
+        state = service.session.get_state()
+        assert state is not None
+        finalized_card = service.session.deserialize_card(state.cards[0])
+        assert finalized_card.cnt_corr_answers == 1
+        assert finalized_card.level == Levels.LEVEL_1
+
+
+class TestLearnSessionPersistence:
+    def test_failed_save_retains_learning_data_for_retry(self, request_context):
+        manager = CardSessionManager("learn")
+        manager.initialize([make_card()], "TestTab", 1)
+        sm.set(sk.LEARNING_ANSWERS, [])
+        sm.set(sk.LEARNING_ORIGINAL_COUNT, 1)
+        sm.set(sk.LEARNING_CARD_PIPELINES, {})
+        sm.set(sk.LEARNING_FINALIZED, False)
+
+        with patch.object(LearnService, "_batch_update_cards", return_value=False):
+            result = LearnService().end_session()
+
+        assert result.update_successful is False
+        assert sm.has(sk.LEARNING_CARDS)
+        assert sm.get(sk.LEARNING_FINALIZED) is True
+
+    def test_successful_save_clears_learning_data(self, request_context):
+        manager = CardSessionManager("learn")
+        manager.initialize([make_card()], "TestTab", 1)
+        sm.set(sk.LEARNING_ANSWERS, [])
+        sm.set(sk.LEARNING_ORIGINAL_COUNT, 1)
+        sm.set(sk.LEARNING_CARD_PIPELINES, {})
+        sm.set(sk.LEARNING_FINALIZED, False)
+
+        with patch.object(LearnService, "_batch_update_cards", return_value=True):
+            result = LearnService().end_session()
+
+        assert result.update_successful is True
+        assert not sm.has(sk.LEARNING_CARDS)
+
 
 class TestTypeExampleGuidedMode:
     """type_example_guided checks full example sentence; answer record uses example."""

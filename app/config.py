@@ -90,6 +90,7 @@ class Config(BaseSettings):
     session_type: str = _settings["session_type"]
     session_permanent: bool = _settings["session_permanent"]
     session_use_signer: bool = _settings["session_use_signer"]
+    session_refresh_each_request: bool = _settings.get("session_refresh_each_request", False)
     session_file_dir: str = _settings["session_file_dir"]
     session_cookie_secure: bool = _settings["session_cookie_secure"]
     session_cookie_httponly: bool = _settings["session_cookie_httponly"]

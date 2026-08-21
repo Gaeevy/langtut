@@ -110,9 +110,8 @@ class AuthManager:
     - Refresh tokens encrypted at rest using Fernet symmetric encryption
     - Encryption key stored in .secrets.toml (never in code)
     - Access tokens only in session (ephemeral, short-lived)
-    - Automatic token refresh with 5-minute buffer before expiry
-    - Failed refresh → Clear session and redirect to login
-    - No silent failures - always clear error handling
+    - Automatic token refresh with 10-minute buffer before expiry
+    - Failed refresh → use a still-valid token or require re-authentication
     - Session expiry requires re-authentication (no DB restoration)
     - Multiple refresh tokens per user supported (different devices)
 
@@ -393,7 +392,7 @@ class AuthManager:
 
     # Credential Management Methods
 
-    def get_credentials(self) -> Credentials | None:
+    def get_credentials(self, *, force_refresh: bool = False) -> Credentials | None:
         """Get valid credentials, refreshing if needed.
 
         This is a PASSIVE GETTER - it returns credentials or None without
@@ -403,7 +402,7 @@ class AuthManager:
 
         Flow:
         1. Check if user is logged in (user_id in session)
-        2. Check if access token needs refresh
+        2. Check if access token needs refresh (or honor a forced refresh)
         3. If needed, refresh using database refresh token
         4. Get credentials from session
         5. Return credentials or None
@@ -424,24 +423,38 @@ class AuthManager:
         Returns:
             Valid Credentials object if authenticated, None otherwise
 
+        Args:
+            force_refresh: Refresh even if the session access token has not reached
+                the normal refresh window. Used for a single retry after a Google API
+                rejects an apparently valid access token.
+
         Note:
             Returns None if:
             - User not logged in (no user_id in session)
             - Access token expired and refresh failed
             - No refresh token in database
         """
-        creds = None
-
         # Check if user is logged in
         user_id = sm.get(sk.USER_ID)
         if not user_id:
             logger.debug("No user_id in session")
             return None
 
+        current_creds = self._credentials_from_session()
+
         # Check if token needs refresh
-        if self._needs_token_refresh():
-            logger.info("Access token expired or missing, attempting refresh")
-            self._refresh_credentials(user_id)
+        if force_refresh or self._needs_token_refresh():
+            reason = "forced" if force_refresh else "expired, missing, or expiring soon"
+            logger.info(f"Access token refresh requested ({reason})")
+            if not self._refresh_credentials(user_id):
+                if force_refresh or current_creds is None or not current_creds.valid:
+                    logger.warning("No usable Google credentials after refresh failure")
+                    return None
+
+                # A proactive refresh can fail transiently while the current token
+                # is still valid. Keep serving it and retry refresh on the next request.
+                logger.warning("Token refresh failed; temporarily using current valid token")
+                return current_creds
 
         # Get credentials from session
         creds = self._credentials_from_session()
@@ -587,6 +600,11 @@ class AuthManager:
 
         if isinstance(expiry, str):
             expiry = datetime.fromisoformat(expiry)
+
+        # google-auth compares expiry with a naive UTC clock internally. Flask
+        # session serializers may preserve or restore the value as timezone-aware.
+        if expiry and expiry.tzinfo:
+            expiry = expiry.astimezone(UTC).replace(tzinfo=None)
 
         # Create credentials without refresh token (we keep that in DB only)
         return Credentials(

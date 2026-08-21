@@ -48,6 +48,7 @@ class SessionKeys(Enum):
     LEARNING_CARD_START_LEVELS = (
         "learning.card_start_levels"  # {str(idx): int level at session start}
     )
+    LEARNING_FINALIZED = "learning.finalized"  # End-of-session outcomes applied exactly once
 
     # Review namespace - Review mode session state
     REVIEW_CARDS = "review.cards"
