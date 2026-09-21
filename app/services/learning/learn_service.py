@@ -387,7 +387,7 @@ class LearnService:
             )
 
         # Persist updated card
-        self.session.update_card(card_idx, self.session._serialize_card(card_obj))
+        self.session.update_card(card_idx, self.session.serialize_card(card_obj))
 
         # Record answer
         answer_record = self._create_answer_record(card, user_answer, is_correct, card_idx, mode)
@@ -502,7 +502,7 @@ class LearnService:
             else:
                 card_obj.level = card_obj.level.previous_level()
 
-            self.session.update_card(idx, self.session._serialize_card(card_obj))
+            self.session.update_card(idx, self.session.serialize_card(card_obj))
             logger.info(
                 f"Finalized card {idx}: retries={retries}, max={max_allowed_retries}, "
                 f"level {original_level}→{card_obj.level.value}"

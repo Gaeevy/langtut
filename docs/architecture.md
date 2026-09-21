@@ -74,7 +74,11 @@ Blueprints are registered in `app/routes/__init__.py`. API sub-blueprints are ne
 and stores the serialized queue/state in the `learning.*` session namespace. Answer processing
 updates per-card statistics and writes completed session progress back to the sheet in a batch.
 
-`ReviewService` loads all cards for a tab and uses the separate `review.*` namespace for navigation.
+`ReviewService` loads all cards for a tab and uses the separate `review.*` namespace for a
+one-pass stack. A forgotten card loses one level; a remembered card keeps its level. Both choices
+update the card's last-shown timestamp in the review session. The full stack is written to Google
+Sheets once, after the final card is reviewed. Ending early writes only cards already reviewed and
+keeps the active session intact if that batch write fails.
 `CardSessionManager` provides the common serialized-card session behavior.
 
 The learn answer route supports both normal form POST/redirect and JSON/AJAX. The AJAX path renders

@@ -33,6 +33,7 @@ class TestRouteRegistration:
         assert "/review/flip" in routes
         assert "/review/start/<tab_name>" in routes
         assert "/review/nav/<direction>" in routes
+        assert "/review/answer/<outcome>" in routes
 
         # API routes
         assert "/api/tts/status" in routes

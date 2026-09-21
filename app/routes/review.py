@@ -6,10 +6,10 @@ Thin route handlers that delegate to ReviewService.
 
 import logging
 
-from flask import Blueprint, redirect, render_template, url_for
+from flask import Blueprint, abort, redirect, render_template, request, url_for
 
 from app.services.auth_manager import auth_manager
-from app.services.learning.review_service import ReviewService
+from app.services.learning.review_service import ReviewOutcome, ReviewService
 from app.session_manager import SessionKeys, SessionManager
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,6 @@ def card():
         return redirect(url_for("index.home"))
 
     user = auth_manager.user
-
     return render_template(
         "card.html",
         card=context.card,
@@ -69,6 +68,7 @@ def card():
         user_spreadsheet_id=user.get_active_spreadsheet_id(),
         active_tab=context.active_tab,
         sheet_gid=context.sheet_gid,
+        review_error=request.args.get("error"),
     )
 
 
@@ -83,7 +83,6 @@ def flip():
         return redirect(url_for("index.home"))
 
     user = auth_manager.user
-
     return render_template(
         "feedback.html",
         card=context.card,
@@ -98,7 +97,33 @@ def flip():
         user_spreadsheet_id=user.get_active_spreadsheet_id(),
         active_tab=context.active_tab,
         sheet_gid=context.sheet_gid,
+        review_error=request.args.get("error"),
     )
+
+
+@review_bp.route("/answer/<outcome>", methods=["POST"])
+@auth_manager.require_auth
+def answer(outcome: str):
+    """Record whether the current card was remembered and advance the stack."""
+    try:
+        review_outcome = ReviewOutcome(outcome)
+    except ValueError:
+        abort(400)
+
+    user = auth_manager.user
+    service = ReviewService()
+    result = service.record_review(
+        outcome=review_outcome,
+        spreadsheet_id=user.get_active_spreadsheet_id(),
+    )
+
+    if not result.success:
+        logger.warning("Review answer was not saved: %s", result.error)
+        return redirect(url_for("review.flip", error="Could not save review progress. Try again."))
+
+    if result.completed:
+        return redirect(url_for("index.home"))
+    return redirect(url_for("review.card"))
 
 
 @review_bp.route("/nav/<direction>")
@@ -117,10 +142,14 @@ def navigate(direction: str):
     return redirect(url_for("review.card"))
 
 
-@review_bp.route("/end")
+@review_bp.route("/end", methods=["POST"])
 @auth_manager.require_auth
 def end():
-    """End the review session."""
+    """Persist reviewed cards and end the session early."""
+    user = auth_manager.user
     service = ReviewService()
-    service.end_session()
+    result = service.end_session_early(user.get_active_spreadsheet_id())
+    if not result.success:
+        logger.warning("Early review end was not saved: %s", result.error)
+        return redirect(url_for("review.card", error="Could not save review progress. Try again."))
     return redirect(url_for("index.home"))

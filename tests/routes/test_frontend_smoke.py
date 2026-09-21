@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from flask import render_template
+from jinja2 import FileSystemLoader
 
 ROOT = Path(__file__).resolve().parents[2]
 TEMPLATES = ROOT / "app" / "templates"
@@ -137,3 +139,58 @@ def test_listening_js_delegates_unlock_to_tts_manager() -> None:
     text = (STATIC / "js" / "listening.js").read_text(encoding="utf-8")
     for snippet in _LISTENING_FORBIDDEN_SNIPPETS:
         assert snippet not in text
+
+
+def test_review_front_back_and_keyboard_contract() -> None:
+    """Review exposes the intended flip and remembered/forgotten controls."""
+    card_template = (TEMPLATES / "card.html").read_text(encoding="utf-8")
+    feedback_template = (TEMPLATES / "feedback.html").read_text(encoding="utf-8")
+    card_script = (STATIC / "js" / "card.js").read_text(encoding="utf-8")
+    feedback_script = (STATIC / "js" / "feedback.js").read_text(encoding="utf-8")
+
+    assert "{{ card.translation }}" in card_template
+    assert "{{ card.example_translation }}" in card_template
+    assert 'onclick="flipCard(event)"' in card_template
+    assert 'onclick="flipCard(event)"' in feedback_template
+    assert 'id="review-forgotten-btn"' in feedback_template
+    assert 'id="review-remembered-btn"' in feedback_template
+    assert card_template.count("url_for('review.end')") == 1
+    assert feedback_template.count("url_for('review.end')") == 1
+    assert 'method="post"' in card_template
+    assert 'method="post"' in feedback_template
+    assert "case ' ':" in card_script
+    assert "document.getElementById('review-forgotten-btn')?.click()" in feedback_script
+    assert "document.getElementById('review-remembered-btn')?.click()" in feedback_script
+
+
+def test_review_card_renders_valid_javascript_defaults(app) -> None:
+    """Missing learn-only context must serialize as JavaScript, not HTML entities."""
+    app.jinja_loader = FileSystemLoader(str(TEMPLATES))
+    card = {
+        "id": 1,
+        "word": "olá",
+        "translation": "hello",
+        "equivalent": "",
+        "example": "Olá, amigo!",
+        "example_translation": "Hello, friend!",
+        "level": 2,
+        "is_review": False,
+    }
+
+    with app.test_request_context():
+        rendered = render_template(
+            "card.html",
+            card=card,
+            index=0,
+            total=5,
+            reviewing=False,
+            mode="review",
+            user_spreadsheet_id="sheet-123",
+            active_tab="Words",
+            sheet_gid=42,
+        )
+
+    assert 'window.cardMode = "review";' in rendered
+    assert 'window.questionMode = "type_answer";' in rendered
+    assert r'word: "ol\u00e1"' in rendered
+    assert "&#34;" not in rendered

@@ -15,7 +15,7 @@
                      aria-valuenow="{{ index }}" aria-valuemin="0" aria-valuemax="{{ total }}"></div>
             </div>
             <div class="d-flex justify-content-between mt-1">
-                <small>Card {{ index + 1 }} of {{ total }} (Browse)</small>
+                <small>Card {{ index + 1 }} of {{ total }}</small>
                 <small>{{ (index / total * 100)|round }}% complete</small>
             </div>
         </div>
@@ -57,21 +57,11 @@
     {% endif %}
     {% endif %}
 
-    <!-- Navigation arrows for review mode -->
     {% if mode == 'review' %}
-    <div class="review-navigation mb-3">
-        <div class="d-flex justify-content-between align-items-center">
-            <a href="{{ url_for('review.navigate', direction='prev') }}" class="btn btn-secondary btn-sm nav-arrow-btn" id="nav-prev">
-                <i class="bi bi-arrow-left"></i>
-            </a>
-            <div class="text-center">
-                <small class="text-muted">Click card to flip back</small>
-            </div>
-            <a href="{{ url_for('review.navigate', direction='next') }}" class="btn btn-secondary btn-sm nav-arrow-btn" id="nav-next">
-                <i class="bi bi-arrow-right"></i>
-            </a>
-        </div>
-    </div>
+    <p class="text-muted small mb-3">Click the card or press Space to flip back</p>
+    {% if review_error %}
+    <div class="alert alert-danger" role="alert">{{ review_error }}</div>
+    {% endif %}
     {% endif %}
 
     <!-- Card: learn mode uses segment-matched tint; review stays neutral -->
@@ -79,7 +69,7 @@
          {% if correct %}is-correct{% else %}is-incorrect{% endif %}"
          data-level="{{ level_value }}"
          style="--level-pct: {{ (level_value * 100 / 8)|round }}%; --level-sat: {{ (0.6 + level_value * 0.05)|round(2) }};{% if mode == 'review' %} cursor: pointer;{% endif %}"
-         {% if mode == 'review' %}onclick="flipCard()"{% endif %}>
+         {% if mode == 'review' %}onclick="flipCard(event)"{% endif %}>
         <div class="row">
             <div class="col-md-12 text-center">
                 <!-- 1. Portuguese word (main focus) with TTS button -->
@@ -113,11 +103,15 @@
                 </p>
                 {% endif %}
 
+                {% if mode == 'review' and card.equivalent %}
+                <p class="text-muted small mb-3"><strong>Equivalent:</strong> {{ card.equivalent }}</p>
+                {% endif %}
+
                 {% if reviewing %}
                 <small class="text-warning d-inline-block mt-1"><i class="bi bi-arrow-repeat"></i> Review</small>
                 {% endif %}
 
-                {% if mode == 'learn' %}
+                {% if mode == 'learn' or mode == 'review' %}
                 <span class="level-badge">L{{ level_value }}</span>
                 {% endif %}
 
@@ -147,11 +141,23 @@
         <a href="{{ url_for('learn.next_card') }}" class="btn btn-primary" id="next-card-btn">Next Card</a>
     </div>
     {% else %}
-    <!-- Review mode - back to home -->
+    <div class="review-answer-actions d-flex gap-2 mt-3" role="group" aria-label="Review answer">
+        <form action="{{ url_for('review.answer', outcome='forgotten') }}" method="post" class="flex-fill">
+            <button type="submit" class="btn btn-outline-danger w-100" id="review-forgotten-btn">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i> Don't remember
+            </button>
+        </form>
+        <form action="{{ url_for('review.answer', outcome='remembered') }}" method="post" class="flex-fill">
+            <button type="submit" class="btn btn-success w-100" id="review-remembered-btn">
+                Remember <i class="bi bi-arrow-right" aria-hidden="true"></i>
+            </button>
+        </form>
+    </div>
     <div class="text-center mt-3">
-        <a href="{{ url_for('index.home') }}" class="btn btn-secondary btn-sm">
-            <i class="bi bi-house"></i> Back to Home
-        </a>
+        <form action="{{ url_for('review.end') }}" method="post"
+              onsubmit="return confirm('Are you sure you want to end the session? Progress so far will be saved.');">
+            <button type="submit" class="btn btn-outline-secondary btn-sm">End Session Early</button>
+        </form>
     </div>
     {% endif %}
 </div>
@@ -162,17 +168,17 @@
 <script type="application/json" id="card-data">
 {
     "word": {{ card.word|tojson }},
-    "example": {{ card.example|tojson if card.example else 'null' }},
+    "example": {{ (card.example if card.example else none)|tojson }},
     "correct": {{ 'true' if correct else 'false' }},
     "level": {{ card.level.value if card.level.value is defined else card.level }},
-    "spreadsheetId": {{ user_spreadsheet_id|tojson if user_spreadsheet_id else 'null' }},
-    "sheetGid": {{ sheet_gid|tojson if sheet_gid else 'null' }},
-    "mode": {{ mode|tojson if mode else '"learn"' }}
+    "spreadsheetId": {{ (user_spreadsheet_id if user_spreadsheet_id else none)|tojson }},
+    "sheetGid": {{ (sheet_gid if sheet_gid else none)|tojson }},
+    "mode": {{ (mode|default('learn', true))|tojson }}
 }
 </script>
 
 <script>
-    window.cardMode = {{ mode|tojson if mode else '"learn"' }};
+    window.cardMode = {{ (mode|default('learn', true))|tojson }};
     window.reviewCardUrl = '{{ url_for("review.card") }}';
 </script>
 
