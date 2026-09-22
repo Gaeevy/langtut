@@ -30,8 +30,9 @@ async function unlockAudioOnFirstInteraction() {
 
 // ---- Review Mode Helpers ----
 
-function flipCard() {
+function flipCard(event) {
     if (window.cardMode === 'review' && window.reviewFlipUrl) {
+        if (event?.target?.closest?.('button, a, input, textarea, select, label')) return;
         window.location.href = window.reviewFlipUrl;
     }
 }
@@ -368,14 +369,6 @@ function setupKeyboardNavigation() {
 
         if (window.cardMode !== 'review') return;
         switch (event.key) {
-            case 'ArrowLeft':
-                event.preventDefault();
-                document.getElementById('nav-prev')?.click();
-                break;
-            case 'ArrowRight':
-                event.preventDefault();
-                document.getElementById('nav-next')?.click();
-                break;
             case ' ':
                 event.preventDefault();
                 flipCard();

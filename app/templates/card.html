@@ -51,28 +51,18 @@
     </div>
 </div>
 
-<!-- Navigation arrows for review mode -->
 {% if mode == 'review' %}
-<div class="review-navigation mb-3">
-    <div class="d-flex justify-content-between align-items-center">
-        <a href="{{ url_for('review.navigate', direction='prev') }}" class="btn btn-secondary btn-sm nav-arrow-btn" id="nav-prev">
-            <i class="bi bi-arrow-left"></i>
-        </a>
-        <div class="text-center">
-            <small class="text-muted">Click card to flip</small>
-        </div>
-        <a href="{{ url_for('review.navigate', direction='next') }}" class="btn btn-secondary btn-sm nav-arrow-btn" id="nav-next">
-            <i class="bi bi-arrow-right"></i>
-        </a>
-    </div>
-</div>
+<p class="text-center text-muted small mb-3">Click the card or press Space to flip</p>
+{% if review_error %}
+<div class="alert alert-danger" role="alert">{{ review_error }}</div>
+{% endif %}
 {% endif %}
 
 <!-- Card face -->
 <div class="language-card mb-4"
      data-level="{{ level_value }}"
      style="--level-pct: {{ (level_value * 100 / 8)|round }}%; --level-sat: {{ (0.6 + level_value * 0.05)|round(2) }};{% if mode == 'review' %} cursor: pointer;{% endif %}"
-     {% if mode == 'review' %}onclick="flipCard()"{% endif %}>
+     {% if mode == 'review' %}onclick="flipCard(event)"{% endif %}>
     <div class="row">
         <div class="col-md-12 text-center p-4">
 
@@ -126,7 +116,7 @@
             {% endif %}
 
             <!-- Hint toggle -->
-            {% if card.equivalent %}
+            {% if card.equivalent and mode != 'review' %}
             <div class="equivalent-toggle mb-3">
                 <button type="button" class="btn btn-secondary btn-sm" onclick="toggleEquivalent()">
                     <i class="bi bi-eye" id="toggle-icon"></i> Show hint
@@ -245,9 +235,10 @@
 
 {% else %}
 <div class="text-center mt-3">
-    <a href="{{ url_for('index.home') }}" class="btn btn-secondary btn-sm">
-        <i class="bi bi-house"></i> Back to Home
-    </a>
+    <form action="{{ url_for('review.end') }}" method="post"
+          onsubmit="return confirm('Are you sure you want to end the session? Progress so far will be saved.');">
+        <button type="submit" class="btn btn-outline-secondary btn-sm">End Session Early</button>
+    </form>
 </div>
 {% endif %}
 {% endblock %}
@@ -255,15 +246,15 @@
 {% block scripts %}
 <script>
     window.cardContext = {
-        spreadsheetId: {{ user_spreadsheet_id|tojson if user_spreadsheet_id else 'null' }},
-        sheetGid: {{ sheet_gid|tojson if sheet_gid else 'null' }}
+        spreadsheetId: {{ (user_spreadsheet_id if user_spreadsheet_id else none)|tojson }},
+        sheetGid: {{ (sheet_gid if sheet_gid else none)|tojson }}
     };
     window.cardData = {
-        word: {{ card.word|tojson if card.word else 'null' }},
-        example: {{ card.example|tojson if card.example else 'null' }}
+        word: {{ (card.word if card.word else none)|tojson }},
+        example: {{ (card.example if card.example else none)|tojson }}
     };
-    window.cardMode = {{ mode|tojson if mode else '"learn"' }};
-    window.questionMode = {{ question_mode|tojson if question_mode else '"type_answer"' }};
+    window.cardMode = {{ (mode|default('learn', true))|tojson }};
+    window.questionMode = {{ (question_mode|default('type_answer', true))|tojson }};
     window.reviewFlipUrl = '{{ url_for("review.flip") }}';
     {% if question_mode == 'type_example_guided' and mode_data.guided_display is defined %}
     window.guidedSentenceText = {{ mode_data.guided_display|tojson }};

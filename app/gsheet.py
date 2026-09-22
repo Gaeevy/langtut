@@ -346,6 +346,9 @@ def update_spreadsheet(worksheet_name, cards, spreadsheet_id: str = None):
         # Create cell updates only for the dynamic columns
         cell_updates = []
         for i, card in enumerate(all_cards):
+            if card.id not in card_updates:
+                continue
+
             # Only create updates for the dynamic columns (statistics)
             # Format the datetime for last_shown
             last_shown_formatted = format_timestamp(card.last_shown)

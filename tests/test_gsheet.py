@@ -10,7 +10,7 @@ from gspread.exceptions import APIError
 from requests import Response
 
 from app import gsheet
-from app.models import CardSet
+from app.models import CardSet, Levels
 from tests.conftest import make_card
 
 
@@ -109,6 +109,23 @@ def test_update_spreadsheet_retries_batch_once_after_401(monkeypatch):
 
     assert gsheet.update_spreadsheet("Tab1", [card], "sheet-id") == "saved"
     assert credential_calls == [False, True]
+
+
+def test_update_spreadsheet_writes_only_requested_cards(monkeypatch):
+    """A single-card review does not rewrite statistics for the whole sheet."""
+    cards = [make_card(id=1), make_card(id=2)]
+    updated_card = cards[1].model_copy(update={"level": Levels.LEVEL_3})
+    card_set = CardSet(name="Tab1", gid=1, cards=cards)
+    captured_updates = []
+
+    monkeypatch.setattr("app.gsheet.read_card_set", lambda name, sheet_id: card_set)
+    monkeypatch.setattr(
+        "app.gsheet._batch_update_worksheet",
+        lambda name, sheet_id, updates: captured_updates.extend(updates) or "saved",
+    )
+
+    assert gsheet.update_spreadsheet("Tab1", [updated_card], "sheet-id") == "saved"
+    assert [update["range"] for update in captured_updates] == ["G3", "H3", "I3", "J3"]
 
 
 def test_get_spreadsheet_does_not_retry_non_authentication_error(monkeypatch):

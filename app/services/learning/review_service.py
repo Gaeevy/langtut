@@ -1,17 +1,21 @@
-"""Review mode service - orchestrates review session logic.
-
-This service handles browse/review sessions where users can flip through
-all cards without answering - simpler than learn mode.
-"""
+"""Review mode service - orchestrates review session logic."""
 
 import logging
 from dataclasses import dataclass
+from enum import StrEnum
 
-from app.gsheet import read_card_set
-
-from .card_session import CardSessionManager
+from app.gsheet import read_card_set, update_spreadsheet
+from app.services.learning.card_session import CardSessionManager
+from app.utils import get_timestamp
 
 logger = logging.getLogger(__name__)
+
+
+class ReviewOutcome(StrEnum):
+    """Available self-assessment choices for a reviewed card."""
+
+    FORGOTTEN = "forgotten"
+    REMEMBERED = "remembered"
 
 
 @dataclass
@@ -35,18 +39,17 @@ class ReviewCardContext:
     mode: str = "review"
 
 
+@dataclass
+class ReviewActionResult:
+    """Result of recording a review choice and advancing the stack."""
+
+    success: bool
+    completed: bool = False
+    error: str | None = None
+
+
 class ReviewService:
-    """Service for review mode operations (browse all cards).
-
-    Review mode allows users to flip through all cards in a set
-    without answering - useful for quick review or memorization.
-
-    Features:
-    - No answer validation
-    - Wraparound navigation (prev/next)
-    - Card flip to see answer
-    - No statistics updates
-    """
+    """Service for reviewing every card in a set once."""
 
     def __init__(self):
         """Initialize the review service."""
@@ -142,6 +145,50 @@ class ReviewService:
         logger.debug(f"Review navigation: {current} -> {new_index} ({direction})")
         return True
 
+    def record_review(self, outcome: ReviewOutcome, spreadsheet_id: str) -> ReviewActionResult:
+        """Record one review choice and advance to the next card.
+
+        Remembered cards retain their level. Forgotten cards lose one level.
+        Both choices update ``last_shown`` in the session. The complete stack
+        is written to Google Sheets once, after the final card is reviewed.
+        """
+        state = self.session.get_state()
+        if not state or state.current_index >= len(state.cards):
+            return ReviewActionResult(success=False, error="No active review card")
+
+        card = self.session.deserialize_card(state.cards[state.current_index])
+        original_level = card.level.value
+        card.last_shown = get_timestamp()
+        if outcome == ReviewOutcome.FORGOTTEN:
+            card.level = card.level.previous_level()
+
+        updated_card = self.session.serialize_card(card)
+        logger.info(
+            "Recorded review for card %s: outcome=%s, level=%s→%s",
+            card.id,
+            outcome,
+            original_level,
+            card.level.value,
+        )
+
+        if state.current_index == len(state.cards) - 1:
+            cards_to_save = [
+                updated_card if index == state.current_index else card_data
+                for index, card_data in enumerate(state.cards)
+            ]
+            try:
+                self._save_cards(state.active_tab, cards_to_save, spreadsheet_id)
+            except Exception as error:
+                logger.error("Failed to save review session: %s", error, exc_info=True)
+                return ReviewActionResult(success=False, error="Could not save review progress")
+
+            self._clear_session()
+            return ReviewActionResult(success=True, completed=True)
+
+        self.session.update_card(state.current_index, updated_card)
+        self.session.set_index(state.current_index + 1)
+        return ReviewActionResult(success=True)
+
     def has_active_session(self) -> bool:
         """Check if there's an active review session.
 
@@ -150,7 +197,39 @@ class ReviewService:
         """
         return self.session.has_active_session()
 
-    def end_session(self) -> None:
-        """End the review session and clear data."""
+    def end_session_early(self, spreadsheet_id: str) -> ReviewActionResult:
+        """Save reviewed cards and end an incomplete review session."""
+        state = self.session.get_state()
+        if not state:
+            return ReviewActionResult(success=False, error="No active review session")
+
+        reviewed_cards = state.cards[: state.current_index]
+        try:
+            self._save_cards(state.active_tab, reviewed_cards, spreadsheet_id)
+        except Exception as error:
+            logger.error("Failed to save partial review session: %s", error, exc_info=True)
+            return ReviewActionResult(success=False, error="Could not save review progress")
+
+        logger.info(
+            "Saved %s reviewed cards before ending session early",
+            len(reviewed_cards),
+        )
+        self._clear_session()
+        return ReviewActionResult(success=True, completed=True)
+
+    def _save_cards(
+        self,
+        active_tab: str,
+        cards_data: list[dict],
+        spreadsheet_id: str,
+    ) -> None:
+        """Deserialize and batch-save review-session cards."""
+        if not cards_data:
+            return
+        cards = [self.session.deserialize_card(card_data) for card_data in cards_data]
+        update_spreadsheet(active_tab, cards, spreadsheet_id=spreadsheet_id)
+
+    def _clear_session(self) -> None:
+        """Clear review session data after a successful completion or early end."""
         self.session.clear()
         logger.info("Review session ended")

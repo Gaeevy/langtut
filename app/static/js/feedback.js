@@ -55,8 +55,9 @@ async function unlockAudioOnFirstInteraction() {
 /**
  * Card flipping functionality for review mode (flip back to face)
  */
-function flipCard() {
+function flipCard(event) {
     if (window.cardMode === 'review' && window.reviewCardUrl) {
+        if (event?.target?.closest?.('button, a, input, textarea, select, label')) return;
         window.location.href = window.reviewCardUrl;
     }
 }
@@ -70,13 +71,11 @@ function setupKeyboardNavigation() {
             switch(event.key) {
                 case 'ArrowLeft':
                     event.preventDefault();
-                    const prevBtn = document.getElementById('nav-prev');
-                    if (prevBtn) prevBtn.click();
+                    document.getElementById('review-forgotten-btn')?.click();
                     break;
                 case 'ArrowRight':
                     event.preventDefault();
-                    const nextBtn = document.getElementById('nav-next');
-                    if (nextBtn) nextBtn.click();
+                    document.getElementById('review-remembered-btn')?.click();
                     break;
                 case ' ':
                     event.preventDefault();
@@ -94,6 +93,21 @@ function setupKeyboardNavigation() {
                 nextCardBtn.click();
             }
         }
+    });
+}
+
+/**
+ * Prevent key repeat or double clicks from submitting the same review twice.
+ */
+function setupReviewActions() {
+    if (window.cardMode !== 'review') return;
+
+    const forms = document.querySelectorAll('.review-answer-actions form');
+    const buttons = document.querySelectorAll('.review-answer-actions button');
+    forms.forEach((form) => {
+        form.addEventListener('submit', () => {
+            buttons.forEach((button) => { button.disabled = true; });
+        });
     });
 }
 
@@ -174,9 +188,9 @@ function initFeedbackPage() {
     if (!cardDataElement) return;
 
     const cardData = JSON.parse(cardDataElement.textContent);
-    const { correct, mode } = cardData;
 
     // Setup keyboard navigation
+    setupReviewActions();
     setupKeyboardNavigation();
 
     // Add first-click unlock handler for mobile

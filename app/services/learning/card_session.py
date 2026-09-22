@@ -65,7 +65,7 @@ class CardSessionManager:
             tab_name: Name of the active tab/worksheet
             gid: Google Sheet GID for the worksheet
         """
-        cards_data = [self._serialize_card(card) for card in cards]
+        cards_data = [self.serialize_card(card) for card in cards]
         sm.set(self.cards_key, cards_data)
         sm.set(self.index_key, 0)
         sm.set(self.tab_key, tab_name)
@@ -189,7 +189,7 @@ class CardSessionManager:
         logger.info(f"Cleared {self.mode} session")
 
     @staticmethod
-    def _serialize_card(card: Card) -> dict:
+    def serialize_card(card: Card) -> dict:
         """Serialize Card object for session storage.
 
         Args:
