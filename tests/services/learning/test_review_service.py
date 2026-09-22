@@ -28,6 +28,28 @@ def test_start_session_loads_the_full_card_set(request_context, monkeypatch):
     assert service.session.get_total_cards() == 2
 
 
+def test_start_session_orders_cards_by_oldest_last_shown(request_context, monkeypatch):
+    """Review presents the least recently shown cards first."""
+    newest = make_card(id=1).model_copy(update={"last_shown": datetime(2026, 9, 20)})
+    never_shown = make_card(id=2)
+    oldest_reviewed = make_card(id=3).model_copy(update={"last_shown": datetime(2026, 8, 1)})
+    same_age = make_card(id=4).model_copy(update={"last_shown": datetime(2026, 8, 1)})
+    cards = [newest, never_shown, oldest_reviewed, same_age]
+    monkeypatch.setattr(
+        "app.services.learning.review_service.read_card_set",
+        lambda **kwargs: CardSet(name="Words", gid=42, cards=cards),
+    )
+
+    service = ReviewService()
+    result = service.start_session("Words", "sheet-123")
+
+    assert result.success is True
+    session_cards = [
+        service.session.deserialize_card(card) for card in service.session.get_all_cards()
+    ]
+    assert [card.id for card in session_cards] == [2, 3, 4, 1]
+
+
 def test_forgotten_card_loses_one_level_updates_timestamp_and_advances(
     request_context, monkeypatch
 ):

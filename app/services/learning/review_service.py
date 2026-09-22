@@ -72,8 +72,10 @@ class ReviewService:
             if not card_set:
                 return ReviewSessionResult(success=False, error=f"Card set '{tab_name}' not found")
 
-            # Get ALL cards (no filtering for review mode)
-            cards = card_set.cards
+            # Get ALL cards (no filtering for review mode), oldest reviewed first.
+            # Python's sort is stable, so cards with the same timestamp retain
+            # their worksheet order.
+            cards = sorted(card_set.cards, key=lambda card: card.last_shown)
 
             if not cards:
                 return ReviewSessionResult(success=False, error="No cards in this set")
