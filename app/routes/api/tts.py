@@ -15,6 +15,7 @@ tts_bp = Blueprint("tts", __name__, url_prefix="/tts")
 
 
 @tts_bp.route("/status", methods=["GET"])
+@auth_manager.require_auth_api
 def status():
     """Get TTS availability status."""
     sm = SessionManager()
@@ -36,6 +37,7 @@ def status():
 
 
 @tts_bp.route("/speak", methods=["POST"])
+@auth_manager.require_auth_api
 def speak():
     """
     Generate speech for single text.

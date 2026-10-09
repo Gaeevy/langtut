@@ -6,6 +6,10 @@ for application-owned data.
 
 ## Start here
 
+- At the start of every agent session, read [docs/operations.local.md](docs/operations.local.md)
+  if present. It contains gitignored deployment context; never commit or copy its identifiers
+  into tracked files. If absent, proceed with repository docs and ask for missing details only
+  when needed for operational work.
 - Read `docs/architecture.md` before changing boundaries, persistence, authentication, or session
   behavior.
 - Read `docs/audio.md` before changing TTS, card submission, listening mode, or mobile playback.

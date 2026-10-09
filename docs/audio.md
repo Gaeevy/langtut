@@ -25,6 +25,7 @@ Google Cloud TTS API
 
 - **TTS Service** (`app/services/tts.py`) -- wraps Google Cloud TTS API, caches audio in the configured GCS bucket, returns base64-encoded MP3
 - **API endpoints** (`app/routes/api/tts.py`):
+  All endpoints require an authenticated session and return JSON `401` when authentication fails.
   - `GET /api/tts/status` -- check if TTS is available
   - `POST /api/tts/speak` -- generate audio for a text string. Request: `{"text": "olá"}`. Response: `{"success": true, "audio_base64": "..."}`
   - `POST /api/tts/invalidate` -- delete one authenticated user's cached GCS clip so the next speak request regenerates it
