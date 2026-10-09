@@ -4,6 +4,14 @@ This file is intentionally an index and should stay lightweight.
 
 ## Docs
 
+### [AI-native Vocabulary & MCP MVP](./ai-native-mcp.md)
+Personal-first SQLite and ChatGPT integration plan: implementation phases, authorization,
+migration, acceptance checks, and Railway cutover considerations.
+
+### [Path to GA](./path-to-ga.md)
+Proposed roadmap to a self-contained web product and an eventual App Store release: challenges,
+options, tradeoffs, open questions, and delivery milestones.
+
 ### [Architecture & Configuration](./architecture.md)
 System design: Flask blueprints, configuration, dual-store (Google Sheets + SQLite), session management, deployment.
 

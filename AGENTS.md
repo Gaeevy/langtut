@@ -10,6 +10,7 @@ for application-owned data.
   behavior.
 - Read `docs/audio.md` before changing TTS, card submission, listening mode, or mobile playback.
 - Treat `README.md` as the user-facing setup reference; keep it aligned with command changes.
+- For Google Cloud CLI workflows, read `skills/gcp-cli/SKILL.md`.
 
 ## Project map
 
@@ -85,6 +86,7 @@ the hooks reject commits to `main` and `master`.
 
 ## Railway credentials and production access
 
+- For Railway CLI workflows, read `skills/railway-cli/SKILL.md`.
 - The production-scoped Railway token is stored in `~/.config/langtut/railway.env`. Use it only by
   sourcing that file inside the same non-traced shell invocation that runs `railway`:
 
