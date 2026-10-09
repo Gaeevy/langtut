@@ -50,7 +50,7 @@ app/
 │   ├── review.py               browse/flip review flow
 │   ├── settings.py             linked spreadsheet management
 │   ├── verbs.py                irregular-verb pages
-│   ├── admin.py, test.py       operational/debug endpoints
+│   ├── test.py                 authenticated diagnostic endpoints
 │   └── api/                    cards, TTS, languages, verbs
 ├── services/
 │   ├── auth_manager.py         OAuth, refresh, and route protection
@@ -135,6 +135,12 @@ HTML routes use `@auth_manager.require_auth` (redirect on failure). JSON endpoin
 `@auth_manager.require_auth_api` (JSON `401`). Session state goes through `SessionManager` and the
 namespaced `SessionKeys` enum; current namespaces are `auth`, `user`, `learning`, `review`, `tts`,
 and `test`.
+
+The unused `/admin/*` endpoints have been retired, including exports and custom SQL queries.
+TTS status/generation and diagnostic routes require authentication. Verb imports at
+`POST /api/verbs/forms` currently accept any authenticated user or a configured `X-Import-Key`;
+this is not an administrator-only permission. Language-settings validation remains public and
+does not read or write user records.
 
 ## Configuration and deployment
 

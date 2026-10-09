@@ -7,14 +7,12 @@ This package contains all the route blueprints organized by feature:
 - review: Review mode (/review/*)
 - settings: User settings (/settings/*)
 - api/: API endpoints (/api/tts/*, /api/cards/*, /api/language-settings/*)
-- admin: Database administration (/admin/*)
 - auth: OAuth authentication (/auth/*, /oauth2callback)
 - test: Development testing (/test/*)
 """
 
 from flask import Flask
 
-from .admin import admin_bp
 from .api import api_bp
 from .auth import auth_bp
 from .index import index_bp
@@ -34,5 +32,4 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(settings_bp)  # Settings routes
     app.register_blueprint(api_bp)  # API routes
     app.register_blueprint(verbs_bp)  # Irregular verbs routes
-    app.register_blueprint(admin_bp)  # Admin routes
     app.register_blueprint(test_bp)  # Test routes

@@ -64,8 +64,9 @@ class TestHomepage:
 class TestTTSRoutes:
     """Tests for TTS API routes."""
 
-    def test_tts_status_returns_json(self, client):
+    def test_tts_status_returns_json(self, client, monkeypatch):
         """TTS status should return JSON."""
+        monkeypatch.setattr(auth_manager, "is_authenticated", lambda: True)
         response = client.get("/api/tts/status")
         assert response.status_code == 200
         assert response.content_type == "application/json"
@@ -73,8 +74,9 @@ class TestTTSRoutes:
         data = response.get_json()
         assert "available" in data
 
-    def test_tts_speak_requires_text(self, client):
+    def test_tts_speak_requires_text(self, client, monkeypatch):
         """TTS speak should require text parameter."""
+        monkeypatch.setattr(auth_manager, "is_authenticated", lambda: True)
         response = client.post("/api/tts/speak", json={})
         assert response.status_code == 400
 
@@ -82,8 +84,9 @@ class TestTTSRoutes:
         assert data["success"] is False
         assert "text" in data["error"].lower()
 
-    def test_tts_speak_rejects_empty_text(self, client):
+    def test_tts_speak_rejects_empty_text(self, client, monkeypatch):
         """TTS speak should reject empty text."""
+        monkeypatch.setattr(auth_manager, "is_authenticated", lambda: True)
         response = client.post("/api/tts/speak", json={"text": "   "})
         assert response.status_code == 400
 

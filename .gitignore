@@ -46,6 +46,9 @@ Thumbs.db
 # Secrets
 .secrets.toml
 
+# Machine-local operations context for agents
+/docs/operations.local.md
+
 # Database files
 data/app.db
 data/*.db

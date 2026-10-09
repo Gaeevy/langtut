@@ -11,6 +11,7 @@ from flask import Blueprint, jsonify, render_template
 
 from app.config import config
 from app.gsheet import read_all_card_sets
+from app.services.auth_manager import auth_manager
 from app.services.tts import tts_service
 
 # Create blueprint
@@ -18,6 +19,7 @@ test_bp = Blueprint("test", __name__)
 
 
 @test_bp.route("/test")
+@auth_manager.require_auth_api
 def test() -> dict[str, Any]:
     """Test endpoint for checking application functionality."""
     try:
@@ -78,6 +80,7 @@ def test() -> dict[str, Any]:
 
 
 @test_bp.route("/test-tts")
+@auth_manager.require_auth
 def test_tts():
     """Test TTS functionality"""
     return render_template("test_tts.html")
