@@ -158,3 +158,17 @@ refresh tokens; `LANGTUT_SECRET_KEY` should be stable so sessions remain valid a
 
 Railway builds the `Dockerfile`, runs Gunicorn, and expects a persistent volume mounted at
 `/app/data`. Language-to-voice mappings are configured separately in `config/languages.yaml`.
+
+## Optional MCP adapter
+
+`app/mcp_server.py` exposes the intentionally public `list_spreadsheets(email)` experiment over
+Streamable HTTP when explicitly enabled. `app/services/mcp_spreadsheets.py` uses the existing
+SQLAlchemy models through a separate SQLite read-only engine and returns names only. No schema
+migration, Google calls, or browser session identity is involved. This is a deliberate temporary
+exception to authenticated application routes: caller-supplied email is only a search filter.
+
+`asgi.py` optionally combines the native ASGI MCP application with the existing Flask application
+through `a2wsgi`. The existing Docker/Gunicorn entry point is unchanged and does not expose MCP.
+Flask setup imports are deferred until the factory runs so standalone MCP does not initialize
+Google clients or browser configuration. See [MCP setup](mcp.md) for isolated local tests, limits,
+deployment configuration, and disabling public access.
