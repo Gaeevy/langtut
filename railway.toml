@@ -4,8 +4,11 @@ dockerfilePath = "Dockerfile"
 
 [deploy]
 restartPolicyType = "on_failure"
+healthcheckPath = "/"
+healthcheckTimeout = 300
 
-# Note: Environment variables are now managed through Railway dashboard
+# Environment variables are managed through Railway dashboard or CLI.
+# See docs/deployment.md for required runtime settings and healthcheck hosts.
 # Core variables needed:
 # - LANGTUT_ENCRYPTION_KEY (Fernet key for OAuth refresh tokens)
 # - LANGTUT_CLIENT_SECRETS_JSON (OAuth credentials)

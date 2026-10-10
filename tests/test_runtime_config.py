@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import httpx
@@ -12,11 +13,33 @@ import pytest
 from flask import Flask, request
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from app import configure_app
+from app import configure_app, create_app
 from app.config import config
 from asgi import create_combined_app
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_railway_healthcheck_serves_anonymous_homepage(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "allowed_hosts", ["healthcheck.railway.app"])
+    monkeypatch.setattr(config, "session_file_dir", str(tmp_path / "sessions"))
+    web = create_app()
+    app = create_combined_app(web, config.mcp_settings().model_copy(update={"enabled": False}))
+    deployment = tomllib.loads((ROOT / "railway.toml").read_text())["deploy"]
+
+    async def exercise():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://healthcheck.railway.app"
+        ) as client:
+            response = await client.get(deployment["healthcheckPath"])
+            assert response.status_code == 200
+            assert "text/html" in response.headers["content-type"]
+            rejected = await client.get(
+                deployment["healthcheckPath"], headers={"Host": "untrusted.example"}
+            )
+            assert rejected.status_code == 400
+
+    asyncio.run(exercise())
 
 
 @pytest.mark.parametrize("environment", ["local", "production"])

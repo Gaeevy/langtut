@@ -57,6 +57,7 @@ See [`docs/architecture.md`](./docs/architecture.md) for details.
 ## Documentation
 - [`docs/README.md`](./docs/README.md) (index)
 - [`docs/architecture.md`](./docs/architecture.md)
+- [`docs/deployment.md`](./docs/deployment.md)
 - [`docs/audio.md`](./docs/audio.md)
 
 ## MCP connectivity demo

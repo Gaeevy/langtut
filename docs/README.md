@@ -4,6 +4,9 @@ This file is intentionally an index and should stay lightweight.
 
 ## Docs
 
+### [Deployment](./deployment.md)
+Railway configuration snapshot, runtime requirements, healthcheck, and release steps.
+
 ### [AI-native Vocabulary & MCP MVP](./ai-native-mcp.md)
 Personal-first SQLite and ChatGPT integration plan: implementation phases, authorization,
 migration, acceptance checks, and Railway cutover considerations.
