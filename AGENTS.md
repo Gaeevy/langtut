@@ -14,7 +14,7 @@ for application-owned data.
   behavior.
 - Read `docs/audio.md` before changing TTS, card submission, listening mode, or mobile playback.
 - Treat `README.md` as the user-facing setup reference; keep it aligned with command changes.
-- Read `docs/deployment.md` before deployment work for the last Railway configuration snapshot.
+- Read `docs/deployment.md` before deployment work for runtime configuration and healthchecks.
 
 ## Project map
 

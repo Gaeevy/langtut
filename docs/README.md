@@ -1,61 +1,27 @@
-# Documentation Index
+# Documentation
 
-This file is intentionally an index and should stay lightweight.
+| Read this | For |
+|---|---|
+| [Project README](../README.md) | Installation and local startup |
+| [Architecture](architecture.md) | Implemented runtime, persistence, and permissions |
+| [Deployment](deployment.md) | Railway configuration, healthcheck, and variable commands |
+| [MCP demo](mcp.md) | Tool contract and local/deployed testing |
+| [Audio](audio.md) | Browser playback contracts, caching, device checks |
+| [Agent guide](../AGENTS.md) | Coding conventions, tests, operational rules |
+| [AI-native roadmap](ai-native-mcp.md) | Proposed private MCP and vocabulary migration |
+| [Path to GA](path-to-ga.md) | Proposed onboarding, account lifecycle, mobile, release criteria |
 
-## Docs
+## Learn MCP authentication
 
-### [Deployment](./deployment.md)
-Railway configuration snapshot, runtime requirements, healthcheck, and release steps.
+These five write-ups explain the proposed design in reading order; they do not
+claim OAuth is already implemented:
 
-### [AI-native Vocabulary & MCP MVP](./ai-native-mcp.md)
-Personal-first SQLite and ChatGPT integration plan: implementation phases, authorization,
-migration, acceptance checks, and Railway cutover considerations.
+1. [Basics: identity, permissions, and tokens](../path-to-auth-mcp/01-basics.md)
+2. [The OAuth connection, step by step](../path-to-auth-mcp/02-oauth-flow.md)
+3. [Accounts, ownership, and permissions](../path-to-auth-mcp/03-accounts-and-permissions.md)
+4. [Implementing it in LangTut](../path-to-auth-mcp/04-implementation.md)
+5. [Testing, rollout, and revocation](../path-to-auth-mcp/05-testing-and-rollout.md)
 
-### [Path to GA](./path-to-ga.md)
-Proposed roadmap to a self-contained web product and an eventual App Store release: challenges,
-options, tradeoffs, open questions, and delivery milestones.
-
-### [Architecture & Configuration](./architecture.md)
-System design: Flask blueprints, configuration, dual-store (Google Sheets + SQLite), session management, deployment.
-
-### [Audio System](./audio.md)
-TTS, audio playback, mobile autoplay, caching, and listening mode -- all in one place.
-
-### [Agent & Development Guide](../AGENTS.md)
-Project map, architecture constraints, commands, testing expectations, and quality gates.
-
-## Quick Reference
-
-### Running Locally
-```bash
-uv run python serve.py --reload
-```
-
-### Mobile Testing
-```bash
-ngrok http 8080 --url=your-name.ngrok-free.dev
-```
-Add the HTTPS forwarding URL to the Google OAuth client's authorized redirect URIs as
-`https://your-name.ngrok-free.dev/oauth2callback`.
-
-### Architecture
-
-```
-Frontend (Vanilla JS + Bootstrap)
-├── TTSManager       → audio fetch, cache, playback, mobile unlock
-├── card.js          → AJAX answer submission + in-page feedback
-├── ListeningManager → sequential card playback
-└── modes.js         → pick_one / build_sentence / build_word UI
-
-Backend (Flask + Blueprints)
-├── Routes: auth, learn, review, index, settings, admin, api/{tts,cards,language,verbs}
-├── Services: TTS, auth, learning, settings, listening cards, verbs
-├── Models: Pydantic + SQLAlchemy
-└── Config: Dynaconf (settings.toml / .secrets.toml)
-
-External Services
-├── Google Cloud TTS  → audio generation
-├── Google Sheets API → vocabulary content
-├── Google OAuth      → authentication
-└── Google Cloud Storage → audio cache
-```
+Private deployment identifiers and authentication procedures live in gitignored
+`operations.local.md`. Roadmap proposals do not override implemented behavior or
+repository instructions.

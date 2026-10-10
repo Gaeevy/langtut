@@ -1,174 +1,97 @@
-# Architecture & Configuration
+# Architecture
 
-## System overview
+LangTut is a Python Flask application with server-rendered Jinja pages and vanilla
+JavaScript. Google Sheets owns vocabulary and study statistics; SQLite owns application
+records. Google OAuth provides login and Sheets access; TTS/GCS provide audio.
 
-LangTut is a server-rendered Flask application with a small vanilla-JavaScript frontend. Users
-authenticate with Google, choose a Google Sheets workbook as their vocabulary source, and study or
-review cards. SQLite stores application-owned state; Google Cloud TTS and Cloud Storage provide and
-cache audio.
-
-```text
-Browser (Jinja + vanilla JS)
-        |
-        v
-Flask blueprints -> services -> Pydantic domain models
-        |                |
-        |                +-> Google Sheets (cards and learning progress)
-        +-> SQLAlchemy/SQLite (users, auth tokens, sheet links, verbs)
-        +-> filesystem sessions
-        +-> Google TTS -> GCS audio cache
-```
-
-## Runtime composition
-
-`serve.py` launches Uvicorn using the single resolved `app.config` object. The ASGI factory
-`asgi.create_app()` creates Flask, initializes its database and missing tables, and composes the
-native MCP endpoint with Flask through `a2wsgi`. Importing `asgi.py` has no database side effects.
-The old Gunicorn `run.py` entry point is retired; Docker and local development use the same launcher.
-
-Flask's own factory still does not initialize the database. `create_all()` creates missing tables,
-but does not migrate changed columns. Configuration is resolved once per process through Dynaconf,
-validated by a plain Pydantic model, and shared by both apps. MCP uses the same database path with
-a separate read-only connection. Tests can inject MCP options directly without loading credentials.
-
-## Code organization
+## Runtime and boundaries
 
 ```text
-serve.py                      Uvicorn launcher
-asgi.py                       combined application factory
-app/
-├── __init__.py                 app factory
-├── config.py                   Dynaconf -> typed Config object
-├── database.py                 SQLAlchemy models and initialization
-├── gsheet.py                   card reads and progress writes
-├── models.py                   Pydantic domain/request models
-├── session_manager.py          namespaced session access
-├── routes/
-│   ├── auth.py                 Google OAuth entry/callback/logout
-│   ├── index.py                login, setup, and dashboard
-│   ├── learn.py                study flow and AJAX/form answer paths
-│   ├── review.py               browse/flip review flow
-│   ├── settings.py             linked spreadsheet management
-│   ├── verbs.py                irregular-verb pages
-│   ├── test.py                 authenticated diagnostic endpoints
-│   └── api/                    cards, TTS, languages, verbs
-├── services/
-│   ├── auth_manager.py         OAuth, refresh, and route protection
-│   ├── learning/               sessions, queues, modes, statistics
-│   ├── listening_cards_service.py
-│   ├── settings_service.py
-│   ├── tts.py
-│   └── verbs_service.py
-├── templates/                  server-rendered UI
-└── static/                     vanilla JS/CSS and PWA files
+Browser -> Flask blueprints ----> services -> Google Sheets / SQLite / TTS
+                                     ^
+ChatGPT -> native MCP adapter --------+      (SQLite names only)
 ```
 
-Blueprints are registered in `app/routes/__init__.py`. API sub-blueprints are nested below the
-`/api` prefix in `app/routes/api/__init__.py`.
+`serve.py` launches one Uvicorn worker. `asgi.create_app()` builds Flask, initializes
+SQLite and missing tables, and mounts Flask through `a2wsgi` behind the native MCP
+routes. Importing `asgi.py` has no database side effects; Flask's factory alone does
+not initialize the database. `run.py` is retired.
 
-## Request and domain flows
+Configuration is resolved once through Dynaconf and validated by Pydantic. MCP receives
+plain settings and opens a separate read-only SQLite connection. It does not use
+Flask sessions, Google clients, or Flask's request-body logger. Runtime settings,
+credentials, proxy handling, and healthchecks are documented in [deployment.md](deployment.md).
 
-### Learn and review
+## Code map
 
-`LearnService` reads due cards from the active workbook, creates a level-dependent task pipeline,
-and stores the serialized queue/state in the `learning.*` session namespace. Answer processing
-updates per-card statistics and writes completed session progress back to the sheet in a batch.
+| Location | Responsibility |
+|---|---|
+| `app/__init__.py` | Flask factory, configuration, extensions, middleware |
+| `app/routes/` | HTTP parsing, HTML rendering; nested JSON blueprints in `api/` |
+| `app/services/` | Business logic; study and review in `learning/` |
+| `app/models.py` | Pydantic domain/request models |
+| `app/database.py` | SQLAlchemy models and database initialization |
+| `app/gsheet.py` | Google Sheets reads and progress writes |
+| `app/session_manager.py` | Exclusive interface to Flask session state |
+| `app/mcp_server.py` | MCP transport, tool declaration, limits |
+| `app/services/mcp_spreadsheets.py` | Read-only email lookup |
+| `app/templates/`, `app/static/` | Jinja and browser assets |
 
-`ReviewService` loads all cards for a tab and uses the separate `review.*` namespace for a
-one-pass stack. A forgotten card loses one level; a remembered card keeps its level. Both choices
-update the card's last-shown timestamp in the review session. The full stack is written to Google
-Sheets once, after the final card is reviewed. Ending early writes only cards already reviewed and
-keeps the active session intact if that batch write fails.
-`CardSessionManager` provides the common serialized-card session behavior.
+Blueprint registration lives in `app/routes/__init__.py` and `app/routes/api/__init__.py`.
+Keep reusable behavior in services, not adapters. See [AGENTS.md](../AGENTS.md) for
+coding and test rules.
 
-The learn answer route supports both normal form POST/redirect and JSON/AJAX. The AJAX path renders
-feedback in place so mobile audio remains in the same page and gesture context. Keep both paths
-working.
+## Persistence
 
-### Listening and TTS
+| Store | Owned data |
+|---|---|
+| Google Sheets | Vocabulary, examples, levels, counters, last study timestamps |
+| SQLite | Users, linked spreadsheets, encrypted refresh tokens, verbs, practice history |
+| Filesystem session | OAuth state/access credentials, active study queues, language settings |
+| GCS | Generated MP3 cache |
+| Browser localStorage | Bounded TTS cache; details in [audio.md](audio.md) |
 
-`GET /api/cards/<tab_name>` uses `ListeningCardsService` to load and shuffle cards that have both a
-word and example. `POST /api/tts/speak` selects a voice from the session's target language, checks
-the GCS cache when workbook and sheet identifiers are provided, and returns base64 MP3. See
-[`audio.md`](./audio.md) for the browser-side playback details.
+Vocabulary rows have ten columns: ID, word, translation, equivalent, example,
+example translation, shown count, correct count, level, and last-shown timestamp.
+Reads skip invalid rows; progress writes update G:J. Sheets owns this data until
+an explicit storage migration lands. `create_all()` only creates missing tables.
 
-### Irregular verbs
+## Study and audio flows
 
-Verb forms and per-user practice history are application-owned, so this feature uses SQLite rather
-than Google Sheets. HTML routes live in `routes/verbs.py`; JSON/import endpoints live in
-`routes/api/verbs.py`; persistence and selection behavior is in `VerbsService` and
-`app/import_verbs/`.
+Learning reads due cards, creates tasks, and keeps the active queue in session.
+Learning/review persist progress to Sheets at their save points; review early exit
+also saves and retains session state if the write fails. This is not incremental
+per-answer database persistence or guaranteed session recovery after interruption.
 
-## Persistence boundaries
+Card submission supports form POST and AJAX. AJAX renders feedback in the existing
+page so audio can use the interaction that submitted the answer. Preserve the
+server-rendered fallback and Jinja/JavaScript contracts. Listening fetches tab cards
+and plays word/example clips in sequence. [audio.md](audio.md) owns playback,
+caching, invalidation, and physical-device verification.
 
-| Store | Owned data | Main access point |
-|---|---|---|
-| Google Sheets | card text, examples, counters, levels, last-shown time | `app/gsheet.py` |
-| SQLite | users, linked workbooks and language settings, encrypted refresh tokens, verb data | `app/database.py` + services |
-| Filesystem session | OAuth access token/state and refresh-token row ID, active learn/review queues, target language | `SessionManager` |
-| Google Cloud Storage | generated MP3 cache | `TTSService` |
-| Browser localStorage | base64 TTS cache keyed by trimmed text | `TTSManager` |
+Irregular verbs use SQLite services and `app/import_verbs/`, independently of Sheets.
+Unifying verb and vocabulary models is not an implemented feature.
 
-The SQLite models are `User`, `RefreshToken`, `UserSpreadsheet`, `VerbInfinitive`, `VerbTense`,
-`VerbForm`, and `UserVerbInteraction`. `UserSpreadsheet.properties` stores validated language
-settings as JSON.
+## Authentication and permissions
 
-Each vocabulary worksheet has a header row followed by ten positional columns: ID, word,
-translation, equivalent, example, example translation, shown count, correct count, level, and last
-shown. Reads skip invalid rows; progress writes update only the final four statistics columns (G:J).
+`AuthManager` manages Google login, callbacks, refresh, and route protection. Google
+subject IDs identify users; emails are not unique database identifiers. Refresh
+tokens are Fernet-encrypted in SQLite; the browser session holds active credentials
+and a reference to the refresh-token record.
 
-## Authentication and session state
+Protected HTML routes use `require_auth`; protected JSON routes use `require_auth_api`
+and return 401 on failure. They use `auth_manager.user` and `get_credentials()`.
+Sessions go through `SessionManager` with namespaced `SessionKeys`. Read-only requests
+do not refresh sessions by default, preventing stale background session writes.
 
-`AuthManager` owns OAuth flow creation, callbacks, credential refresh, and logout:
+The unused `/admin/*` routes are removed. TTS and diagnostic routes require login.
+`POST /api/verbs/forms` accepts a logged-in user or the configured `X-Import-Key`;
+it is not restricted to an administrator role. Language-settings validation is public
+and does not access user records.
 
-1. the login route stores OAuth state and redirect URI in the session;
-2. the callback identifies or creates the SQLite user;
-3. the short-lived access token and expiry live in the filesystem-backed session;
-4. the refresh token is Fernet-encrypted in SQLite and referenced by its row ID from the session;
-5. protected requests refresh credentials transparently when needed.
-
-Server-side sessions are written only when modified by default
-(`session_refresh_each_request = false`). This prevents slower, read-only background requests such
-as TTS prefetches from overwriting newer authentication or learning state with an older snapshot.
-
-HTML routes use `@auth_manager.require_auth` (redirect on failure). JSON endpoints use
-`@auth_manager.require_auth_api` (JSON `401`). Session state goes through `SessionManager` and the
-namespaced `SessionKeys` enum; current namespaces are `auth`, `user`, `learning`, `review`, `tts`,
-and `test`.
-
-The unused `/admin/*` endpoints have been retired, including exports and custom SQL queries.
-TTS status/generation and diagnostic routes require authentication. Verb imports at
-`POST /api/verbs/forms` currently accept any authenticated user or a configured `X-Import-Key`;
-this is not an administrator-only permission. Language-settings validation remains public and
-does not read or write user records.
-
-## Configuration and deployment
-
-Dynaconf reads `settings.toml`, then gitignored `.secrets.toml`, with `LANGTUT_*` environment values
-taking precedence. There are two runtime environments:
-
-- `local` by default: `data/app.db`, `flask_session/`, insecure OAuth transport enabled by `asgi.create_app()`;
-- `production` when `RAILWAY_ENVIRONMENT=production`: `/app/data/app.db`,
-  `/app/data/flask_session`, secure session cookies.
-
-Local credential files are configured in `.secrets.toml`. Railway supplies OAuth and service-account
-JSON through `LANGTUT_CLIENT_SECRETS_JSON` and
-`LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON`. `LANGTUT_ENCRYPTION_KEY` is required to decrypt stored
-refresh tokens; `LANGTUT_SECRET_KEY` should be stable so sessions remain valid across restarts.
-
-Railway builds the `Dockerfile`, runs `serve.py`, and expects a persistent volume mounted at
-`/app/data`. Language-to-voice mappings are configured separately in `config/languages.yaml`.
-
-## Optional MCP adapter
-
-`app/mcp_server.py` exposes the intentionally public `list_spreadsheets(email)` experiment over
-Streamable HTTP when explicitly enabled. `app/services/mcp_spreadsheets.py` uses the existing
-SQLAlchemy models through a separate SQLite read-only engine and returns names only. No schema
-migration, Google calls, or browser session identity is involved. This is a deliberate temporary
-exception to authenticated application routes: caller-supplied email is only a search filter.
-
-`asgi.py` combines the native ASGI MCP application with Flask through `a2wsgi`. The shared
-`allowed_hosts` setting protects both entry points. The same-origin website does not enable CORS;
-MCP has independent Origin-header validation. `serve.py` trusts forwarded headers only from the
-explicit `proxy_trusted_ips` list. Production hostnames/proxy ranges must be configured before
-release. See [MCP setup](mcp.md) for local tests and deployment configuration.
+Enabled MCP deliberately permits public spreadsheet-name lookup by supplied email.
+It has no user authentication, and host/origin validation does not change that.
+[MCP documentation](mcp.md) owns the exact contract. The
+[auth series](../path-to-auth-mcp/01-basics.md) is a proposed replacement, not existing
+behavior. [AI-native](ai-native-mcp.md) and [GA](path-to-ga.md) roadmaps describe
+future storage and product changes.

@@ -45,24 +45,14 @@ uv run pytest
 - Pre-commit handles lint/format/security basics.
 - Pre-push runs the test suite.
 
-## Architecture at a glance
-- Backend: Flask blueprints + service layer.
-- Stores:
-  - Google Sheets for vocabulary/card content.
-  - SQLite (SQLAlchemy) for user/app state.
-- Frontend: Jinja templates + vanilla JS/CSS.
-
-See [`docs/architecture.md`](./docs/architecture.md) for details.
-
 ## Documentation
-- [`docs/README.md`](./docs/README.md) (index)
-- [`docs/architecture.md`](./docs/architecture.md)
-- [`docs/deployment.md`](./docs/deployment.md)
-- [`docs/audio.md`](./docs/audio.md)
+
+Use the [documentation index](docs/README.md) for architecture, deployment, audio,
+and roadmaps. Start the five-part [MCP auth guide](path-to-auth-mcp/01-basics.md) to
+learn the proposed path from public lookup to per-user access.
 
 ## MCP connectivity demo
 
-A disabled-by-default, read-only MCP tool can list spreadsheet display names by email.
-Start with an isolated synthetic SQLite database and the local SDK smoke client; see
-[`docs/mcp.md`](./docs/mcp.md) for commands, the optional combined runtime, and the explicit
-public-data tradeoff. No production deployment is needed for local protocol testing.
+A disabled-by-default, public MCP tool lists spreadsheet display names by email.
+See [MCP testing](docs/mcp.md) for synthetic/local data and the deployed smoke client.
+The standard server serves both Flask and MCP; OAuth for MCP is proposed, not implemented.
