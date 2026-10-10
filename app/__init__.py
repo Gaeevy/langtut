@@ -10,10 +10,6 @@ from pathlib import Path
 
 from flask import Flask
 
-from app.config import config
-from app.logging import setup_request_logging
-from app.routes import register_blueprints
-from app.utils import ensure_utf8_encoding
 from flask_session import Session
 
 
@@ -23,9 +19,12 @@ def configure_app(app: Flask) -> None:
     Args:
         app: Flask application instance
     """
+    from app.config import config
+
     # Core app configuration
     app.secret_key = config.secret_key or os.urandom(24)
     app.config["DEBUG"] = config.debug
+    app.config["TRUSTED_HOSTS"] = config.allowed_hosts
 
     # Session configuration
     app.config["SESSION_TYPE"] = config.session_type
@@ -64,6 +63,8 @@ def setup_middleware(app: Flask) -> None:
     Args:
         app: Flask application instance
     """
+    from app.logging import setup_request_logging
+
     # Set up request/response logging
     setup_request_logging(app)
 
@@ -77,6 +78,9 @@ def create_app() -> Flask:
     Returns:
         Flask: Configured Flask application instance
     """
+    from app.routes import register_blueprints
+    from app.utils import ensure_utf8_encoding
+
     # Set default encoding to UTF-8
     ensure_utf8_encoding()
 

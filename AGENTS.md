@@ -14,10 +14,12 @@ for application-owned data.
   behavior.
 - Read `docs/audio.md` before changing TTS, card submission, listening mode, or mobile playback.
 - Treat `README.md` as the user-facing setup reference; keep it aligned with command changes.
+- Read `docs/deployment.md` before deployment work for the last Railway configuration snapshot.
 
 ## Project map
 
-- `run.py`: Gunicorn entry point; creates the app and initializes the database.
+- `serve.py`: Uvicorn launcher; reads shared runtime settings.
+- `asgi.py`: combined Flask/MCP factory; initializes the website database.
 - `app/__init__.py`: Flask app factory, configuration, Flask-Session, middleware, and blueprint
   registration.
 - `app/routes/`: HTML blueprints; `app/routes/api/` contains the nested `/api` blueprints.
@@ -39,7 +41,7 @@ uv sync --extra dev
 uv run pre-commit install -t pre-commit -t pre-push
 
 # local server
-uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload run:app
+uv run python serve.py --reload
 
 # verification
 uv run pytest
@@ -83,7 +85,7 @@ the hooks reject commits to `main` and `master`.
   take precedence. Runtime environments are `local` and Railway `production`.
 - Never commit `.secrets.toml`, OAuth/service-account JSON, database files, session files, or new
   user-specific spreadsheet IDs/credentials.
-- Importing `run.py` creates the Flask app and initializes tables. Importing `app.services.tts`
+- Calling `asgi.create_app()` creates the Flask app and initializes tables. Importing `app.services.tts`
   creates the TTS singleton and may initialize Google clients. Unit tests should prefer narrower
   imports and monkeypatch external boundaries.
 

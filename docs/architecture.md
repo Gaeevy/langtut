@@ -21,21 +21,21 @@ Flask blueprints -> services -> Pydantic domain models
 
 ## Runtime composition
 
-`run.py` is the Gunicorn entry point. Importing it:
+`serve.py` launches Uvicorn using the single resolved `app.config` object. The ASGI factory
+`asgi.create_app()` creates Flask, initializes its database and missing tables, and composes the
+native MCP endpoint with Flask through `a2wsgi`. Importing `asgi.py` has no database side effects.
+The old Gunicorn `run.py` entry point is retired; Docker and local development use the same launcher.
 
-1. calls `app.create_app()`;
-2. applies Dynaconf-backed Flask/session settings;
-3. initializes Flask-Session, request logging, and all blueprints;
-4. binds Flask-SQLAlchemy and calls `db.create_all()` through `ensure_tables()`.
-
-The app factory itself does not initialize the database; callers that bypass `run.py` must do that
-explicitly when they need database access. `create_all()` is useful for new installations and new
-tables, but is not a migration system for existing columns.
+Flask's own factory still does not initialize the database. `create_all()` creates missing tables,
+but does not migrate changed columns. Configuration is resolved once per process through Dynaconf,
+validated by a plain Pydantic model, and shared by both apps. MCP uses the same database path with
+a separate read-only connection. Tests can inject MCP options directly without loading credentials.
 
 ## Code organization
 
 ```text
-run.py
+serve.py                      Uvicorn launcher
+asgi.py                       combined application factory
 app/
 ├── __init__.py                 app factory
 ├── config.py                   Dynaconf -> typed Config object
@@ -147,7 +147,7 @@ does not read or write user records.
 Dynaconf reads `settings.toml`, then gitignored `.secrets.toml`, with `LANGTUT_*` environment values
 taking precedence. There are two runtime environments:
 
-- `local` by default: `data/app.db`, `flask_session/`, insecure OAuth transport enabled by `run.py`;
+- `local` by default: `data/app.db`, `flask_session/`, insecure OAuth transport enabled by `asgi.create_app()`;
 - `production` when `RAILWAY_ENVIRONMENT=production`: `/app/data/app.db`,
   `/app/data/flask_session`, secure session cookies.
 
@@ -156,5 +156,19 @@ JSON through `LANGTUT_CLIENT_SECRETS_JSON` and
 `LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON`. `LANGTUT_ENCRYPTION_KEY` is required to decrypt stored
 refresh tokens; `LANGTUT_SECRET_KEY` should be stable so sessions remain valid across restarts.
 
-Railway builds the `Dockerfile`, runs Gunicorn, and expects a persistent volume mounted at
+Railway builds the `Dockerfile`, runs `serve.py`, and expects a persistent volume mounted at
 `/app/data`. Language-to-voice mappings are configured separately in `config/languages.yaml`.
+
+## Optional MCP adapter
+
+`app/mcp_server.py` exposes the intentionally public `list_spreadsheets(email)` experiment over
+Streamable HTTP when explicitly enabled. `app/services/mcp_spreadsheets.py` uses the existing
+SQLAlchemy models through a separate SQLite read-only engine and returns names only. No schema
+migration, Google calls, or browser session identity is involved. This is a deliberate temporary
+exception to authenticated application routes: caller-supplied email is only a search filter.
+
+`asgi.py` combines the native ASGI MCP application with Flask through `a2wsgi`. The shared
+`allowed_hosts` setting protects both entry points. The same-origin website does not enable CORS;
+MCP has independent Origin-header validation. `serve.py` trusts forwarded headers only from the
+explicit `proxy_trusted_ips` list. Production hostnames/proxy ranges must be configured before
+release. See [MCP setup](mcp.md) for local tests and deployment configuration.

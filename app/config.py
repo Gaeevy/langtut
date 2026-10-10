@@ -7,11 +7,13 @@ and simplified credential handling (env vars first, then file paths).
 
 import os
 from enum import StrEnum
+from pathlib import Path
 
 from dynaconf import Dynaconf
-from pydantic_settings import BaseSettings
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.logging import setup_logging
+from app.mcp_settings import MCPSettings
 from app.utils import resolve_secrets_file_path
 
 
@@ -50,17 +52,20 @@ _settings = Dynaconf(
     load_dotenv=True,
 )
 
-_client_secrets_file_path = resolve_secrets_file_path(
-    _settings.get("client_secrets_json"),
-    _settings.get("client_secrets_file"),
-)
-_google_cloud_service_account_file_path = resolve_secrets_file_path(
-    _settings.get("google_cloud_service_account_json"),
-    _settings.get("google_cloud_service_account_file"),
+
+def optional_credentials(json_key: str, file_key: str) -> str | None:
+    """Resolve configured credentials; standalone tools need no Google credentials."""
+    payload, path = _settings.get(json_key), _settings.get(file_key)
+    return resolve_secrets_file_path(payload, path) if payload or path else None
+
+
+_client_secrets_file_path = optional_credentials("client_secrets_json", "client_secrets_file")
+_google_cloud_service_account_file_path = optional_credentials(
+    "google_cloud_service_account_json", "google_cloud_service_account_file"
 )
 
 
-class Config(BaseSettings):
+class Config(BaseModel):
     """Unified configuration using Pydantic.
 
     Single source of truth for all application settings with environment-aware
@@ -70,6 +75,8 @@ class Config(BaseSettings):
     1. Environment variable (JSON string for Railway)
     2. File path (for local development)
     """
+
+    model_config = ConfigDict(validate_default=True)
 
     # Environment
     environment: Environment = _environment
@@ -85,6 +92,27 @@ class Config(BaseSettings):
 
     # Database
     database_path: str = _settings["database_path"]
+
+    # Shared web/MCP runtime; Dynaconf is the only environment loader.
+    bind_host: str = _settings["bind_host"]
+    port: int = Field(default=_settings.get("port", os.getenv("PORT", 8080)), ge=1, le=65535)
+    allowed_hosts: list[str] = _settings["allowed_hosts"]
+    proxy_trusted_ips: list[str] = _settings["proxy_trusted_ips"]
+    mcp_enabled: bool = _settings["mcp_enabled"]
+    mcp_allowed_origins: list[str] = _settings["mcp_allowed_origins"]
+    mcp_requests_per_minute: int = Field(
+        default=_settings["mcp_requests_per_minute"], ge=1, le=10000
+    )
+
+    def mcp_settings(self) -> MCPSettings:
+        """Pass resolved shared values to MCP without reading configuration again."""
+        return MCPSettings(
+            enabled=self.mcp_enabled,
+            database_path=Path(self.database_path),
+            allowed_hosts=[value for host in self.allowed_hosts for value in (host, f"{host}:*")],
+            allowed_origins=self.mcp_allowed_origins,
+            requests_per_minute=self.mcp_requests_per_minute,
+        )
 
     # Flask Session
     session_type: str = _settings["session_type"]
@@ -110,8 +138,8 @@ class Config(BaseSettings):
     gcs_audio_bucket: str = _settings["gcs_audio_bucket"]
 
     # Credentials
-    client_secrets_file_path: str = _client_secrets_file_path
-    google_cloud_service_account_file_path: str = _google_cloud_service_account_file_path
+    client_secrets_file_path: str | None = _client_secrets_file_path
+    google_cloud_service_account_file_path: str | None = _google_cloud_service_account_file_path
 
     # Encryption
     encryption_key: str = _settings.get("ENCRYPTION_KEY", "")

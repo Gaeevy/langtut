@@ -27,7 +27,7 @@ Fill `.secrets.toml` with local credential paths and required secrets.
 
 ### Run
 ```bash
-uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload run:app
+uv run python serve.py --reload
 ```
 
 ### Tests
@@ -57,4 +57,12 @@ See [`docs/architecture.md`](./docs/architecture.md) for details.
 ## Documentation
 - [`docs/README.md`](./docs/README.md) (index)
 - [`docs/architecture.md`](./docs/architecture.md)
+- [`docs/deployment.md`](./docs/deployment.md)
 - [`docs/audio.md`](./docs/audio.md)
+
+## MCP connectivity demo
+
+A disabled-by-default, read-only MCP tool can list spreadsheet display names by email.
+Start with an isolated synthetic SQLite database and the local SDK smoke client; see
+[`docs/mcp.md`](./docs/mcp.md) for commands, the optional combined runtime, and the explicit
+public-data tradeoff. No production deployment is needed for local protocol testing.
