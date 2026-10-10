@@ -15,8 +15,10 @@ from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 
 from app.database import User, UserSpreadsheet
-from app.mcp_server import MCPSettings, create_combined_app, create_mcp_app
+from app.mcp_server import create_mcp_app
+from app.mcp_settings import MCPSettings
 from app.services.mcp_spreadsheets import list_spreadsheet_names, readonly_engine
+from asgi import create_combined_app
 
 
 @pytest.fixture
@@ -44,7 +46,14 @@ def database(tmp_path):
 
 
 def settings(database, **kwargs):
-    return MCPSettings(enabled=True, database_path=database, **kwargs)
+    return MCPSettings(
+        enabled=kwargs.pop("enabled", True),
+        database_path=database,
+        allowed_hosts=["localhost", "127.0.0.1", "localhost:*", "127.0.0.1:*"],
+        allowed_origins=["http://localhost", "http://localhost:*"],
+        requests_per_minute=kwargs.pop("requests_per_minute", 60),
+        **kwargs,
+    )
 
 
 @pytest.mark.parametrize(
@@ -104,7 +113,7 @@ def test_large_result_is_explicitly_truncated(database):
 
 
 def test_disabled_mcp_needs_no_database():
-    app = create_mcp_app(MCPSettings(enabled=False, database_path=Path("absent.db")))
+    app = create_mcp_app(settings(Path("absent.db"), enabled=False))
     with TestClient(app) as client:
         assert client.post("/mcp", json={}).status_code == 404
 

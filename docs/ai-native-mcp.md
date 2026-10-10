@@ -249,10 +249,10 @@ phases; this phase is the release gate, not the first time backups are considere
   Separate automated verification from production release approval. Preserve the repository's
   explicit confirmation requirement immediately before production mutations.
 - Keep SQLite on the persistent `/app/data` volume and initially use one application instance.
-  Multiple Gunicorn workers still mean concurrent writers: use short transactions, configure
+  Multiple server workers still mean concurrent writers: use short transactions, configure
   and test lock handling, and evaluate WAL/busy timeout with the actual workload.
 - Run migrations once in a controlled startup step before serving traffic, not from each
-  worker's import of `run.py`. Fail startup on migration errors and account for old processes
+  worker's application factory. Fail startup on migration errors and account for old processes
   still using the database. Prefer compatible additive changes during early rollout.
 - Railway volumes are unavailable during build and pre-deploy steps. Migrations touching the
   volume need a runtime procedure after the volume is mounted.

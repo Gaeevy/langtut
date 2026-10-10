@@ -1,7 +1,7 @@
 """Guardrail tests for Flask session configuration.
 
-Production runs Gunicorn with multiple workers, so the session backend MUST
-be shared between workers (filesystem on a persistent volume). An in-memory
+Sessions must survive process restarts and remain shared if multiple workers are used
+(filesystem on a persistent volume). An in-memory
 backend like ``cachelib`` with ``SimpleCache`` would silently regress to
 per-worker state, so we pin the intended config here.
 """
@@ -18,7 +18,7 @@ from app.config import config
 
 
 def test_default_session_type_is_filesystem() -> None:
-    """Session type must default to a backend shared across Gunicorn workers."""
+    """Session type must default to a backend shared across server workers."""
     assert config.session_type == "filesystem", (
         "Default session_type must remain 'filesystem' (or another shared backend "
         "like 'sqlalchemy'/'redis'). In-process backends such as 'cachelib' "
@@ -30,7 +30,7 @@ def test_session_file_dir_is_configured() -> None:
     """Filesystem sessions require an explicit, non-empty session_file_dir."""
     assert config.session_type != "filesystem" or config.session_file_dir, (
         "session_file_dir must be set when session_type='filesystem' so all "
-        "Gunicorn workers share the same session store."
+        "server workers share the same session store."
     )
 
 
@@ -84,5 +84,5 @@ def test_create_app_uses_shared_filesystem_session_interface(tmp_path, monkeypat
 def test_known_unshared_session_types_are_not_default(bad_type: str) -> None:
     """Catch regressions where session_type defaults to an unshared backend."""
     assert config.session_type != bad_type, (
-        f"session_type must not default to '{bad_type}': it is not shared across Gunicorn workers."
+        f"session_type must not default to '{bad_type}': it is not shared across server workers."
     )

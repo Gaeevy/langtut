@@ -6,6 +6,11 @@ verbs_import_api_key = ""
 verbs_import_local_url = "http://127.0.0.1:8080"
 verbs_import_production_url = ""
 
+# Shared service configuration (PORT is supplied by Railway unless overridden).
+mcp_enabled = false
+mcp_requests_per_minute = 60
+proxy_trusted_ips = []
+
 # Google OAuth
 scopes = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -33,12 +38,19 @@ session_cookie_samesite = "Lax"
 json_as_ascii = false
 
 [local]
+bind_host = "127.0.0.1"
+allowed_hosts = ["localhost", "127.0.0.1"]
+mcp_allowed_origins = ["http://localhost", "http://localhost:*", "http://127.0.0.1", "http://127.0.0.1:*"]
 debug = true
 session_cookie_secure = false
 database_path = "data/app.db"
 session_file_dir = "flask_session"
 
 [production]
+bind_host = "0.0.0.0"
+# Set exact deployment hostnames via LANGTUT_ALLOWED_HOSTS; no private targets in Git.
+allowed_hosts = []
+mcp_allowed_origins = []
 debug = false
 session_cookie_secure = true
 database_path = "/app/data/app.db"

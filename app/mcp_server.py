@@ -3,16 +3,12 @@
 import logging
 import time
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Annotated
 
-from a2wsgi import WSGIMiddleware
-from flask import Flask
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -20,6 +16,7 @@ from starlette.responses import Response
 from starlette.routing import Route
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from app.mcp_settings import MCPSettings
 from app.services.mcp_spreadsheets import (
     LookupStatus,
     SpreadsheetNames,
@@ -28,22 +25,6 @@ from app.services.mcp_spreadsheets import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-class MCPSettings(BaseSettings):
-    """Explicit opt-in settings, independent of Google credentials and browser config."""
-
-    model_config = SettingsConfigDict(env_prefix="LANGTUT_MCP_")
-    enabled: bool = False
-    database_path: Path = Path("data/app.db")
-    allowed_hosts: list[str] = ["127.0.0.1", "localhost", "127.0.0.1:*", "localhost:*"]
-    allowed_origins: list[str] = [
-        "http://127.0.0.1",
-        "http://localhost",
-        "http://127.0.0.1:*",
-        "http://localhost:*",
-    ]
-    requests_per_minute: int = Field(default=60, ge=1, le=10000)
 
 
 class RequestLimit:
@@ -74,7 +55,10 @@ async def disabled_endpoint(request: Request) -> Response:
 
 def create_mcp_app(settings: MCPSettings | None = None) -> Starlette:
     """Build a stateless Streamable HTTP server, disabled unless explicitly enabled."""
-    settings = settings or MCPSettings()
+    if settings is None:
+        from app.config import config
+
+        settings = config.mcp_settings()
     if not settings.enabled:
         return Starlette(
             routes=[
@@ -134,11 +118,4 @@ def create_mcp_app(settings: MCPSettings | None = None) -> Starlette:
 
     app.router.lifespan_context = lifespan
     app.add_middleware(RequestLimit, limit=settings.requests_per_minute)
-    return app
-
-
-def create_combined_app(flask_app: Flask, settings: MCPSettings) -> Starlette:
-    """Dispatch MCP natively and all remaining paths to the existing Flask application."""
-    app = create_mcp_app(settings)
-    app.mount("/", WSGIMiddleware(flask_app))
     return app

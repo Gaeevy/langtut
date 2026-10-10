@@ -24,6 +24,7 @@ def configure_app(app: Flask) -> None:
     # Core app configuration
     app.secret_key = config.secret_key or os.urandom(24)
     app.config["DEBUG"] = config.debug
+    app.config["TRUSTED_HOSTS"] = config.allowed_hosts
 
     # Session configuration
     app.config["SESSION_TYPE"] = config.session_type

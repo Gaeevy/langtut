@@ -25,7 +25,7 @@ Project map, architecture constraints, commands, testing expectations, and quali
 
 ### Running Locally
 ```bash
-uv run gunicorn --bind 0.0.0.0:8080 --workers 1 --reload run:app
+uv run python serve.py --reload
 ```
 
 ### Mobile Testing
