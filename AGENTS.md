@@ -81,6 +81,12 @@ the hooks reject commits to `main` and `master`.
 
 ## Configuration and side effects
 
+- Treat `credentials/` as secret storage. Agents may list filenames only; do not read,
+  parse, search, copy, or display file contents, including through scripts or indirect tool
+  calls. Exclude this directory from content searches. Exception: with explicit owner
+  authorization, transfer a named file directly to a named service through stdin without
+  exposing its contents to the model, chat, command arguments, logs, or temporary files.
+  Disable shell tracing, suppress command output, and report only success or failure.
 - Dynaconf loads `settings.toml` plus gitignored `.secrets.toml`; `LANGTUT_*` environment variables
   take precedence. Runtime environments are `local` and Railway `production`.
 - Never commit `.secrets.toml`, OAuth/service-account JSON, database files, session files, or new
