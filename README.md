@@ -13,7 +13,7 @@ Flask app for learning European Portuguese with Google Sheets-backed card conten
 - Python 3.13
 - `uv`
 - Google OAuth client credentials
-- Google Cloud service account (TTS)
+- Google Cloud CLI with user Application Default Credentials (local TTS/GCS)
 
 ### Setup
 ```bash
@@ -23,7 +23,25 @@ uv sync --extra dev
 cp .secrets.toml.example .secrets.toml
 ```
 
-Fill `.secrets.toml` with local credential paths and required secrets.
+Create a gitignored `credentials/` directory and save the Google OAuth client JSON as
+`credentials/client_secret.json`. Fill `.secrets.toml` with the required local secrets.
+Register both local callback URLs on the OAuth client:
+
+- `http://localhost:8080/oauth2callback`
+- `http://127.0.0.1:8080/oauth2callback`
+
+For local TTS/GCS, sign in with your Google user account and select the quota project:
+
+```bash
+gcloud auth application-default login
+gcloud auth application-default set-quota-project YOUR_GCP_PROJECT_ID
+```
+
+The account needs access to TTS/GCS and permission to use the quota project. Leave
+`google_cloud_service_account_file` and `google_cloud_service_account_json` unset locally;
+also remove any service-account credential environment overrides from your terminal or IDE.
+ADC is separate from the Google Sheets OAuth login. Railway continues to use its
+service-account JSON through `LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON`.
 
 ### Run
 ```bash

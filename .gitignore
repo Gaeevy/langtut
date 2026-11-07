@@ -22,6 +22,7 @@ env.bak/
 venv.bak/
 
 # OAuth credentials - IMPORTANT: Do not commit these!
+/credentials/
 client_secret.json
 credentials.json
 token.json
@@ -48,6 +49,7 @@ Thumbs.db
 
 # Machine-local operations context for agents
 /docs/operations.local.md
+/docs/credentials.md
 
 # Database files
 data/app.db
