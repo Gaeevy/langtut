@@ -28,7 +28,6 @@ credentials.json
 token.json
 
 # Google Cloud credentials - IMPORTANT: Do not commit these!
-google-cloud-service-account.json
 *service-account*.json
 
 # Environment variables
@@ -62,3 +61,6 @@ data/*.db
 
 # Local import payloads
 verbs*.json
+
+# Local learning material and OAuth experiments
+/.clanker/
