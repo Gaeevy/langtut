@@ -3,8 +3,10 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from flask import Flask
 
+from app.config import config
 from app.database import UserVerbInteraction, db
 from app.import_verbs import upsert_from_import_payload
 from app.models import VerbImportRequest
@@ -97,8 +99,16 @@ def test_verbs_api_forms_accepts_authenticated_user(monkeypatch):
     assert data["success"] is True
 
 
-def test_verbs_api_forms_rejects_unauthorized(monkeypatch):
-    """Import API rejects callers without auth and import key."""
+@pytest.mark.parametrize(
+    ("headers", "status"),
+    [
+        ({}, 401),
+        ({"X-Import-Key": "wrong-key"}, 401),
+        ({"X-Import-Key": "test-import-key"}, 200),
+    ],
+)
+def test_verbs_api_forms_checks_import_key_without_browser_login(monkeypatch, headers, status):
+    """Import API accepts a configured import key when browser authentication fails."""
     template_folder = Path(__file__).resolve().parents[1] / "app" / "templates"
     app = Flask(__name__, template_folder=str(template_folder))
     app.config["TESTING"] = True
@@ -109,6 +119,7 @@ def test_verbs_api_forms_rejects_unauthorized(monkeypatch):
     db.init_app(app)
     register_blueprints(app)
     monkeypatch.setattr(auth_manager, "is_authenticated", lambda: False)
+    monkeypatch.setattr(config, "verbs_import_api_key", "test-import-key")
 
     with app.app_context():
         db.create_all()
@@ -116,6 +127,7 @@ def test_verbs_api_forms_rejects_unauthorized(monkeypatch):
     client = app.test_client()
     response = client.post(
         "/api/verbs/forms",
+        headers=headers,
         json={
             "infinitive": "ser",
             "tense": "presente do indicativo",
@@ -128,7 +140,8 @@ def test_verbs_api_forms_rejects_unauthorized(monkeypatch):
             },
         },
     )
-    assert response.status_code == 401
+    assert response.status_code == status
+    assert response.get_json()["success"] is (status == 200)
 
 
 def test_verbs_index_hides_form_count_and_has_localstorage_script(monkeypatch):
