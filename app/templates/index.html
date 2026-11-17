@@ -165,18 +165,10 @@
         </div>
     </div>
 
-    <!-- Account -->
-    {% if is_authenticated %}
-        <div class="alert alert-light border-0 mt-4">
-            <div class="d-flex flex-wrap gap-2 justify-content-center align-items-center">
-                <a href="{{ url_for('auth.clear_credentials') }}" class="btn btn-secondary btn-sm">Log out</a>
-            </div>
-        </div>
-    {% else %}
-        <div class="mt-4">
-            <a href="{{ url_for('auth.auth') }}" class="btn btn-primary">Sign in with Google</a>
-        </div>
+    {% if not sheets_connected %}
+        <p class="text-center mt-4">Google Sheets is disconnected.</p>
     {% endif %}
+    {% include "_account_actions.html" %}
 </div>
 {% endblock %}
 

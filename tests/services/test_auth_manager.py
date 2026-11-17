@@ -1,27 +1,21 @@
-"""Behavior tests for browser login, Google credential refresh, and logout."""
+"""Behavior tests for browser login and the Google Sheets connection lifecycle."""
 
 import json
-from datetime import UTC, datetime, timedelta
+import re
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
 from cryptography.fernet import Fernet
-from google.auth.exceptions import RefreshError, TransportError
+from google.auth.exceptions import RefreshError
 from google.oauth2.credentials import Credentials
 
 from app import create_app
 from app.config import config
-from app.database import RefreshToken, User, db
+from app.database import GoogleSheetsConnection, RefreshToken, User, db
 from app.services.auth_manager import auth_manager
 from app.session_manager import SessionKeys as sk
 from app.session_manager import SessionManager as sm
-
-
-def _set_valid_session_credentials() -> None:
-    sm.set(sk.USER_ID, 1)
-    sm.set(sk.ACCESS_TOKEN, "current-token")
-    sm.set(sk.ACCESS_TOKEN_EXPIRY, datetime.now(UTC) + timedelta(minutes=30))
 
 
 @pytest.fixture
@@ -84,58 +78,15 @@ def _add_user(google_user_id: str) -> User:
     return user
 
 
-def _add_refresh_token(user: User, value: str, last_used: datetime) -> RefreshToken:
-    token = RefreshToken(user_id=user.id, last_used=last_used)
-    token.encrypt_and_store(value)
-    db.session.add(token)
-    db.session.flush()
-    return token
+def _sign_in(client) -> None:
+    state = _start_login(client)["state"][0]
+    assert client.get(_callback_url(state)).location == "/"
 
 
-@pytest.fixture
-def browser_with_grant(auth_app):
-    with auth_app.test_request_context():
-        user = _add_user("current-user")
-        grant = _add_refresh_token(user, "refresh-token", datetime.now(UTC))
-        _set_valid_session_credentials()
-        sm.set(sk.USER_ID, user.id)
-        sm.set(sk.REFRESH_TOKEN_ID, grant.id)
-        db.session.commit()
-        yield
-
-
-@pytest.mark.parametrize(
-    ("minutes_left", "expected_refreshes", "expected_token"),
-    [(11, 0, "current-token"), (9, 1, "current-token"), (-1, 1, None)],
-)
-def test_proactive_refresh_failure_uses_only_still_valid_tokens(
-    browser_with_grant, minutes_left, expected_refreshes, expected_token
-):
-    sm.set(sk.ACCESS_TOKEN_EXPIRY, datetime.now(UTC) + timedelta(minutes=minutes_left))
-    with patch.object(Credentials, "refresh", side_effect=TransportError("offline")) as refresh:
-        credentials = auth_manager.get_credentials()
-
-    assert (credentials.token if credentials else None) == expected_token
-    assert refresh.call_count == expected_refreshes
-
-
-def test_forced_refresh_failure_does_not_reuse_rejected_token(browser_with_grant):
-    with patch.object(Credentials, "refresh", side_effect=TransportError("offline")) as refresh:
-        assert auth_manager.get_credentials(force_refresh=True) is None
-        refresh.assert_called_once()
-        assert not sm.has(sk.ACCESS_TOKEN)
-        assert not sm.has(sk.ACCESS_TOKEN_EXPIRY)
-        assert auth_manager.get_credentials() is None
-
-
-def test_revoked_grant_clears_browser_access_token(browser_with_grant):
-    sm.set(sk.ACCESS_TOKEN_EXPIRY, datetime.now(UTC) + timedelta(minutes=9))
-    revoked = RefreshError("revoked", {"error": "invalid_grant"})
-    with patch.object(Credentials, "refresh", side_effect=revoked):
-        assert auth_manager.get_credentials() is None
-
-    assert not sm.has(sk.ACCESS_TOKEN)
-    assert RefreshToken.query.count() == 1
+def _csrf_token(client) -> str:
+    response = client.get("/")
+    assert response.status_code == 200
+    return re.search(rb'name="csrf_token" value="([^"]+)"', response.data)[1].decode()
 
 
 def test_google_login_creates_user_and_shows_spreadsheet_setup(
@@ -174,9 +125,11 @@ def test_google_login_creates_user_and_shows_spreadsheet_setup(
         assert not sm.has(sk.AUTH_STATE)
         assert not sm.has(sk.AUTH_REDIRECT_URI)
         assert not sm.has(sk.AUTH_CODE_VERIFIER)
-        token = db.session.get(RefreshToken, sm.get(sk.REFRESH_TOKEN_ID))
-        assert token.user_id == user.id
-        assert token.get_decrypted_token() == "refresh-token"
+        connection = user.google_sheets_connection
+        assert connection.google_user_id == user.google_user_id
+        assert connection.get_decrypted_token() == "refresh-token"
+        assert auth_manager.get_credentials().token == "access-token"
+        assert RefreshToken.query.count() == 0
         assert b"Set Up Your Learning Spreadsheet" in client.get(callback.location).data
         assert b"OAuth callback error" in client.get(callback_url).data
         assert auth_manager.is_authenticated()
@@ -204,9 +157,9 @@ def test_failed_callback_leaves_browser_signed_out(auth_app, google_token_reques
         assert b"OAuth callback error" in response.data
         assert not auth_manager.is_authenticated()
         assert auth_manager.user is None
-        assert not sm.has(sk.ACCESS_TOKEN)
+        assert not sm.has(sk.LOGIN_EXPIRES_AT)
         assert User.query.count() == 0
-        assert RefreshToken.query.count() == 0
+        assert GoogleSheetsConnection.query.count() == 0
     google_token_request.assert_not_called()
 
 
@@ -247,7 +200,7 @@ def test_invalid_id_token_leaves_no_user_or_grant(
         assert not sm.has(sk.AUTH_STATE)
         assert auth_manager.user is None
         assert User.query.count() == 0
-        assert RefreshToken.query.count() == 0
+        assert GoogleSheetsConnection.query.count() == 0
     google_token_request.assert_called_once()
 
 
@@ -270,85 +223,148 @@ def test_google_login_updates_existing_user_by_google_subject(
     verify_token.assert_called_once()
 
 
-@pytest.mark.parametrize("deleted_user", [False, True], ids=["anonymous", "deleted-user"])
-def test_user_lookup_can_differ_from_credential_based_authentication(auth_app, deleted_user):
-    with auth_app.test_request_context():
-        if deleted_user:
-            _set_valid_session_credentials()
-            user = _add_user("deleted-user")
-            sm.set(sk.USER_ID, user.id)
+@pytest.mark.parametrize("invalid_session", ["legacy", "deleted-user"])
+def test_legacy_sessions_and_deleted_users_require_sign_in(
+    auth_app, google_token_request, verify_token, invalid_session
+):
+    client = auth_app.test_client()
+    if invalid_session == "legacy":
+        with client.session_transaction() as session:
+            session[sk.USER_ID.value] = 1
+            session["auth.access_token"] = "legacy-access-token"
+    else:
+        _sign_in(client)
+        with auth_app.app_context():
+            db.session.delete(User.query.one())
             db.session.commit()
-            db.session.delete(user)
-            db.session.commit()
 
-        assert auth_manager.user is None
-        assert auth_manager.is_authenticated() is deleted_user
+    assert client.get("/api/verbs/tenses").status_code == 401
+    assert client.get("/verbs").location == "/auth"
+    assert b"Sign in with Google" in client.get("/").data
 
 
-@pytest.mark.parametrize("preferred_owner", ["current-user", "other-user"])
-def test_refresh_uses_only_tokens_owned_by_session_user(auth_app, monkeypatch, preferred_owner):
-    def refresh(credentials, request):
-        assert credentials.refresh_token == expected_token
-        credentials.token = "refreshed-access-token"
-        credentials.expiry = datetime.now(UTC) + timedelta(hours=1)
+def test_login_expires_after_seven_days_without_sliding(
+    auth_app, google_token_request, verify_token, monkeypatch
+):
+    clock = Mock(return_value=1_700_000_000)
+    monkeypatch.setattr("app.services.auth_manager.time", clock)
+    client = auth_app.test_client()
+    _sign_in(client)
 
-    monkeypatch.setattr(Credentials, "refresh", refresh)
-    with auth_app.test_request_context():
-        current_user = _add_user("current-user")
-        other_user = _add_user("other-user")
-        now = datetime.now(UTC)
-        older = _add_refresh_token(current_user, "older-token", now - timedelta(days=1))
-        _add_refresh_token(current_user, "newer-token", now - timedelta(hours=1))
-        foreign = _add_refresh_token(other_user, "other-users-token", now)
-        db.session.commit()
-        preferred, expected_token = (
-            (older, "older-token")
-            if preferred_owner == "current-user"
-            else (foreign, "newer-token")
-        )
-        sm.set(sk.USER_ID, current_user.id)
-        sm.set(sk.REFRESH_TOKEN_ID, preferred.id)
+    clock.return_value += 7 * 24 * 60 * 60 - 1
+    assert client.get("/api/verbs/tenses").status_code == 200
+    clock.return_value += 1
+    assert client.get("/api/verbs/tenses").status_code == 401
+    assert client.get("/verbs").location == "/auth"
 
-        credentials = auth_manager.get_credentials(force_refresh=True)
 
-        assert credentials is not None
-        assert credentials.token == "refreshed-access-token"
+@pytest.mark.parametrize("path", ["/clear", "/logout-everywhere", "/disconnect-google-sheets"])
+def test_account_mutations_require_post_and_csrf(
+    auth_app, google_token_request, verify_token, path
+):
+    client = auth_app.test_client()
+    _sign_in(client)
+
+    assert client.get(path).status_code == 405
+    assert client.post(path).status_code == 400
+    assert client.post(path, data={"csrf_token": "wrong"}).status_code == 400
+    assert client.get("/api/verbs/tenses").status_code == 200
+    with auth_app.app_context():
+        assert GoogleSheetsConnection.query.count() == 1
+        assert User.query.one().session_version == 0
 
 
 @pytest.mark.parametrize(
-    ("logout_all_devices", "preferred_owner", "remaining_devices"),
-    [
-        (False, "current-user", {"second-device", "other-users-device"}),
-        (False, "other-user", {"current-device", "second-device", "other-users-device"}),
-        (True, "current-user", {"other-users-device"}),
-    ],
+    ("path", "other_browser_status", "remaining_version"),
+    [("/clear", 200, 0), ("/logout-everywhere", 401, 1)],
 )
-def test_logout_clears_session_and_deletes_only_selected_owned_tokens(
-    auth_app, logout_all_devices, preferred_owner, remaining_devices
+def test_logout_preserves_sheets_and_invalidates_intended_browser_sessions(
+    auth_app, google_token_request, verify_token, path, other_browser_status, remaining_version
 ):
-    with auth_app.test_request_context():
-        current_user = _add_user("current-user")
-        other_user = _add_user("other-user")
-        now = datetime.now(UTC)
-        current_token = _add_refresh_token(current_user, "current-device", now)
-        _add_refresh_token(current_user, "second-device", now)
-        foreign = _add_refresh_token(other_user, "other-users-device", now)
-        db.session.commit()
-        _set_valid_session_credentials()
-        sm.set(sk.USER_ID, current_user.id)
-        preferred = current_token if preferred_owner == "current-user" else foreign
-        sm.set(sk.REFRESH_TOKEN_ID, preferred.id)
-        sm.set(sk.LEARNING_ACTIVE_TAB, "Vocabulary")
-        sm.set(sk.REVIEW_ACTIVE_TAB, "Review")
+    device = auth_app.test_client()
+    other_device = auth_app.test_client()
+    _sign_in(device)
+    _sign_in(other_device)
+    with device.session_transaction() as session:
+        session[sk.LEARNING_ACTIVE_TAB.value] = "Vocabulary"
+        session[sk.REVIEW_ACTIVE_TAB.value] = "Review"
 
-        auth_manager.logout(logout_all_devices=logout_all_devices)
+    response = device.post(path, data={"csrf_token": _csrf_token(device)})
 
-        assert not auth_manager.is_authenticated()
-        assert auth_manager.user is None
-        assert not sm.has(sk.ACCESS_TOKEN)
-        assert not sm.has(sk.REFRESH_TOKEN_ID)
-        assert not sm.has(sk.LEARNING_ACTIVE_TAB)
-        assert sm.get(sk.REVIEW_ACTIVE_TAB) == "Review"
-        assert {token.get_decrypted_token() for token in RefreshToken.query.all()} == (
-            remaining_devices
+    assert response.location == "/"
+    assert device.get("/api/verbs/tenses").status_code == 401
+    assert other_device.get("/api/verbs/tenses").status_code == other_browser_status
+    with device.session_transaction() as session:
+        assert sk.LEARNING_ACTIVE_TAB.value not in session
+        assert sk.REVIEW_ACTIVE_TAB.value not in session
+    with auth_app.app_context():
+        assert User.query.one().session_version == remaining_version
+        assert GoogleSheetsConnection.query.one().get_decrypted_token() == "refresh-token"
+
+
+def test_disconnect_keeps_both_browsers_signed_in_without_google_calls(
+    auth_app, google_token_request, verify_token
+):
+    device = auth_app.test_client()
+    other_device = auth_app.test_client()
+    _sign_in(device)
+    _sign_in(other_device)
+    csrf_token = _csrf_token(device)
+    with auth_app.app_context():
+        user = User.query.one()
+        user.add_spreadsheet("synthetic-sheet")
+        user_id = user.id
+        service = auth_app.extensions["google_credentials"]
+        assert service.get_credentials(user_id).token == "access-token"
+    google_token_request.reset_mock()
+
+    with (
+        patch("app.routes.index.read_all_card_sets") as read_sheets,
+        patch.object(Credentials, "refresh") as refresh,
+    ):
+        response = device.post(
+            "/disconnect-google-sheets", json={}, headers={"X-CSRFToken": csrf_token}
         )
+
+        assert response.location == "/"
+        assert b"Google Sheets is disconnected" in device.get("/").data
+        assert device.get("/verbs").status_code == 200
+        assert other_device.get("/api/verbs/tenses").status_code == 200
+        assert b"Google Sheets is disconnected" in other_device.get("/").data
+        with auth_app.app_context():
+            assert GoogleSheetsConnection.query.count() == 0
+            assert User.query.one().get_active_spreadsheet_id() == "synthetic-sheet"
+            assert RefreshToken.query.count() == 0
+        read_sheets.assert_not_called()
+        refresh.assert_not_called()
+    google_token_request.assert_not_called()
+
+
+def test_confirmed_google_revocation_keeps_current_login(
+    auth_app, google_token_request, verify_token
+):
+    with auth_app.test_client() as client:
+        _sign_in(client)
+        revoked = RefreshError("revoked", {"error": "invalid_grant"})
+        with patch.object(Credentials, "refresh", side_effect=revoked):
+            assert auth_manager.get_credentials(force_refresh=True) is None
+
+        assert GoogleSheetsConnection.query.count() == 0
+        assert auth_manager.is_authenticated()
+        assert client.get("/api/verbs/tenses").status_code == 200
+
+
+def test_successful_google_login_without_refresh_token_has_no_sheets_connection(
+    auth_app, google_token_request, verify_token
+):
+    response = google_token_request.return_value
+    payload = json.loads(response.text)
+    del payload["refresh_token"]
+    response.text = json.dumps(payload)
+    client = auth_app.test_client()
+    _sign_in(client)
+
+    assert b"Google Sheets is disconnected" in client.get("/").data
+    assert client.get("/api/verbs/tenses").status_code == 200
+    with auth_app.app_context():
+        assert GoogleSheetsConnection.query.count() == 0

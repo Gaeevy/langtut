@@ -21,7 +21,7 @@ def create_app() -> Starlette:
     """Initialize the website/database once and compose both applications."""
     from app import create_app as create_flask_app
     from app.config import Environment, config
-    from app.database import ensure_tables, init_database
+    from app.database import check_auth_schema, ensure_tables, init_database
 
     if not config.allowed_hosts:
         raise ValueError("Configure LANGTUT_ALLOWED_HOSTS before starting the service")
@@ -31,5 +31,6 @@ def create_app() -> Starlette:
     web = create_flask_app()
     init_database(web)
     with web.app_context():
+        check_auth_schema()
         ensure_tables()
     return create_combined_app(web, config.mcp_settings())

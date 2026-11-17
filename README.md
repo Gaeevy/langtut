@@ -48,6 +48,9 @@ service-account JSON through `LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON`.
 uv run python serve.py --reload
 ```
 
+When upgrading an existing SQLite database, follow the [auth cutover instructions](docs/deployment.md#auth-cutover)
+before starting the new version.
+
 ### Tests
 ```bash
 uv run pytest

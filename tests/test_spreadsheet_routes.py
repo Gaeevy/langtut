@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from time import time
 from types import SimpleNamespace
 
 import pytest
@@ -32,9 +33,12 @@ def app_with_db(tmp_path, google_oauth, monkeypatch):
     return application
 
 
-def _session_as_user(client, user_id: int) -> None:
+def _session_as_user(client, user_id: int, google_user_id: str) -> None:
     with client.session_transaction() as sess:
         sess[SessionKeys.USER_ID.value] = user_id
+        sess[SessionKeys.USER_GOOGLE_ID.value] = google_user_id
+        sess[SessionKeys.SESSION_VERSION.value] = 0
+        sess[SessionKeys.LOGIN_EXPIRES_AT.value] = int(time()) + 3600
 
 
 def _seed_user_two_sheets():
@@ -66,17 +70,13 @@ def _seed_user_two_sheets():
     return user
 
 
-def test_activate_spreadsheet_returns_summary_and_updates_db(app_with_db, monkeypatch):
-    monkeypatch.setattr(
-        "app.services.auth_manager.auth_manager.is_authenticated",
-        lambda: True,
-    )
+def test_activate_spreadsheet_returns_summary_and_updates_db(app_with_db):
     with app_with_db.app_context():
         user = _seed_user_two_sheets()
         user_id = user.id
 
     client = app_with_db.test_client()
-    _session_as_user(client, user_id)
+    _session_as_user(client, user_id, "gid_integration")
 
     response = client.post("/settings/activate-spreadsheet", json={"spreadsheet_id": "sheet_b"})
     assert response.status_code == 200
@@ -98,10 +98,6 @@ def test_activate_spreadsheet_returns_summary_and_updates_db(app_with_db, monkey
 
 def test_validate_spreadsheet_adds_sheet_and_returns_spreadsheet_payload(app_with_db, monkeypatch):
     monkeypatch.setattr(
-        "app.services.auth_manager.auth_manager.is_authenticated",
-        lambda: True,
-    )
-    monkeypatch.setattr(
         "app.services.settings_service.validate_spreadsheet_access",
         lambda sid: "Mock Title",
     )
@@ -119,7 +115,7 @@ def test_validate_spreadsheet_adds_sheet_and_returns_spreadsheet_payload(app_wit
         user_id = user.id
 
     client = app_with_db.test_client()
-    _session_as_user(client, user_id)
+    _session_as_user(client, user_id, "gid_val")
 
     response = client.post(
         "/validate-spreadsheet",
@@ -141,17 +137,13 @@ def test_validate_spreadsheet_adds_sheet_and_returns_spreadsheet_payload(app_wit
         assert row.is_active is True
 
 
-def test_rename_spreadsheet_clear_display_name(app_with_db, monkeypatch):
-    monkeypatch.setattr(
-        "app.services.auth_manager.auth_manager.is_authenticated",
-        lambda: True,
-    )
+def test_rename_spreadsheet_clear_display_name(app_with_db):
     with app_with_db.app_context():
         user = _seed_user_two_sheets()
         user_id = user.id
 
     client = app_with_db.test_client()
-    _session_as_user(client, user_id)
+    _session_as_user(client, user_id, "gid_integration")
 
     response = client.post(
         "/settings/rename-spreadsheet",

@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text, inspect
 from sqlalchemy.orm import relationship
 
 db = SQLAlchemy()
@@ -24,6 +24,7 @@ class User(db.Model):
     name = Column(String(255))
     created_at = Column(DateTime, default=utc_now)
     last_login = Column(DateTime, default=utc_now)
+    session_version = Column(Integer, nullable=False, server_default="0")
 
     # Relationship to user spreadsheets
     spreadsheets = relationship(
@@ -31,6 +32,9 @@ class User(db.Model):
     )
     verb_interactions = relationship(
         "UserVerbInteraction", back_populates="user", cascade="all, delete-orphan"
+    )
+    google_sheets_connection = relationship(
+        "GoogleSheetsConnection", cascade="all, delete-orphan", uselist=False
     )
 
     def __repr__(self):
@@ -196,13 +200,7 @@ class User(db.Model):
 
 
 class RefreshToken(db.Model):
-    """Store encrypted refresh tokens for users.
-
-    Each row represents a refresh token for a user session. Users can have
-    multiple refresh tokens (e.g., different devices, different sessions).
-
-    Tokens are encrypted at rest using Fernet symmetric encryption.
-    """
+    """Retain the legacy refresh-token rows during the migration window."""
 
     __tablename__ = "refresh_tokens"
 
@@ -213,11 +211,19 @@ class RefreshToken(db.Model):
     last_used = Column(DateTime, nullable=False, default=utc_now)
     last_rotated = Column(DateTime, nullable=False, default=utc_now)
 
-    # Relationship to user
-    user = relationship("User", backref=db.backref("refresh_tokens", lazy=True))
 
-    def __repr__(self):
-        return f"<RefreshToken {self.id} for user {self.user_id}>"
+class GoogleSheetsConnection(db.Model):
+    """Store one encrypted Google Sheets grant per LangTut user."""
+
+    __tablename__ = "google_sheets_connections"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    google_user_id = Column(String(255), nullable=False)
+    token_encrypted = Column(Text, nullable=False)
+    granted_scopes = Column(JSON(none_as_null=True), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    last_used = Column(DateTime, nullable=False, default=utc_now)
+    last_rotated = Column(DateTime, nullable=False, default=utc_now)
 
     def encrypt_and_store(self, token: str) -> None:
         """Encrypt and store refresh token.
@@ -461,3 +467,15 @@ def ensure_tables():
         _tables_created = True
     except Exception:
         _tables_created = True
+
+
+def check_auth_schema() -> None:
+    """Require an explicit migration for databases with the legacy users table."""
+    schema = inspect(db.engine)
+    if not schema.has_table("users"):
+        return
+    user_columns = {column["name"] for column in schema.get_columns("users")}
+    if "session_version" not in user_columns or not schema.has_table("google_sheets_connections"):
+        raise RuntimeError(
+            "Migrate the LangTut database with scripts.migrate_auth before starting this version."
+        )

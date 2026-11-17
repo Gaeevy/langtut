@@ -12,9 +12,10 @@ from cryptography.fernet import Fernet
 from flask import Flask, has_request_context
 from google.auth.exceptions import TransportError
 from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 
 from app.config import config
-from app.database import RefreshToken, User, db
+from app.database import GoogleSheetsConnection, User, db
 from app.services.google_credentials import (
     GoogleConnectionRequiredError,
     GoogleCredentialsService,
@@ -43,12 +44,13 @@ def service(google_oauth):
     )
 
 
-def _add_google_user(service: GoogleCredentialsService, subject: str) -> tuple[int, int]:
+def _add_google_user(service: GoogleCredentialsService, subject: str) -> int:
     user = User(google_user_id=subject, email=f"{subject}@example.test")
     db.session.add(user)
     db.session.flush()
     user_id = user.id
-    return user_id, service.save_refresh_token(user_id, f"grant-{subject}")
+    service.save_connection(user, Credentials(token=None, refresh_token=f"grant-{subject}"))
+    return user_id
 
 
 def _google_response(access_token: str, *, expires_in: int = 3600, **payload):
@@ -71,15 +73,13 @@ def send_to_google(monkeypatch):
     return send_mock
 
 
-def test_refresh_without_request_context_isolates_users_and_checks_grant_ownership(
-    credentials_app, service, send_to_google
-):
+def test_refresh_without_request_context_isolates_users(credentials_app, service, send_to_google):
     with credentials_app.app_context():
         assert not has_request_context()
-        alice_id, _ = _add_google_user(service, "alice")
-        bob_id, bob_grant = _add_google_user(service, "bob")
+        alice_id = _add_google_user(service, "alice")
+        bob_id = _add_google_user(service, "bob")
 
-        alice_credentials = service.get_credentials(alice_id, preferred_record_id=bob_grant)
+        alice_credentials = service.get_credentials(alice_id)
         bob_credentials = service.get_credentials(bob_id)
 
         assert alice_credentials.token == "access-for-grant-alice"
@@ -97,10 +97,10 @@ def test_refresh_persists_rotation_before_reusing_grant(credentials_app, service
         _google_response("second-access"),
     ]
     with credentials_app.app_context():
-        user_id, grant_id = _add_google_user(service, "one")
+        user_id = _add_google_user(service, "one")
         assert service.get_credentials(user_id).token == "first-access"
     with credentials_app.app_context():
-        grant = db.session.get(RefreshToken, grant_id)
+        grant = db.session.get(GoogleSheetsConnection, user_id)
         assert grant.get_decrypted_token() == "rotated-grant"
         assert grant.token_encrypted != "rotated-grant"
 
@@ -110,21 +110,46 @@ def test_refresh_persists_rotation_before_reusing_grant(credentials_app, service
         ]
 
 
-def test_cache_keeps_separate_tokens_for_each_owned_grant(credentials_app, service, send_to_google):
+def test_new_grant_replaces_old_connection_and_cache(credentials_app, service, send_to_google):
     with credentials_app.app_context():
-        user_id, first_grant = _add_google_user(service, "one")
-        second_grant = service.save_refresh_token(user_id, "second-grant")
+        user_id = _add_google_user(service, "one")
+        assert service.get_credentials(user_id).token == "access-for-grant-one"
+        user = db.session.get(User, user_id)
+        service.save_connection(
+            user,
+            Credentials(
+                token=None, refresh_token="replacement-grant", granted_scopes=config.scopes
+            ),
+        )
 
-        assert service.get_credentials(user_id, preferred_record_id=first_grant).token == (
-            "access-for-grant-one"
-        )
-        assert service.get_credentials(user_id, preferred_record_id=second_grant).token == (
-            "access-for-second-grant"
-        )
-        assert service.get_credentials(user_id, preferred_record_id=first_grant).token == (
-            "access-for-grant-one"
-        )
+        assert service.get_credentials(user_id).token == "access-for-replacement-grant"
+        assert GoogleSheetsConnection.query.one().granted_scopes == config.scopes
         assert send_to_google.call_count == 2
+
+
+def test_login_without_new_refresh_token_preserves_existing_connection(
+    credentials_app, service, send_to_google
+):
+    with credentials_app.app_context():
+        user_id = _add_google_user(service, "one")
+        user = db.session.get(User, user_id)
+        service.save_connection(user, Credentials(token=None))
+
+        assert service.get_credentials(user_id).token == "access-for-grant-one"
+        send_to_google.assert_called_once()
+
+
+def test_connection_with_wrong_google_subject_is_unusable(credentials_app, service, send_to_google):
+    with credentials_app.app_context():
+        user_id = _add_google_user(service, "one")
+        assert service.get_credentials(user_id).token == "access-for-grant-one"
+        connection = db.session.get(GoogleSheetsConnection, user_id)
+        connection.google_user_id = "different-google-user"
+        db.session.commit()
+
+        with pytest.raises(GoogleConnectionRequiredError):
+            service.get_credentials(user_id)
+        send_to_google.assert_called_once()
 
 
 def test_expiry_and_outage_fall_back_only_to_usable_access_token(
@@ -136,12 +161,12 @@ def test_expiry_and_outage_fall_back_only_to_usable_access_token(
         _google_response("renewed-access"),
     ]
     with credentials_app.app_context():
-        user_id, grant_id = _add_google_user(service, "one")
+        user_id = _add_google_user(service, "one")
         assert service.get_credentials(user_id).token == "expiring-access"
         assert service.get_credentials(user_id).token == "expiring-access"
         assert service.get_credentials(user_id).token == "renewed-access"
         assert send_to_google.call_count == 3
-        assert db.session.get(RefreshToken, grant_id).get_decrypted_token() == "grant-one"
+        assert db.session.get(GoogleSheetsConnection, user_id).get_decrypted_token() == "grant-one"
 
 
 def test_provider_outage_uses_only_the_sdk_retry_budget(
@@ -152,12 +177,12 @@ def test_provider_outage_uses_only_the_sdk_retry_budget(
     send_to_google.return_value = Mock(status=503, data=b'{"error":"temporarily_unavailable"}')
 
     with credentials_app.app_context():
-        user_id, grant_id = _add_google_user(service, "one")
+        user_id = _add_google_user(service, "one")
         with pytest.raises(GoogleCredentialsUnavailableError):
             service.get_credentials(user_id)
 
         assert send_to_google.call_count == 3
-        assert db.session.get(RefreshToken, grant_id) is not None
+        assert db.session.get(GoogleSheetsConnection, user_id) is not None
 
 
 def test_forced_refresh_evicts_rejected_token_even_if_refresh_fails(
@@ -169,7 +194,7 @@ def test_forced_refresh_evicts_rejected_token_even_if_refresh_fails(
         TransportError("provider outage"),
     ]
     with credentials_app.app_context():
-        user_id, _ = _add_google_user(service, "one")
+        user_id = _add_google_user(service, "one")
         assert service.get_credentials(user_id).token == "rejected-access"
 
         with pytest.raises(GoogleCredentialsUnavailableError):
@@ -187,10 +212,9 @@ def test_invalid_grant_requires_reconnection_and_sanitizes_provider_details(
     send_to_google.side_effect = [
         _google_response("expiring-access", expires_in=540),
         Mock(status=400, data=b'{"error":"invalid_grant","error_description":"provider-details"}'),
-        _google_response("working-access"),
     ]
     with credentials_app.app_context():
-        user_id, grant_id = _add_google_user(service, "one")
+        user_id = _add_google_user(service, "one")
         assert service.get_credentials(user_id).token == "expiring-access"
 
         with pytest.raises(GoogleConnectionRequiredError, match="Reconnect") as error:
@@ -198,15 +222,17 @@ def test_invalid_grant_requires_reconnection_and_sanitizes_provider_details(
         assert send_to_google.call_count == 2
         assert "provider-details" not in caplog.text
         assert error.value.__suppress_context__
-        assert db.session.get(RefreshToken, grant_id) is not None
-        assert service.get_credentials(user_id).token == "working-access"
+        assert db.session.get(GoogleSheetsConnection, user_id) is None
+        with pytest.raises(GoogleConnectionRequiredError):
+            service.get_credentials(user_id)
+        assert send_to_google.call_count == 2
 
 
 def test_cache_is_bounded_and_grant_deletion_invalidates_access(
     credentials_app, service, send_to_google
 ):
     with credentials_app.app_context():
-        user_ids = [_add_google_user(service, subject)[0] for subject in ("one", "two", "three")]
+        user_ids = [_add_google_user(service, subject) for subject in ("one", "two", "three")]
         for user_id in user_ids:
             service.get_credentials(user_id)
         service.get_credentials(user_ids[-1])
@@ -214,7 +240,7 @@ def test_cache_is_bounded_and_grant_deletion_invalidates_access(
         service.get_credentials(user_ids[0])
         assert send_to_google.call_count == 4
 
-        service.delete_refresh_tokens(user_ids[0])
+        service.disconnect(user_ids[0])
         with pytest.raises(GoogleConnectionRequiredError):
             service.get_credentials(user_ids[0])
         assert send_to_google.call_count == 4
@@ -222,7 +248,7 @@ def test_cache_is_bounded_and_grant_deletion_invalidates_access(
 
 def test_concurrent_requests_share_one_refresh(credentials_app, service, send_to_google):
     with credentials_app.app_context():
-        user_id, _ = _add_google_user(service, "one")
+        user_id = _add_google_user(service, "one")
 
     first_refresh = Event()
     second_request = Event()

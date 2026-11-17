@@ -18,9 +18,8 @@ class SessionKeys(Enum):
     AUTH_STATE = "auth.state"
     AUTH_REDIRECT_URI = "auth.redirect_uri"
     AUTH_CODE_VERIFIER = "auth.code_verifier"
-    ACCESS_TOKEN = "auth.access_token"  # OAuth access token (short-lived, stored in session)
-    ACCESS_TOKEN_EXPIRY = "auth.access_token_expiry"  # Token expiry datetime
-    REFRESH_TOKEN_ID = "auth.refresh_token_id"  # ID of RefreshToken record for this session
+    LOGIN_EXPIRES_AT = "auth.login_expires_at"
+    SESSION_VERSION = "auth.session_version"
 
     # User namespace - User identification and metadata
     USER_ID = "user.id"

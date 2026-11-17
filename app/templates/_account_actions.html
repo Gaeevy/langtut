@@ -1,0 +1,18 @@
+<div class="mt-4">
+    <div class="d-flex flex-wrap gap-2 justify-content-center">
+        <form method="post" action="{{ url_for('auth.logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-secondary btn-sm">Log out</button>
+        </form>
+        <form method="post" action="{{ url_for('auth.logout_everywhere') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-secondary btn-sm">Log out everywhere</button>
+        </form>
+        {% if sheets_connected %}
+            <form method="post" action="{{ url_for('auth.disconnect_google_sheets') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Disconnect Google Sheets</button>
+            </form>
+        {% endif %}
+    </div>
+</div>

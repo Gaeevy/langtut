@@ -2,6 +2,9 @@
 
 from datetime import UTC, datetime
 
+from sqlalchemy import update
+from sqlalchemy.exc import SQLAlchemyError
+
 from app.database import User, db
 from app.services.google_oauth import GoogleIdentity
 
@@ -20,3 +23,17 @@ def login_or_create_user(identity: GoogleIdentity) -> User:
         user.name = identity.name or user.name
     db.session.commit()
     return user
+
+
+def invalidate_user_sessions(user: User) -> None:
+    """Invalidate all current browser sessions for this local account."""
+    try:
+        db.session.execute(
+            update(User)
+            .where(User.id == user.id, User.google_user_id == user.google_user_id)
+            .values(session_version=User.session_version + 1)
+        )
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        raise

@@ -7,9 +7,12 @@ Handles Google OAuth authentication flow using centralized AuthManager.
 import logging
 
 from flask import Blueprint, redirect, render_template, request, url_for
+from sqlalchemy.exc import SQLAlchemyError
 
+from app import csrf
 from app.config import Environment, config
 from app.services.auth_manager import auth_manager
+from app.services.google_credentials import GoogleCredentialsUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +55,36 @@ def oauth2callback():
         return render_template("error.html", message="OAuth callback error. Start sign-in again.")
 
 
-@auth_bp.route("/clear")
-def clear_credentials():
-    """Logout user and clear credentials."""
+@auth_bp.post("/clear")
+@auth_manager.require_auth
+def logout():
+    """End the current browser login."""
+    csrf.protect()
     auth_manager.logout()
+    return redirect(url_for("index.home"))
+
+
+@auth_bp.post("/logout-everywhere")
+@auth_manager.require_auth
+def logout_everywhere():
+    """Invalidate all browser logins for the current user."""
+    csrf.protect()
+    try:
+        auth_manager.logout(logout_all_devices=True)
+    except SQLAlchemyError:
+        logger.warning("Could not log out the user on all devices")
+        return render_template("error.html", message="Could not log out on all devices."), 503
+    return redirect(url_for("index.home"))
+
+
+@auth_bp.post("/disconnect-google-sheets")
+@auth_manager.require_auth
+def disconnect_google_sheets():
+    """Remove LangTut's Google Sheets connection."""
+    csrf.protect()
+    try:
+        auth_manager.disconnect_google_sheets()
+    except GoogleCredentialsUnavailableError:
+        logger.warning("Could not disconnect Google Sheets")
+        return render_template("error.html", message="Could not disconnect Google Sheets."), 503
     return redirect(url_for("index.home"))

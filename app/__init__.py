@@ -10,11 +10,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from flask import Flask
+from flask_wtf.csrf import CSRFProtect
 
 from flask_session import Session
 
 if TYPE_CHECKING:
     from app.services.google_oauth import GoogleOAuthService
+
+
+csrf = CSRFProtect()
 
 
 def configure_app(app: Flask) -> None:
@@ -59,6 +63,8 @@ def initialize_extensions(app: Flask) -> None:
     """
     # Initialize Flask-Session
     Session(app)
+    app.config["WTF_CSRF_CHECK_DEFAULT"] = False
+    csrf.init_app(app)
 
 
 def setup_middleware(app: Flask) -> None:

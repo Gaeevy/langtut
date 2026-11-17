@@ -47,7 +47,7 @@ coding and test rules.
 |---|---|
 | Google Sheets | Vocabulary, examples, levels, counters, last study timestamps |
 | SQLite | Users, linked spreadsheets, encrypted refresh tokens, verbs, practice history |
-| Filesystem session | OAuth state/access credentials, active study queues, language settings |
+| Filesystem session | OAuth transaction, LangTut login expiry and version, active study queues, language settings |
 | GCS | Generated MP3 cache |
 | Browser localStorage | Bounded TTS cache; details in [audio.md](audio.md) |
 
@@ -81,22 +81,23 @@ token. The browser session holds OAuth state, the redirect URI, and a PKCE verif
 until the callback consumes them. Successful login rotates the session ID and resets
 the browser state for the signed-in user.
 
-Google subject IDs identify users. The local user lookup can update an email address
-without creating a new account. Refresh tokens are Fernet-encrypted in SQLite. The
-server-side session holds active credentials and a reference to the refresh-token record.
+Google subject IDs identify users. The browser login expires seven days after sign-in
+without extension. Each guard checks the local user, Google subject, session version,
+and expiry. Protected HTML routes use `require_auth` and redirect to sign-in. Protected
+JSON routes use `require_auth_api` and return 401. All-device logout increments the user's
+session version. Both logout actions preserve the Sheets connection.
 
-`GoogleCredentialsService` refreshes access tokens for a trusted local user ID
-within an application context. It caches up to 128 access tokens by user and
-refresh-token record in each process and serializes refresh for the same user.
-Forced refresh and grant deletion evict the affected entries. Each worker has an
-independent cache and locks. Cross-process refresh coordination would need review
-before running multiple workers. Website callers still use the browser session
-through `AuthManager.get_credentials()`.
+`GoogleCredentialsService` refreshes access tokens for a trusted local user ID within an
+application context. One `GoogleSheetsConnection` per user stores the encrypted refresh
+token and granted scopes when known. Up to 128 access tokens are cached per process.
+Refreshes for the same user are serialized within that process. Forced refresh and
+connection deletion evict the affected cache entry. A confirmed invalid grant removes
+the connection and leaves browser logins active.
 
-Protected HTML routes use `require_auth`; protected JSON routes use `require_auth_api`
-and return 401 on failure. They use `auth_manager.user` and `get_credentials()`.
-Sessions go through `SessionManager` with namespaced `SessionKeys`. Read-only requests
-do not refresh sessions by default, preventing stale background session writes.
+Sheets callers currently go through `AuthManager.get_credentials()`. The SQLite-only
+features need a valid LangTut login. The logout and Sheets disconnect forms use POST
+with Flask-WTF CSRF protection. See the [auth cutover and rollback](deployment.md#auth-cutover)
+for existing databases and Google-side revocation.
 
 The unused `/admin/*` routes are removed. TTS and diagnostic routes require login.
 `POST /api/verbs/forms` accepts a logged-in user or the configured `X-Import-Key`;
