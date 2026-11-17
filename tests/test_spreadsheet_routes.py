@@ -10,13 +10,15 @@ from app.session_manager import SessionKeys
 
 
 @pytest.fixture
-def app_with_db(tmp_path):
+def app_with_db(tmp_path, google_oauth, monkeypatch):
     """Flask app with SQLite database and all tables."""
     from app import create_app
+    from app.config import config
     from app.database import db
 
     db_path = tmp_path / "integration.sqlite"
-    application = create_app()
+    monkeypatch.setattr(config, "session_file_dir", str(tmp_path / "sessions"))
+    application = create_app(google_oauth=google_oauth)
     application.config.update(
         TESTING=True,
         SECRET_KEY="integration-test-secret",

@@ -74,10 +74,16 @@ Unifying verb and vocabulary models is not an implemented feature.
 
 ## Authentication and permissions
 
-`AuthManager` manages Google login, callbacks, refresh, and route protection. Google
-subject IDs identify users; emails are not unique database identifiers. Refresh
-tokens are Fernet-encrypted in SQLite; the server-side session holds active credentials
-and a reference to the refresh-token record.
+`AuthManager` coordinates browser login, refresh, and route protection.
+`GoogleOAuthService` loads OAuth client configuration at Flask application setup.
+It builds the combined sign-in and Sheets consent flow and verifies the Google ID
+token. The browser session holds OAuth state, the redirect URI, and a PKCE verifier
+until the callback consumes them. Successful login rotates the session ID and resets
+the browser state for the signed-in user.
+
+Google subject IDs identify users. The local user lookup can update an email address
+without creating a new account. Refresh tokens are Fernet-encrypted in SQLite. The
+server-side session holds active credentials and a reference to the refresh-token record.
 
 Protected HTML routes use `require_auth`; protected JSON routes use `require_auth_api`
 and return 401 on failure. They use `auth_manager.user` and `get_credentials()`.

@@ -20,11 +20,14 @@ auth_bp = Blueprint("auth", __name__)
 def auth():
     """Initiate OAuth flow."""
     try:
-        authorization_url = auth_manager.initiate_login(request.host)
+        use_https = config.environment == Environment.PRODUCTION or "ngrok" in request.host
+        scheme = "https" if use_https else "http"
+        redirect_uri = f"{scheme}://{request.host}{url_for('auth.oauth2callback')}"
+        authorization_url = auth_manager.initiate_login(redirect_uri)
         return redirect(authorization_url)
     except Exception as e:
-        logger.error(f"Error initiating OAuth flow: {e}")
-        return render_template("error.html", message=f"Authentication error: {e!s}")
+        logger.error("Could not start Google sign-in (%s)", type(e).__name__)
+        return render_template("error.html", message="Could not start Google sign-in.")
 
 
 @auth_bp.route("/oauth2callback")
@@ -39,14 +42,14 @@ def oauth2callback():
             authorization_response = authorization_response.replace("http://", "https://", 1)
 
         # Handle callback and create/login user
-        user = auth_manager.handle_callback(authorization_response, request.host)
+        user = auth_manager.handle_callback(authorization_response)
 
-        logger.info(f"User {user.email} authenticated successfully")
+        logger.info("User %s signed in with Google", user.id)
         return redirect(url_for("index.home"))
 
     except Exception as e:
-        logger.error(f"Error handling OAuth callback: {e}")
-        return render_template("error.html", message=f"OAuth callback error: {e!s}")
+        logger.warning("Google sign-in callback failed (%s)", type(e).__name__)
+        return render_template("error.html", message="OAuth callback error. Start sign-in again.")
 
 
 @auth_bp.route("/clear")

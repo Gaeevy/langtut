@@ -25,9 +25,6 @@ def create_app() -> Starlette:
 
     if not config.allowed_hosts:
         raise ValueError("Configure LANGTUT_ALLOWED_HOSTS before starting the service")
-    if not config.client_secrets_file_path:
-        raise ValueError("Google OAuth credentials are required for the combined website")
-
     if config.environment == Environment.LOCAL:
         os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 

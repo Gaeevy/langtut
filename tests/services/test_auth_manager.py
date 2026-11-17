@@ -1,7 +1,9 @@
 """Behavior tests for browser login, Google credential refresh, and logout."""
 
+import json
 from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
 from cryptography.fernet import Fernet
@@ -58,10 +60,11 @@ def test_expired_token_is_rejected_when_refresh_fails(request_context, monkeypat
 
 
 @pytest.fixture
-def auth_app(tmp_path, monkeypatch):
+def auth_app(tmp_path, monkeypatch, google_oauth):
     monkeypatch.setattr(config, "session_file_dir", str(tmp_path / "sessions"))
     monkeypatch.setattr(config, "encryption_key", Fernet.generate_key().decode())
-    app = create_app()
+    monkeypatch.setenv("OAUTHLIB_INSECURE_TRANSPORT", "1")
+    app = create_app(google_oauth=google_oauth)
     app.config.update(TESTING=True, SQLALCHEMY_DATABASE_URI="sqlite:///:memory:")
     db.init_app(app)
     with app.app_context():
@@ -70,19 +73,43 @@ def auth_app(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def google_flow(monkeypatch):
-    flow = Mock()
-    flow.authorization_url.return_value = ("https://accounts.example.test/authorize", "state")
-    flow.credentials = Credentials(
-        token="access-token",
-        refresh_token="refresh-token",
-        id_token="id-token",
-        expiry=datetime.now(UTC) + timedelta(hours=1),
+def google_token_request(monkeypatch):
+    response = Mock(
+        text=json.dumps(
+            {
+                "access_token": "access-token",
+                "refresh_token": "refresh-token",
+                "id_token": "id-token",
+                "expires_in": 3600,
+                "token_type": "Bearer",
+            }
+        ),
+        status_code=200,
     )
-    monkeypatch.setattr(
-        "app.services.auth_manager.Flow.from_client_secrets_file", Mock(return_value=flow)
+    request = Mock(return_value=response)
+    monkeypatch.setattr("requests_oauthlib.OAuth2Session.request", request)
+    return request
+
+
+@pytest.fixture
+def verify_token(monkeypatch):
+    verify = Mock(
+        return_value={"sub": "google-user", "email": "learner@example.test", "name": "Learner"}
     )
-    return flow
+    monkeypatch.setattr("app.services.google_oauth.id_token.verify_oauth2_token", verify)
+    return verify
+
+
+def _start_login(client, **kwargs) -> dict[str, list[str]]:
+    login = client.get("/auth", **kwargs)
+    assert login.status_code == 302
+    authorization_url = urlsplit(login.location)
+    assert authorization_url.netloc == "accounts.example.test"
+    return parse_qs(authorization_url.query)
+
+
+def _callback_url(state: str) -> str:
+    return "/oauth2callback?" + urlencode({"code": "test-code", "state": state})
 
 
 def _add_user(google_user_id: str) -> User:
@@ -100,28 +127,33 @@ def _add_refresh_token(user: User, value: str, last_used: datetime) -> RefreshTo
     return token
 
 
-def test_google_login_creates_user_and_shows_spreadsheet_setup(auth_app, google_flow, monkeypatch):
-    verify_token = Mock(
-        return_value={"sub": "google-user", "email": "learner@example.test", "name": "Learner"}
-    )
+def test_google_login_creates_user_and_shows_spreadsheet_setup(
+    auth_app, google_token_request, verify_token, monkeypatch
+):
     read_sheets = Mock()
-    monkeypatch.setattr("app.services.auth_manager.id_token.verify_oauth2_token", verify_token)
     monkeypatch.setattr("app.routes.index.read_all_card_sets", read_sheets)
+    cookie_name = auth_app.config["SESSION_COOKIE_NAME"]
 
     with auth_app.test_client() as client:
         assert b"Sign in with Google" in client.get("/").data
+        assert sm.has(sk.TEST_SESSION)
 
-        login = client.get("/auth")
-        assert login.status_code == 302
-        assert login.location == "https://accounts.example.test/authorize"
-        google_flow.authorization_url.assert_called_once_with(
-            access_type="offline", include_granted_scopes="true"
-        )
+        params = _start_login(client, base_url="http://localhost:8080")
+        assert params["access_type"] == ["offline"]
+        assert params["include_granted_scopes"] == ["true"]
+        assert set(params["scope"][0].split()) == set(config.scopes)
+        assert params["code_challenge_method"] == ["S256"]
+        assert params["code_challenge"][0]
+        code_verifier = sm.get(sk.AUTH_CODE_VERIFIER)
+        previous_cookie = client.get_cookie(cookie_name).value
+        callback_url = _callback_url(params["state"][0])
 
-        callback = client.get("/oauth2callback?code=example&state=state", follow_redirects=True)
+        callback = client.get(callback_url)
 
-        assert callback.status_code == 200
-        assert b"Set Up Your Learning Spreadsheet" in callback.data
+        assert callback.status_code == 302
+        assert callback.location == "/"
+        assert client.get_cookie(cookie_name).value != previous_cookie
+        assert not sm.has(sk.TEST_SESSION)
         user = auth_manager.user
         assert (user.google_user_id, user.email, user.name) == (
             "google-user",
@@ -130,19 +162,33 @@ def test_google_login_creates_user_and_shows_spreadsheet_setup(auth_app, google_
         )
         assert not sm.has(sk.AUTH_STATE)
         assert not sm.has(sk.AUTH_REDIRECT_URI)
+        assert not sm.has(sk.AUTH_CODE_VERIFIER)
         token = db.session.get(RefreshToken, sm.get(sk.REFRESH_TOKEN_ID))
         assert token.user_id == user.id
-        assert token.get_decrypted_token() == google_flow.credentials.refresh_token
+        assert token.get_decrypted_token() == "refresh-token"
+        assert b"Set Up Your Learning Spreadsheet" in client.get(callback.location).data
+        assert b"OAuth callback error" in client.get(callback_url).data
+        assert auth_manager.is_authenticated()
+
+    old_browser = auth_app.test_client()
+    old_browser.set_cookie(cookie_name, previous_cookie)
+    assert b"OAuth callback error" in old_browser.get(callback_url).data
+    assert b"Sign in with Google" in old_browser.get("/").data
+
     verify_token.assert_called_once()
     read_sheets.assert_not_called()
+    google_token_request.assert_called_once()
+    token_data = google_token_request.call_args.kwargs["data"]
+    assert token_data["redirect_uri"] == params["redirect_uri"][0]
+    assert token_data["redirect_uri"] == "http://localhost:8080/oauth2callback"
+    assert len(code_verifier) >= 43
+    assert token_data["code_verifier"] == code_verifier
 
 
-def test_failed_callback_leaves_browser_signed_out(auth_app, google_flow):
-    google_flow.fetch_token.side_effect = ValueError("Google denied authorization")
-
+def test_failed_callback_leaves_browser_signed_out(auth_app, google_token_request):
     with auth_app.test_client() as client:
-        client.get("/auth")
-        response = client.get("/oauth2callback?error=access_denied&state=state")
+        state = _start_login(client)["state"][0]
+        response = client.get("/oauth2callback?error=access_denied&" + urlencode({"state": state}))
 
         assert b"OAuth callback error" in response.data
         assert not auth_manager.is_authenticated()
@@ -150,6 +196,67 @@ def test_failed_callback_leaves_browser_signed_out(auth_app, google_flow):
         assert not sm.has(sk.ACCESS_TOKEN)
         assert User.query.count() == 0
         assert RefreshToken.query.count() == 0
+    google_token_request.assert_not_called()
+
+
+@pytest.mark.parametrize("callback_state", ["missing", "empty", "mismatch", "duplicate"])
+def test_invalid_callback_state_is_rejected_and_consumed(
+    auth_app, google_token_request, callback_state
+):
+    with auth_app.test_client() as client:
+        state = _start_login(client)["state"][0]
+        state_queries = {
+            "missing": "",
+            "empty": "&state=",
+            "mismatch": "&state=unexpected",
+            "duplicate": "&state=unexpected&" + urlencode({"state": state}),
+        }
+        invalid = client.get("/oauth2callback?code=test-code" + state_queries[callback_state])
+        assert b"OAuth callback error" in invalid.data
+        assert not sm.has(sk.AUTH_STATE)
+
+        retry = client.get(_callback_url(state))
+        assert b"OAuth callback error" in retry.data
+        assert auth_manager.user is None
+    google_token_request.assert_not_called()
+
+
+def test_invalid_id_token_leaves_no_user_or_grant(
+    auth_app, google_token_request, verify_token, caplog
+):
+    verify_token.side_effect = ValueError("provider details")
+    with auth_app.test_client() as client:
+        state = _start_login(client)["state"][0]
+        response = client.get(_callback_url(state))
+
+        assert b"OAuth callback error" in response.data
+        assert b"provider details" not in response.data
+        assert "provider details" not in caplog.text
+        assert "test-code" not in caplog.text
+        assert not sm.has(sk.AUTH_STATE)
+        assert auth_manager.user is None
+        assert User.query.count() == 0
+        assert RefreshToken.query.count() == 0
+    google_token_request.assert_called_once()
+
+
+def test_google_login_updates_existing_user_by_google_subject(
+    auth_app, google_token_request, verify_token
+):
+    with auth_app.app_context():
+        user = _add_user("google-user")
+        user_id = user.id
+        _add_user("another-google-user").email = "learner@example.test"
+        db.session.commit()
+
+    with auth_app.test_client() as client:
+        state = _start_login(client)["state"][0]
+        assert client.get(_callback_url(state)).location == "/"
+        assert auth_manager.user.id == user_id
+        assert auth_manager.user.email == "learner@example.test"
+        assert User.query.count() == 2
+    google_token_request.assert_called_once()
+    verify_token.assert_called_once()
 
 
 @pytest.mark.parametrize("deleted_user", [False, True], ids=["anonymous", "deleted-user"])

@@ -3,16 +3,37 @@
 import pytest
 from flask import Flask
 
+from app.config import config
 from app.models import Card, Levels
 from app.routes import register_blueprints
+from app.services.google_oauth import GoogleOAuthService
 
 
 @pytest.fixture
-def app():
+def google_client_config() -> dict:
+    """Provide synthetic Google client settings."""
+    return {
+        "web": {
+            "client_id": "test-client",
+            "client_secret": "test-secret",
+            "auth_uri": "https://accounts.example.test/authorize",
+            "token_uri": "https://accounts.example.test/token",
+        }
+    }
+
+
+@pytest.fixture
+def google_oauth(google_client_config) -> GoogleOAuthService:
+    return GoogleOAuthService(google_client_config, config.scopes)
+
+
+@pytest.fixture
+def app(google_oauth):
     """Create a Flask application for testing."""
     app = Flask(__name__)
     app.config["TESTING"] = True
     app.config["SECRET_KEY"] = "test-secret-key"
+    app.extensions["google_oauth"] = google_oauth
 
     register_blueprints(app)
 

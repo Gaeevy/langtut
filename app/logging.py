@@ -74,8 +74,8 @@ def setup_request_logging(app):
             f"IP: {request.remote_addr}",
         ]
 
-        # Add query params if present
-        if request.args:
+        # The OAuth callback query contains the authorization code and state.
+        if request.args and request.endpoint != "auth.oauth2callback":
             log_parts.append(f"Query: {dict(request.args)}")
 
         # Add body preview for POST/PUT/PATCH
