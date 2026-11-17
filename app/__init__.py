@@ -86,6 +86,7 @@ def create_app(*, google_oauth: "GoogleOAuthService | None" = None) -> Flask:
         Flask: Configured Flask application instance
     """
     from app.config import config
+    from app.services.google_credentials import GoogleCredentialsService
     from app.services.google_oauth import GoogleOAuthService
     from app.utils import ensure_utf8_encoding
 
@@ -104,6 +105,11 @@ def create_app(*, google_oauth: "GoogleOAuthService | None" = None) -> Flask:
             scopes=config.scopes,
         )
     app.extensions["google_oauth"] = google_oauth
+    app.extensions["google_credentials"] = GoogleCredentialsService(
+        client_id=google_oauth.client_id,
+        client_secret=google_oauth.client_secret,
+        token_uri=google_oauth.token_uri,
+    )
 
     from app.routes import register_blueprints
 

@@ -2,11 +2,12 @@
 
 import json
 from datetime import UTC, datetime, timedelta
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
 from cryptography.fernet import Fernet
+from google.auth.exceptions import RefreshError, TransportError
 from google.oauth2.credentials import Credentials
 
 from app import create_app
@@ -21,42 +22,6 @@ def _set_valid_session_credentials() -> None:
     sm.set(sk.USER_ID, 1)
     sm.set(sk.ACCESS_TOKEN, "current-token")
     sm.set(sk.ACCESS_TOKEN_EXPIRY, datetime.now(UTC) + timedelta(minutes=30))
-
-
-def test_refresh_boundary_uses_ten_minute_buffer(request_context):
-    _set_valid_session_credentials()
-
-    sm.set(sk.ACCESS_TOKEN_EXPIRY, datetime.now(UTC) + timedelta(minutes=11))
-    assert auth_manager._needs_token_refresh() is False
-
-    sm.set(sk.ACCESS_TOKEN_EXPIRY, datetime.now(UTC) + timedelta(minutes=9))
-    assert auth_manager._needs_token_refresh() is True
-
-
-def test_proactive_refresh_failure_uses_still_valid_token(request_context, monkeypatch):
-    _set_valid_session_credentials()
-    monkeypatch.setattr(auth_manager, "_needs_token_refresh", lambda: True)
-    monkeypatch.setattr(auth_manager, "_refresh_credentials", lambda user_id: False)
-
-    credentials = auth_manager.get_credentials()
-
-    assert credentials is not None
-    assert credentials.token == "current-token"
-
-
-def test_forced_refresh_failure_does_not_reuse_rejected_token(request_context, monkeypatch):
-    _set_valid_session_credentials()
-    monkeypatch.setattr(auth_manager, "_refresh_credentials", lambda user_id: False)
-
-    assert auth_manager.get_credentials(force_refresh=True) is None
-
-
-def test_expired_token_is_rejected_when_refresh_fails(request_context, monkeypatch):
-    _set_valid_session_credentials()
-    sm.set(sk.ACCESS_TOKEN_EXPIRY, datetime.now(UTC) - timedelta(minutes=1))
-    monkeypatch.setattr(auth_manager, "_refresh_credentials", lambda user_id: False)
-
-    assert auth_manager.get_credentials() is None
 
 
 @pytest.fixture
@@ -125,6 +90,52 @@ def _add_refresh_token(user: User, value: str, last_used: datetime) -> RefreshTo
     db.session.add(token)
     db.session.flush()
     return token
+
+
+@pytest.fixture
+def browser_with_grant(auth_app):
+    with auth_app.test_request_context():
+        user = _add_user("current-user")
+        grant = _add_refresh_token(user, "refresh-token", datetime.now(UTC))
+        _set_valid_session_credentials()
+        sm.set(sk.USER_ID, user.id)
+        sm.set(sk.REFRESH_TOKEN_ID, grant.id)
+        db.session.commit()
+        yield
+
+
+@pytest.mark.parametrize(
+    ("minutes_left", "expected_refreshes", "expected_token"),
+    [(11, 0, "current-token"), (9, 1, "current-token"), (-1, 1, None)],
+)
+def test_proactive_refresh_failure_uses_only_still_valid_tokens(
+    browser_with_grant, minutes_left, expected_refreshes, expected_token
+):
+    sm.set(sk.ACCESS_TOKEN_EXPIRY, datetime.now(UTC) + timedelta(minutes=minutes_left))
+    with patch.object(Credentials, "refresh", side_effect=TransportError("offline")) as refresh:
+        credentials = auth_manager.get_credentials()
+
+    assert (credentials.token if credentials else None) == expected_token
+    assert refresh.call_count == expected_refreshes
+
+
+def test_forced_refresh_failure_does_not_reuse_rejected_token(browser_with_grant):
+    with patch.object(Credentials, "refresh", side_effect=TransportError("offline")) as refresh:
+        assert auth_manager.get_credentials(force_refresh=True) is None
+        refresh.assert_called_once()
+        assert not sm.has(sk.ACCESS_TOKEN)
+        assert not sm.has(sk.ACCESS_TOKEN_EXPIRY)
+        assert auth_manager.get_credentials() is None
+
+
+def test_revoked_grant_clears_browser_access_token(browser_with_grant):
+    sm.set(sk.ACCESS_TOKEN_EXPIRY, datetime.now(UTC) + timedelta(minutes=9))
+    revoked = RefreshError("revoked", {"error": "invalid_grant"})
+    with patch.object(Credentials, "refresh", side_effect=revoked):
+        assert auth_manager.get_credentials() is None
+
+    assert not sm.has(sk.ACCESS_TOKEN)
+    assert RefreshToken.query.count() == 1
 
 
 def test_google_login_creates_user_and_shows_spreadsheet_setup(

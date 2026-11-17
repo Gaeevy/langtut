@@ -1,14 +1,18 @@
-"""Manage browser authentication and session-backed Google credentials."""
+"""Manage browser authentication and adapt Google credentials to the browser session."""
 
 import logging
-from datetime import UTC, datetime, timedelta
 from functools import wraps
 
 from flask import current_app, jsonify, redirect, request, url_for
-from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 
-from app.database import RefreshToken, User, db
+from app.database import User, db
+from app.services.google_credentials import (
+    GoogleAccessToken,
+    GoogleConnectionRequiredError,
+    GoogleCredentialsService,
+    GoogleCredentialsUnavailableError,
+)
 from app.services.google_oauth import GoogleOAuthService, GoogleOAuthTransaction
 from app.services.users import login_or_create_user
 from app.session_manager import SessionKeys as sk
@@ -18,13 +22,15 @@ logger = logging.getLogger(__name__)
 
 
 class AuthManager:
-    """Coordinate browser login and manage session-backed Google credentials."""
-
-    TOKEN_REFRESH_BUFFER = timedelta(minutes=10)
+    """Coordinate browser login, route protection, and logout."""
 
     @property
     def _google_oauth(self) -> GoogleOAuthService:
         return current_app.extensions["google_oauth"]
+
+    @property
+    def _google_credentials(self) -> GoogleCredentialsService:
+        return current_app.extensions["google_credentials"]
 
     # OAuth Flow Methods
 
@@ -52,7 +58,9 @@ class AuthManager:
 
         refresh_token_id = sm.get(sk.REFRESH_TOKEN_ID) if sm.get(sk.USER_ID) == user.id else None
         if credentials.refresh_token:
-            refresh_token_id = self._save_refresh_token(user.id, credentials.refresh_token)
+            refresh_token_id = self._google_credentials.save_refresh_token(
+                user.id, credentials.refresh_token
+            )
 
         sm.clear()
         if refresh_token_id:
@@ -67,262 +75,42 @@ class AuthManager:
     # Credential Management Methods
 
     def get_credentials(self, *, force_refresh: bool = False) -> Credentials | None:
-        """Get valid credentials, refreshing if needed.
-
-        This is a PASSIVE GETTER - it returns credentials or None without
-        enforcing authentication. It does NOT redirect to login or raise errors.
-
-        Responsibility: Data retrieval (no policy enforcement)
-
-        Flow:
-        1. Check if user is logged in (user_id in session)
-        2. Check if access token needs refresh (or honor a forced refresh)
-        3. If needed, refresh using database refresh token
-        4. Get credentials from session
-        5. Return credentials or None
-
-        Who should enforce re-login?
-        - Routes: Use @require_auth decorator (redirects to login)
-        - APIs: Manual check + return JSON error
-        - Services: Get credentials, handle None appropriately
-
-        Usage Examples:
-            # Service layer (internal use)
-            creds = auth_manager.get_credentials()
-            if not creds:
-                return None  # Handle gracefully
-
-            # Don't use this for route protection - use @require_auth instead!
-
-        Returns:
-            Valid Credentials object if authenticated, None otherwise
-
-        Args:
-            force_refresh: Refresh even if the session access token has not reached
-                the normal refresh window. Used for a single retry after a Google API
-                rejects an apparently valid access token.
-
-        Note:
-            Returns None if:
-            - User not logged in (no user_id in session)
-            - Access token expired and refresh failed
-            - No refresh token in database
-        """
-        # Check if user is logged in
+        """Adapt Google credential failures for existing website callers."""
+        # Remove this browser adapter once Sheets callers pass the user ID directly.
         user_id = sm.get(sk.USER_ID)
         if not user_id:
-            logger.debug("No user_id in session")
             return None
 
-        current_creds = self._credentials_from_session()
-
-        # Check if token needs refresh
-        if force_refresh or self._needs_token_refresh():
-            reason = "forced" if force_refresh else "expired, missing, or expiring soon"
-            logger.info(f"Access token refresh requested ({reason})")
-            if not self._refresh_credentials(user_id):
-                if force_refresh or current_creds is None or not current_creds.valid:
-                    logger.warning("No usable Google credentials after refresh failure")
-                    return None
-
-                # A proactive refresh can fail transiently while the current token
-                # is still valid. Keep serving it and retry refresh on the next request.
-                logger.warning("Token refresh failed; temporarily using current valid token")
-                return current_creds
-
-        # Get credentials from session
-        creds = self._credentials_from_session()
-
-        if creds:
-            logger.debug("Returning valid credentials from session")
-        else:
-            logger.warning("No valid credentials available")
-
-        return creds
-
-    def _needs_token_refresh(self) -> bool:
-        """Check if access token needs to be refreshed.
-
-        Returns:
-            True if token is missing or will expire soon, False otherwise
-        """
-        access_token = sm.get(sk.ACCESS_TOKEN)
-        expiry = sm.get(sk.ACCESS_TOKEN_EXPIRY)
-
-        # No token in session - need refresh
-        if not access_token or not expiry:
-            return True
-
-        # Check if token expires soon (with buffer)
-        if isinstance(expiry, str):
-            expiry = datetime.fromisoformat(expiry)
-
-        expiry_utc = expiry if expiry.tzinfo else expiry.replace(tzinfo=UTC)
-        return datetime.now(UTC) >= expiry_utc - self.TOKEN_REFRESH_BUFFER
-
-    def _refresh_credentials(self, user_id: int) -> bool:
-        """Refresh access token using refresh token from database.
-
-        Uses the specific refresh token for THIS session (tracked by token_id in session).
-        Falls back to most recent token if session token_id is not found.
-
-        Args:
-            user_id: User ID to refresh credentials for
-
-        Returns:
-            True if refresh successful, False otherwise
-        """
+        if force_refresh:
+            sm.remove(sk.ACCESS_TOKEN)
+            sm.remove(sk.ACCESS_TOKEN_EXPIRY)
+        browser_token = GoogleAccessToken.from_values(
+            sm.get(sk.ACCESS_TOKEN), sm.get(sk.ACCESS_TOKEN_EXPIRY)
+        )
         try:
-            # Try to get the specific refresh token for THIS session
-            refresh_token_id = sm.get(sk.REFRESH_TOKEN_ID)
-            if refresh_token_id:
-                refresh_token_obj = db.session.get(RefreshToken, refresh_token_id)
-                if refresh_token_obj and refresh_token_obj.user_id == user_id:
-                    logger.debug(f"Using session-specific refresh token {refresh_token_id}")
-                else:
-                    logger.warning(
-                        f"Session token {refresh_token_id} not found, falling back to most recent"
-                    )
-                    refresh_token_obj = None
-            else:
-                refresh_token_obj = None
-
-            # Fallback: Get most recent refresh token if session token not found
-            if not refresh_token_obj:
-                refresh_token_obj = (
-                    RefreshToken.query.filter_by(user_id=user_id)
-                    .order_by(RefreshToken.last_used.desc())
-                    .first()
-                )
-                if refresh_token_obj:
-                    logger.debug(f"Using most recent refresh token {refresh_token_obj.id}")
-
-            if not refresh_token_obj:
-                logger.warning(f"No refresh token found for user {user_id}")
-                return False
-
-            # Decrypt refresh token
-            refresh_token = refresh_token_obj.get_decrypted_token()
-
-            # Create credentials object with refresh token
-            credentials = Credentials(
-                token=None,  # Will be refreshed
-                refresh_token=refresh_token,
-                token_uri=self._google_oauth.token_uri,
-                client_id=self._google_oauth.client_id,
-                client_secret=self._google_oauth.client_secret,
+            credentials = self._google_credentials.get_credentials(
+                user_id,
+                force_refresh=force_refresh,
+                preferred_record_id=sm.get(sk.REFRESH_TOKEN_ID),
+                browser_token=browser_token,
             )
+        except GoogleConnectionRequiredError:
+            sm.remove(sk.ACCESS_TOKEN)
+            sm.remove(sk.ACCESS_TOKEN_EXPIRY)
+            return None
+        except GoogleCredentialsUnavailableError:
+            return None
 
-            # Refresh the access token
-            credentials.refresh(Request())
-
-            logger.info(f"Access token refreshed for user {user_id}")
-
-            # Check if Google rotated the refresh token
-            if credentials.refresh_token and credentials.refresh_token != refresh_token:
-                logger.info("Google rotated refresh token, updating database")
-                refresh_token_obj.rotate_token(credentials.refresh_token)
-            else:
-                # Just update last_used
-                refresh_token_obj.touch()
-
-            db.session.commit()
-
-            # Store new access token in session
+        access_token = GoogleAccessToken.from_values(credentials.token, credentials.expiry)
+        if access_token != browser_token:
             sm.set(sk.ACCESS_TOKEN, credentials.token)
             sm.set(sk.ACCESS_TOKEN_EXPIRY, credentials.expiry)
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Failed to refresh credentials for user {user_id}: {e}", exc_info=True)
-            return False
-
-    def _save_refresh_token(self, user_id: int, token: str) -> int:
-        """Save refresh token to database (encrypted).
-
-        Args:
-            user_id: User ID to save token for
-            token: Plain text refresh token from Google
-
-        Returns:
-            ID of the created RefreshToken record
-        """
-        refresh_token_obj = RefreshToken(user_id=user_id)
-        refresh_token_obj.encrypt_and_store(token)
-        db.session.add(refresh_token_obj)
-        db.session.commit()
-        logger.info(f"Refresh token saved for user {user_id} (ID: {refresh_token_obj.id})")
-        return refresh_token_obj.id
-
-    def _credentials_from_session(self) -> Credentials | None:
-        """Create Credentials object from session data.
-
-        Returns:
-            Credentials object or None if session data incomplete
-        """
-        access_token = sm.get(sk.ACCESS_TOKEN)
-        expiry = sm.get(sk.ACCESS_TOKEN_EXPIRY)
-
-        if not access_token:
-            return None
-
-        if isinstance(expiry, str):
-            expiry = datetime.fromisoformat(expiry)
-
-        # google-auth compares expiry with a naive UTC clock internally. Flask
-        # session serializers may preserve or restore the value as timezone-aware.
-        if expiry and expiry.tzinfo:
-            expiry = expiry.astimezone(UTC).replace(tzinfo=None)
-
-        # Create credentials without refresh token (we keep that in DB only)
-        return Credentials(
-            token=access_token,
-            refresh_token=None,  # Don't include refresh token
-            token_uri=self._google_oauth.token_uri,
-            client_id=self._google_oauth.client_id,
-            client_secret=self._google_oauth.client_secret,
-            expiry=expiry,
-        )
+        return credentials
 
     # Authentication State Methods
 
     def is_authenticated(self) -> bool:
-        """Check if the current user is authenticated.
-
-        This is a PASSIVE CHECKER - it returns True/False without enforcing
-        authentication. It does NOT redirect to login or raise errors.
-
-        Responsibility: State checking (no policy enforcement)
-
-        How it works:
-        1. Calls get_credentials() to get credentials (auto-refreshes if needed)
-        2. Returns True if credentials exist and are valid
-        3. Returns False otherwise (no side effects)
-
-        Who should enforce re-login?
-        - Routes: Use @require_auth decorator (not this method)
-        - APIs: Use this method + return JSON error
-        - Services: Use get_credentials() directly
-
-        Usage Examples:
-            # API endpoint (JSON response)
-            @api_bp.route('/api/data')
-            def api_data():
-                if not auth_manager.is_authenticated():
-                    return jsonify({"error": "Unauthorized"}), 401
-                return jsonify({"data": "..."})
-
-            # Don't use for route protection - use @require_auth decorator instead!
-
-        Returns:
-            True if user is authenticated with valid credentials, False otherwise
-
-        Note:
-            This method has NO side effects - it only checks state.
-            For route protection, use @require_auth decorator.
-        """
-        # Try to get valid credentials (will auto-refresh if needed)
+        """Check whether the browser has usable Google credentials, refreshing if needed."""
         credentials = self.get_credentials()
         return credentials is not None and credentials.valid
 
@@ -476,47 +264,20 @@ class AuthManager:
         logger.info("Auth session cleared")
 
     def logout(self, logout_all_devices: bool = False) -> None:
-        """Logout user.
-
-        By default, logs out only THIS session (single device).
-        Optionally can log out ALL sessions/devices.
-
-        Args:
-            logout_all_devices: If True, delete ALL refresh tokens (logout everywhere).
-                              If False (default), delete only THIS session's token.
-
-        Multi-device behavior:
-            - Default: Logs out THIS device only, other sessions remain active
-            - logout_all_devices=True: Logs out from ALL devices/sessions
-        """
+        """Clear this browser session and delete its grant or all the user's grants."""
         user_id = sm.get(sk.USER_ID)
         refresh_token_id = sm.get(sk.REFRESH_TOKEN_ID)
 
-        if user_id:
+        if user_id and (logout_all_devices or refresh_token_id):
             try:
-                if logout_all_devices:
-                    # Delete ALL refresh tokens for user (logout everywhere)
-                    count = RefreshToken.query.filter_by(user_id=user_id).delete()
-                    db.session.commit()
-                    logger.info(f"All refresh tokens deleted for user {user_id} ({count} tokens)")
-                elif refresh_token_id:
-                    # Delete only THIS session's refresh token (single device logout)
-                    token = db.session.get(RefreshToken, refresh_token_id)
-                    if token and token.user_id == user_id:
-                        db.session.delete(token)
-                        db.session.commit()
-                        logger.info(f"Refresh token {refresh_token_id} deleted for user {user_id}")
-                    else:
-                        logger.warning(f"Session token {refresh_token_id} not found for logout")
-                else:
-                    logger.warning(f"No refresh token ID in session for user {user_id}")
-            except Exception as e:
-                logger.error(f"Error deleting refresh tokens: {e}", exc_info=True)
+                self._google_credentials.delete_refresh_tokens(
+                    user_id, record_id=None if logout_all_devices else refresh_token_id
+                )
+            except GoogleCredentialsUnavailableError:
+                logger.warning("Could not delete stored Google credentials during logout")
 
-        # Clear session
         self.clear_auth_session()
-        sm.clear_namespace("learning")  # Also clear learning data on logout
-
+        sm.clear_namespace("learning")
         logger.info("User logged out")
 
 
