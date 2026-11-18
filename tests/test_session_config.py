@@ -66,12 +66,14 @@ def test_configure_app_uses_session_refresh_setting(monkeypatch) -> None:
     assert app.config["SESSION_REFRESH_EACH_REQUEST"] is True
 
 
-def test_create_app_uses_shared_filesystem_session_interface(tmp_path, monkeypatch) -> None:
+def test_create_app_uses_shared_filesystem_session_interface(
+    tmp_path, monkeypatch, google_oauth
+) -> None:
     """create_app produces a Flask app backed by FileSystemSessionInterface."""
     monkeypatch.setattr(config, "session_type", "filesystem")
     monkeypatch.setattr(config, "session_file_dir", str(tmp_path / "sessions"))
 
-    app = create_app()
+    app = create_app(google_oauth=google_oauth)
 
     interface_name = type(app.session_interface).__name__
     assert interface_name == "FileSystemSessionInterface", (

@@ -7,10 +7,18 @@ aspect of application setup.
 
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from flask import Flask
+from flask_wtf.csrf import CSRFProtect
 
 from flask_session import Session
+
+if TYPE_CHECKING:
+    from app.services.google_oauth import GoogleOAuthService
+
+
+csrf = CSRFProtect()
 
 
 def configure_app(app: Flask) -> None:
@@ -55,6 +63,8 @@ def initialize_extensions(app: Flask) -> None:
     """
     # Initialize Flask-Session
     Session(app)
+    app.config["WTF_CSRF_CHECK_DEFAULT"] = False
+    csrf.init_app(app)
 
 
 def setup_middleware(app: Flask) -> None:
@@ -69,16 +79,21 @@ def setup_middleware(app: Flask) -> None:
     setup_request_logging(app)
 
 
-def create_app() -> Flask:
+def create_app(*, google_oauth: "GoogleOAuthService | None" = None) -> Flask:
     """Application factory function.
 
     Creates and configures the Flask application with all necessary
     components properly initialized.
 
+    Args:
+        google_oauth: Optional Google OAuth service for this application.
+
     Returns:
         Flask: Configured Flask application instance
     """
-    from app.routes import register_blueprints
+    from app.config import config
+    from app.services.google_credentials import GoogleCredentialsService
+    from app.services.google_oauth import GoogleOAuthService
     from app.utils import ensure_utf8_encoding
 
     # Set default encoding to UTF-8
@@ -89,6 +104,22 @@ def create_app() -> Flask:
 
     # Configure application settings
     configure_app(app)
+    if google_oauth is None:
+        google_oauth = GoogleOAuthService.from_settings(
+            client_json=config.client_secrets_json,
+            client_file=config.client_secrets_file,
+            identity_scopes=config.google_identity_scopes,
+            sheets_scopes=config.google_sheets_scopes,
+        )
+    app.extensions["google_oauth"] = google_oauth
+    app.extensions["google_credentials"] = GoogleCredentialsService(
+        client_id=google_oauth.client_id,
+        client_secret=google_oauth.client_secret,
+        token_uri=google_oauth.token_uri,
+        sheets_scopes=config.google_sheets_scopes,
+    )
+
+    from app.routes import register_blueprints
 
     # Initialize extensions
     initialize_extensions(app)

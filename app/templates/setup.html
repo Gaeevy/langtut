@@ -6,6 +6,7 @@
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-md-8 text-center">
+        {% if sheets_connected %}
             <h2 class="mb-4">📊 Set Up Your Learning Spreadsheet</h2>
 
             <div class="alert alert-success mb-4">
@@ -66,6 +67,12 @@
                     </a>
                 </div>
             </div>
+        {% else %}
+            <h2 class="mb-4">Google Sheets is disconnected</h2>
+            <a href="{{ url_for('verbs.index') }}" class="btn btn-primary">Practice irregular verbs</a>
+            <p class="mt-3 mb-0">Connect Google Sheets to learn vocabulary from your spreadsheets.</p>
+        {% endif %}
+            {% include "_account_actions.html" %}
         </div>
     </div>
 </div>

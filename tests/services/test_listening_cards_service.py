@@ -15,9 +15,9 @@ def _card(card_id: int, word: str | None, example: str | None) -> SimpleNamespac
 
 def _user(spreadsheet_id: str | None) -> SimpleNamespace:
     if spreadsheet_id is None:
-        return SimpleNamespace(get_active_spreadsheet=lambda: None)
+        return SimpleNamespace(id=7, get_active_spreadsheet=lambda: None)
     return SimpleNamespace(
-        get_active_spreadsheet=lambda: SimpleNamespace(spreadsheet_id=spreadsheet_id)
+        id=7, get_active_spreadsheet=lambda: SimpleNamespace(spreadsheet_id=spreadsheet_id)
     )
 
 

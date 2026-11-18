@@ -10,7 +10,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from dynaconf import Dynaconf
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from app.logging import setup_logging
 from app.mcp_settings import MCPSettings
@@ -59,7 +59,6 @@ def optional_credentials(json_key: str, file_key: str) -> str | None:
     return resolve_secrets_file_path(payload, path) if payload or path else None
 
 
-_client_secrets_file_path = optional_credentials("client_secrets_json", "client_secrets_file")
 _google_cloud_service_account_file_path = optional_credentials(
     "google_cloud_service_account_json", "google_cloud_service_account_file"
 )
@@ -76,7 +75,7 @@ class Config(BaseModel):
     2. File path (for local development)
     """
 
-    model_config = ConfigDict(validate_default=True)
+    model_config = ConfigDict(validate_default=True, hide_input_in_errors=True)
 
     # Environment
     environment: Environment = _environment
@@ -128,9 +127,8 @@ class Config(BaseModel):
     json_as_ascii: bool = _settings["json_as_ascii"]
 
     # Google OAuth
-    scopes: list[str] = _settings["scopes"]
-    api_service_name: str = _settings["api_service_name"]
-    api_version: str = _settings["api_version"]
+    google_identity_scopes: list[str] = _settings["google_identity_scopes"]
+    google_sheets_scopes: list[str] = _settings["google_sheets_scopes"]
 
     # Google TTS
     tts_enabled: bool = _settings["tts_enabled"]
@@ -138,7 +136,8 @@ class Config(BaseModel):
     gcs_audio_bucket: str = _settings["gcs_audio_bucket"]
 
     # Credentials
-    client_secrets_file_path: str | None = _client_secrets_file_path
+    client_secrets_json: SecretStr | None = _settings.get("client_secrets_json")
+    client_secrets_file: str | None = _settings.get("client_secrets_file")
     google_cloud_service_account_file_path: str | None = _google_cloud_service_account_file_path
 
     # Encryption

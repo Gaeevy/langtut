@@ -11,7 +11,10 @@ This package contains all the route blueprints organized by feature:
 - test: Development testing (/test/*)
 """
 
-from flask import Flask
+from flask import Flask, url_for
+
+from app.session_manager import SessionKeys as sk
+from app.session_manager import SessionManager as sm
 
 from .api import api_bp
 from .auth import auth_bp
@@ -25,6 +28,26 @@ from .verbs import verbs_bp
 
 def register_blueprints(app: Flask) -> None:
     """Register all blueprints with the Flask app."""
+    from app.routes.google_errors import register_google_error_handlers
+
+    register_google_error_handlers(app)
+
+    @app.context_processor
+    def unfinished_study_sessions() -> dict[str, str | None]:
+        learning_url = None
+        if sm.get(sk.LEARNING_CARDS):
+            endpoint = "learn.card"
+            if sm.get(sk.LEARNING_FINALIZED):
+                remaining_tasks = len(sm.get(sk.LEARNING_TASK_QUEUE, [])) - sm.get(
+                    sk.LEARNING_TASK_INDEX, 0
+                )
+                endpoint = "learn.end_early" if remaining_tasks > 0 else "learn.results"
+            learning_url = url_for(endpoint)
+        return {
+            "unfinished_learning_url": learning_url,
+            "unfinished_review_url": url_for("review.flip") if sm.get(sk.REVIEW_CARDS) else None,
+        }
+
     app.register_blueprint(auth_bp)
     app.register_blueprint(index_bp)  # Homepage routes
     app.register_blueprint(learn_bp)  # Learn mode routes

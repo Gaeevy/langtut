@@ -1,0 +1,6 @@
+<form method="post" action="{{ url_for('auth.connect_google_sheets') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-primary btn-sm">
+        {{ "Reconnect Google Sheets" if sheets_connected else "Connect Google Sheets" }}
+    </button>
+</form>

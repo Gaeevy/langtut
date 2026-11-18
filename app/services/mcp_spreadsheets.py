@@ -1,4 +1,4 @@
-"""Read-only spreadsheet-name lookup for the explicitly public MCP experiment."""
+"""Read stored spreadsheet names through public-email and trusted-user lookups."""
 
 from enum import StrEnum
 from pathlib import Path
@@ -57,17 +57,33 @@ def list_spreadsheet_names(engine: Engine, email: str) -> SpreadsheetNames:
             return SpreadsheetNames(status=LookupStatus.USER_NOT_FOUND)
         if len(users) > 1:
             return SpreadsheetNames(status=LookupStatus.AMBIGUOUS_USER)
-        names = session.scalars(
-            select(UserSpreadsheet.spreadsheet_name)
-            .where(UserSpreadsheet.user_id == users[0])
-            .order_by(UserSpreadsheet.id)
-            .limit(51)
-        ).all()
-        return SpreadsheetNames(
-            status=LookupStatus.OK,
-            spreadsheets=[
-                (name.strip() if name and name.strip() else "Unnamed spreadsheet")[:255]
-                for name in names[:50]
-            ],
-            truncated=len(names) > 50,
-        )
+        return _names_for_user(session, users[0])
+
+
+def list_spreadsheet_names_for_user(engine: Engine, user_id: int) -> SpreadsheetNames:
+    """List stored names for a local user ID supplied by authenticated application code.
+
+    The caller must establish the acting user before calling this service. This
+    function only reads SQLite and can run without a Flask request or Google grant.
+    """
+    with Session(engine) as session:
+        if session.scalar(select(User.id).where(User.id == user_id)) is None:
+            return SpreadsheetNames(status=LookupStatus.USER_NOT_FOUND)
+        return _names_for_user(session, user_id)
+
+
+def _names_for_user(session: Session, user_id: int) -> SpreadsheetNames:
+    names = session.scalars(
+        select(UserSpreadsheet.spreadsheet_name)
+        .where(UserSpreadsheet.user_id == user_id)
+        .order_by(UserSpreadsheet.id)
+        .limit(51)
+    ).all()
+    return SpreadsheetNames(
+        status=LookupStatus.OK,
+        spreadsheets=[
+            (name.strip() if name and name.strip() else "Unnamed spreadsheet")[:255]
+            for name in names[:50]
+        ],
+        truncated=len(names) > 50,
+    )

@@ -12,14 +12,12 @@ mcp_requests_per_minute = 60
 proxy_trusted_ips = []
 
 # Google OAuth
-scopes = [
-    "https://www.googleapis.com/auth/spreadsheets",
+google_identity_scopes = [
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
     "openid"
 ]
-api_service_name = "sheets"
-api_version = "v4"
+google_sheets_scopes = ["https://www.googleapis.com/auth/spreadsheets"]
 
 # Google TTS
 tts_enabled = true

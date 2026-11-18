@@ -22,11 +22,13 @@ review_bp = Blueprint("review", __name__, url_prefix="/review")
 @auth_manager.require_auth
 def start(tab_name: str):
     """Start a review session with ALL cards from the specified tab."""
+    if SessionManager.get(SessionKeys.REVIEW_CARDS):
+        return redirect(url_for("review.flip"))
     user = auth_manager.user
     spreadsheet_id = user.get_active_spreadsheet_id()
 
     service = ReviewService()
-    result = service.start_session(tab_name, spreadsheet_id)
+    result = service.start_session(tab_name, spreadsheet_id, user_id=user.id)
 
     if not result.success:
         logger.warning(f"Failed to start review session: {result.error}")
@@ -115,6 +117,7 @@ def answer(outcome: str):
     result = service.record_review(
         outcome=review_outcome,
         spreadsheet_id=user.get_active_spreadsheet_id(),
+        user_id=user.id,
     )
 
     if not result.success:
@@ -148,7 +151,7 @@ def end():
     """Persist reviewed cards and end the session early."""
     user = auth_manager.user
     service = ReviewService()
-    result = service.end_session_early(user.get_active_spreadsheet_id())
+    result = service.end_session_early(user.get_active_spreadsheet_id(), user_id=user.id)
     if not result.success:
         logger.warning("Early review end was not saved: %s", result.error)
         return redirect(url_for("review.card", error="Could not save review progress. Try again."))

@@ -8,18 +8,16 @@ to prevent typos and enable refactoring-safe session access.
 from enum import Enum
 from typing import Any
 
-from flask import session
+from flask import current_app, session
 
 
 class SessionKeys(Enum):
     """Enumerated session keys with prefix namespacing for organization."""
 
     # Auth namespace - OAuth and authentication state
-    AUTH_STATE = "auth.state"
-    AUTH_REDIRECT_URI = "auth.redirect_uri"
-    ACCESS_TOKEN = "auth.access_token"  # OAuth access token (short-lived, stored in session)
-    ACCESS_TOKEN_EXPIRY = "auth.access_token_expiry"  # Token expiry datetime
-    REFRESH_TOKEN_ID = "auth.refresh_token_id"  # ID of RefreshToken record for this session
+    AUTH_TRANSACTIONS = "auth.transactions"
+    LOGIN_EXPIRES_AT = "auth.login_expires_at"
+    SESSION_VERSION = "auth.session_version"
 
     # User namespace - User identification and metadata
     USER_ID = "user.id"
@@ -101,6 +99,16 @@ class SessionManager:
             key: SessionKeys enum value to remove
         """
         session.pop(key.value, None)
+
+    @staticmethod
+    def clear() -> None:
+        """Clear all data in the browser session."""
+        session.clear()
+
+    @staticmethod
+    def regenerate_id() -> None:
+        """Rotate the ID of the populated server-side session."""
+        current_app.session_interface.regenerate(session)
 
     @staticmethod
     def has(key: SessionKeys) -> bool:

@@ -79,11 +79,15 @@ def _render_results_template(result, ended_early: bool = False):
 @auth_manager.require_auth
 def start(tab_name: str):
     """Start learning session."""
+    if SessionManager.get(SessionKeys.LEARNING_FINALIZED) and SessionManager.get(
+        SessionKeys.LEARNING_CARDS
+    ):
+        return redirect(url_for("index.home"))
     user = auth_manager.user
     spreadsheet_id = user.get_active_spreadsheet_id()
 
     service = LearnService()
-    result = service.start_session(tab_name, spreadsheet_id)
+    result = service.start_session(tab_name, spreadsheet_id, user_id=user.id)
 
     if not result.success:
         logger.warning(f"Failed to start learn session: {result.error}")
@@ -218,7 +222,11 @@ def results():
     if not service.has_active_session():
         return redirect(url_for("index.home"))
 
-    result = service.end_session(early=False)
+    result = service.end_session(
+        early=False,
+        user_id=auth_manager.user.id,
+        spreadsheet_id=auth_manager.user.get_active_spreadsheet_id(),
+    )
     return _render_results_template(result)
 
 
@@ -231,5 +239,9 @@ def end_early():
     if not service.has_active_session():
         return redirect(url_for("index.home"))
 
-    result = service.end_session(early=True)
+    result = service.end_session(
+        early=True,
+        user_id=auth_manager.user.id,
+        spreadsheet_id=auth_manager.user.get_active_spreadsheet_id(),
+    )
     return _render_results_template(result, ended_early=True)

@@ -8,6 +8,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.gsheet import read_card_set
+from app.services.google_credentials import (
+    GoogleConnectionRequiredError,
+    GoogleCredentialsUnavailableError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +42,9 @@ class ListeningCardsService:
             user_spreadsheet_id = active_spreadsheet.spreadsheet_id
             logger.info(f"Using spreadsheet: {user_spreadsheet_id}")
 
-            card_set = read_card_set(worksheet_name=tab_name, spreadsheet_id=user_spreadsheet_id)
+            card_set = read_card_set(
+                worksheet_name=tab_name, spreadsheet_id=user_spreadsheet_id, user_id=user.id
+            )
             if not card_set:
                 logger.error(
                     f'Card set "{tab_name}" not found in spreadsheet {user_spreadsheet_id}'
@@ -85,6 +91,9 @@ class ListeningCardsService:
                     "original_count": len(card_set.cards),
                 }
             )
+        except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
+            raise
+
         except Exception as e:
             logger.error(f"Error fetching cards for listening: {e}", exc_info=True)
             return ListeningCardsResult(

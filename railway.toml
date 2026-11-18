@@ -13,7 +13,7 @@ healthcheckTimeout = 300
 # - LANGTUT_ENCRYPTION_KEY (Fernet key for OAuth refresh tokens)
 # - LANGTUT_CLIENT_SECRETS_JSON (OAuth credentials)
 # - LANGTUT_GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON (TTS credentials)
-# - LANGTUT_SECRET_KEY (Flask session encryption)
+# - LANGTUT_SECRET_KEY (Flask session signing)
 # - RAILWAY_ENVIRONMENT=production (automatically set by Railway)
 
 # Note: Volumes are now created and attached through Railway dashboard

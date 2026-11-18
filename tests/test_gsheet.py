@@ -11,6 +11,7 @@ from requests import Response
 
 from app import gsheet
 from app.models import CardSet, Levels
+from app.services.google_credentials import GoogleConnectionRequiredError
 from tests.conftest import make_card
 
 
@@ -24,8 +25,12 @@ def _api_error(status_code: int) -> APIError:
 
 
 def test_get_spreadsheet_returns_none_without_credentials(monkeypatch):
-    monkeypatch.setattr("app.gsheet.auth_manager.get_credentials", lambda: None)
-    assert gsheet.get_spreadsheet("sheet-id") is None
+    def unavailable(user_id, *, force_refresh=False):
+        raise GoogleConnectionRequiredError()
+
+    monkeypatch.setattr("app.gsheet._get_credentials", unavailable)
+    with pytest.raises(GoogleConnectionRequiredError):
+        gsheet.get_spreadsheet("sheet-id", user_id=7)
 
 
 @pytest.mark.parametrize(
@@ -39,7 +44,9 @@ def test_lookup_helpers_return_none_on_known_gspread_errors(monkeypatch, error):
     fake_spreadsheet = SimpleNamespace(
         worksheet=lambda name: (_ for _ in ()).throw(error),
     )
-    monkeypatch.setattr("app.gsheet.auth_manager.get_credentials", lambda: object())
+    monkeypatch.setattr(
+        "app.gsheet._get_credentials", lambda user_id, *, force_refresh=False: object()
+    )
     monkeypatch.setattr(
         "app.gsheet.gspread.authorize",
         lambda creds: SimpleNamespace(open_by_key=lambda sid: fake_spreadsheet),
@@ -52,9 +59,9 @@ def test_lookup_helpers_return_none_on_known_gspread_errors(monkeypatch, error):
                 open_by_key=lambda sid: (_ for _ in ()).throw(gspread.SpreadsheetNotFound("x"))
             ),
         )
-        assert gsheet.get_spreadsheet("sheet-id") is None
+        assert gsheet.get_spreadsheet("sheet-id", user_id=7) is None
     else:
-        assert gsheet.get_worksheet("Tab1", "sheet-id") is None
+        assert gsheet.get_worksheet("Tab1", "sheet-id", user_id=7) is None
 
 
 def test_get_spreadsheet_forces_refresh_and_retries_once_after_401(monkeypatch):
@@ -62,8 +69,8 @@ def test_get_spreadsheet_forces_refresh_and_retries_once_after_401(monkeypatch):
     open_calls = 0
     spreadsheet = object()
 
-    def get_credentials(*, force_refresh=False):
-        credential_calls.append(force_refresh)
+    def get_credentials(user_id, *, force_refresh=False):
+        credential_calls.append((user_id, force_refresh))
         return "refreshed" if force_refresh else "initial"
 
     def open_by_key(sheet_id):
@@ -73,14 +80,14 @@ def test_get_spreadsheet_forces_refresh_and_retries_once_after_401(monkeypatch):
             raise _api_error(401)
         return spreadsheet
 
-    monkeypatch.setattr("app.gsheet.auth_manager.get_credentials", get_credentials)
+    monkeypatch.setattr("app.gsheet._get_credentials", get_credentials)
     monkeypatch.setattr(
         "app.gsheet.gspread.authorize",
         lambda credentials: SimpleNamespace(open_by_key=open_by_key),
     )
 
-    assert gsheet.get_spreadsheet("sheet-id") is spreadsheet
-    assert credential_calls == [False, True]
+    assert gsheet.get_spreadsheet("sheet-id", user_id=7) is spreadsheet
+    assert credential_calls == [(7, False), (7, True)]
     assert open_calls == 2
 
 
@@ -99,16 +106,16 @@ def test_update_spreadsheet_retries_batch_once_after_401(monkeypatch):
         spreadsheet = SimpleNamespace(worksheet=lambda name: worksheet)
         return SimpleNamespace(open_by_key=lambda sheet_id: spreadsheet)
 
-    monkeypatch.setattr("app.gsheet.read_card_set", lambda name, sheet_id: card_set)
+    monkeypatch.setattr("app.gsheet.read_card_set", lambda name, sheet_id, *, user_id: card_set)
     monkeypatch.setattr(
-        "app.gsheet.auth_manager.get_credentials",
-        lambda *, force_refresh=False: credential_calls.append(force_refresh)
+        "app.gsheet._get_credentials",
+        lambda user_id, *, force_refresh=False: credential_calls.append((user_id, force_refresh))
         or ("refreshed" if force_refresh else "initial"),
     )
     monkeypatch.setattr("app.gsheet.gspread.authorize", authorize)
 
-    assert gsheet.update_spreadsheet("Tab1", [card], "sheet-id") == "saved"
-    assert credential_calls == [False, True]
+    assert gsheet.update_spreadsheet("Tab1", [card], "sheet-id", user_id=7) == "saved"
+    assert credential_calls == [(7, False), (7, True)]
 
 
 def test_update_spreadsheet_writes_only_requested_cards(monkeypatch):
@@ -118,30 +125,31 @@ def test_update_spreadsheet_writes_only_requested_cards(monkeypatch):
     card_set = CardSet(name="Tab1", gid=1, cards=cards)
     captured_updates = []
 
-    monkeypatch.setattr("app.gsheet.read_card_set", lambda name, sheet_id: card_set)
+    monkeypatch.setattr("app.gsheet.read_card_set", lambda name, sheet_id, *, user_id: card_set)
     monkeypatch.setattr(
         "app.gsheet._batch_update_worksheet",
-        lambda name, sheet_id, updates: captured_updates.extend(updates) or "saved",
+        lambda name, sheet_id, updates, *, user_id: captured_updates.extend(updates) or "saved",
     )
 
-    assert gsheet.update_spreadsheet("Tab1", [updated_card], "sheet-id") == "saved"
+    assert gsheet.update_spreadsheet("Tab1", [updated_card], "sheet-id", user_id=7) == "saved"
     assert [update["range"] for update in captured_updates] == ["G3", "H3", "I3", "J3"]
 
 
-def test_get_spreadsheet_does_not_retry_non_authentication_error(monkeypatch):
+@pytest.mark.parametrize("status", [403, 500])
+def test_get_spreadsheet_does_not_retry_non_authentication_error(monkeypatch, status):
     credential_calls = []
 
-    def get_credentials(*, force_refresh=False):
-        credential_calls.append(force_refresh)
+    def get_credentials(user_id, *, force_refresh=False):
+        credential_calls.append((user_id, force_refresh))
         return object()
 
-    monkeypatch.setattr("app.gsheet.auth_manager.get_credentials", get_credentials)
+    monkeypatch.setattr("app.gsheet._get_credentials", get_credentials)
     monkeypatch.setattr(
         "app.gsheet.gspread.authorize",
         lambda credentials: SimpleNamespace(
-            open_by_key=lambda sheet_id: (_ for _ in ()).throw(_api_error(500))
+            open_by_key=lambda sheet_id: (_ for _ in ()).throw(_api_error(status))
         ),
     )
 
-    assert gsheet.get_spreadsheet("sheet-id") is None
-    assert credential_calls == [False]
+    assert gsheet.get_spreadsheet("sheet-id", user_id=7) is None
+    assert credential_calls == [(7, False)]

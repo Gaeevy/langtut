@@ -21,7 +21,7 @@ def test_start_session_loads_the_full_card_set(request_context, monkeypatch):
     )
 
     service = ReviewService()
-    result = service.start_session("Words", "sheet-123")
+    result = service.start_session("Words", "sheet-123", user_id=7)
 
     assert result.success is True
     assert result.card_count == 2
@@ -41,7 +41,7 @@ def test_start_session_orders_cards_by_oldest_last_shown(request_context, monkey
     )
 
     service = ReviewService()
-    result = service.start_session("Words", "sheet-123")
+    result = service.start_session("Words", "sheet-123", user_id=7)
 
     assert result.success is True
     session_cards = [
@@ -65,10 +65,10 @@ def test_forgotten_card_loses_one_level_updates_timestamp_and_advances(
     monkeypatch.setattr("app.services.learning.review_service.get_timestamp", lambda: reviewed_at)
     monkeypatch.setattr(
         "app.services.learning.review_service.update_spreadsheet",
-        lambda tab, cards, spreadsheet_id: save_calls.append(cards),
+        lambda tab, cards, spreadsheet_id, *, user_id: save_calls.append(cards),
     )
 
-    result = service.record_review(ReviewOutcome.FORGOTTEN, spreadsheet_id="sheet-123")
+    result = service.record_review(ReviewOutcome.FORGOTTEN, spreadsheet_id="sheet-123", user_id=7)
 
     assert result.success is True
     assert result.completed is False
@@ -95,10 +95,10 @@ def test_remembered_card_preserves_level_and_only_updates_timestamp(request_cont
     monkeypatch.setattr("app.services.learning.review_service.get_timestamp", lambda: reviewed_at)
     monkeypatch.setattr(
         "app.services.learning.review_service.update_spreadsheet",
-        lambda tab, cards, spreadsheet_id: save_calls.append(cards),
+        lambda tab, cards, spreadsheet_id, *, user_id: save_calls.append(cards),
     )
 
-    result = service.record_review(ReviewOutcome.REMEMBERED, spreadsheet_id="sheet-123")
+    result = service.record_review(ReviewOutcome.REMEMBERED, spreadsheet_id="sheet-123", user_id=7)
 
     assert result.success is True
     assert save_calls == []
@@ -121,11 +121,13 @@ def test_last_review_completes_and_clears_the_stack(request_context, monkeypatch
     saved_batches = []
     monkeypatch.setattr(
         "app.services.learning.review_service.update_spreadsheet",
-        lambda tab, cards, spreadsheet_id: saved_batches.append((tab, cards, spreadsheet_id)),
+        lambda tab, cards, spreadsheet_id, *, user_id: saved_batches.append(
+            (tab, cards, spreadsheet_id)
+        ),
     )
 
-    first_result = service.record_review(ReviewOutcome.FORGOTTEN, "sheet-123")
-    result = service.record_review(ReviewOutcome.REMEMBERED, "sheet-123")
+    first_result = service.record_review(ReviewOutcome.FORGOTTEN, "sheet-123", user_id=7)
+    result = service.record_review(ReviewOutcome.REMEMBERED, "sheet-123", user_id=7)
 
     assert first_result.completed is False
     assert result.success is True
@@ -155,8 +157,10 @@ def test_failed_save_keeps_current_card_and_level(request_context, monkeypatch):
 
     monkeypatch.setattr("app.services.learning.review_service.update_spreadsheet", fail_save)
 
-    first_result = service.record_review(ReviewOutcome.FORGOTTEN, spreadsheet_id="sheet-123")
-    result = service.record_review(ReviewOutcome.FORGOTTEN, spreadsheet_id="sheet-123")
+    first_result = service.record_review(
+        ReviewOutcome.FORGOTTEN, spreadsheet_id="sheet-123", user_id=7
+    )
+    result = service.record_review(ReviewOutcome.FORGOTTEN, spreadsheet_id="sheet-123", user_id=7)
 
     assert first_result.success is True
     assert result.success is False
@@ -177,11 +181,13 @@ def test_end_session_early_saves_only_reviewed_cards(request_context, monkeypatc
     saved_batches = []
     monkeypatch.setattr(
         "app.services.learning.review_service.update_spreadsheet",
-        lambda tab, cards, spreadsheet_id: saved_batches.append((tab, cards, spreadsheet_id)),
+        lambda tab, cards, spreadsheet_id, *, user_id: saved_batches.append(
+            (tab, cards, spreadsheet_id)
+        ),
     )
-    service.record_review(ReviewOutcome.FORGOTTEN, "sheet-123")
+    service.record_review(ReviewOutcome.FORGOTTEN, "sheet-123", user_id=7)
 
-    result = service.end_session_early("sheet-123")
+    result = service.end_session_early("sheet-123", user_id=7)
 
     assert result.success is True
     assert result.completed is True
@@ -204,7 +210,7 @@ def test_end_session_early_without_reviews_skips_sheet_write(request_context, mo
         lambda *args, **kwargs: save_calls.append((args, kwargs)),
     )
 
-    result = service.end_session_early("sheet-123")
+    result = service.end_session_early("sheet-123", user_id=7)
 
     assert result.success is True
     assert save_calls == []
@@ -215,14 +221,14 @@ def test_failed_early_end_keeps_review_session(request_context, monkeypatch):
     """A failed partial batch write leaves reviewed progress available to retry."""
     service = ReviewService()
     service.session.initialize([make_card(id=1), make_card(id=2)], "Words", 42)
-    service.record_review(ReviewOutcome.REMEMBERED, "sheet-123")
+    service.record_review(ReviewOutcome.REMEMBERED, "sheet-123", user_id=7)
 
     def fail_save(*args, **kwargs):
         raise RuntimeError("Sheets unavailable")
 
     monkeypatch.setattr("app.services.learning.review_service.update_spreadsheet", fail_save)
 
-    result = service.end_session_early("sheet-123")
+    result = service.end_session_early("sheet-123", user_id=7)
 
     assert result.success is False
     assert service.has_active_session() is True

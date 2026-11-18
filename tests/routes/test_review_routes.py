@@ -15,7 +15,9 @@ def _set_authenticated_user(monkeypatch, spreadsheet_id: str = "sheet-123") -> N
     monkeypatch.setattr(
         type(auth_manager),
         "user",
-        property(lambda self: SimpleNamespace(get_active_spreadsheet_id=lambda: spreadsheet_id)),
+        property(
+            lambda self: SimpleNamespace(id=7, get_active_spreadsheet_id=lambda: spreadsheet_id)
+        ),
     )
 
 
@@ -32,7 +34,7 @@ def test_review_answer_records_choice_and_advances(client, monkeypatch, outcome,
     calls = []
 
     class FakeReviewService:
-        def record_review(self, outcome: ReviewOutcome, spreadsheet_id: str):
+        def record_review(self, outcome: ReviewOutcome, spreadsheet_id: str, *, user_id: int):
             calls.append((outcome, spreadsheet_id))
             return SimpleNamespace(success=True, completed=False, error=None)
 
@@ -50,7 +52,7 @@ def test_review_answer_returns_home_after_last_card(client, monkeypatch):
     _set_authenticated_user(monkeypatch)
 
     class FakeReviewService:
-        def record_review(self, outcome: ReviewOutcome, spreadsheet_id: str):
+        def record_review(self, outcome: ReviewOutcome, spreadsheet_id: str, *, user_id: int):
             return SimpleNamespace(success=True, completed=True, error=None)
 
     monkeypatch.setattr("app.routes.review.ReviewService", FakeReviewService)
@@ -66,7 +68,7 @@ def test_review_answer_keeps_back_visible_when_save_fails(client, monkeypatch):
     _set_authenticated_user(monkeypatch)
 
     class FakeReviewService:
-        def record_review(self, outcome: ReviewOutcome, spreadsheet_id: str):
+        def record_review(self, outcome: ReviewOutcome, spreadsheet_id: str, *, user_id: int):
             return SimpleNamespace(success=False, completed=False, error="failed")
 
     monkeypatch.setattr("app.routes.review.ReviewService", FakeReviewService)
@@ -101,7 +103,7 @@ def test_end_review_early_saves_progress_and_returns_home(client, monkeypatch):
     calls = []
 
     class FakeReviewService:
-        def end_session_early(self, spreadsheet_id: str):
+        def end_session_early(self, spreadsheet_id: str, *, user_id: int):
             calls.append(spreadsheet_id)
             return SimpleNamespace(success=True, completed=True, error=None)
 
@@ -119,7 +121,7 @@ def test_end_review_early_save_failure_returns_to_current_card(client, monkeypat
     _set_authenticated_user(monkeypatch)
 
     class FakeReviewService:
-        def end_session_early(self, spreadsheet_id: str):
+        def end_session_early(self, spreadsheet_id: str, *, user_id: int):
             return SimpleNamespace(success=False, completed=False, error="failed")
 
     monkeypatch.setattr("app.routes.review.ReviewService", FakeReviewService)

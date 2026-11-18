@@ -90,7 +90,7 @@ class TestLearnServiceLevelBumpAtPipelineEnd:
         assert _card_level(service, 0) == Levels.LEVEL_0
 
         with patch.object(LearnService, "_batch_update_cards", return_value=True):
-            end = service.end_session(early=False)
+            end = service.end_session(early=False, user_id=7, spreadsheet_id="sheet-123")
 
         assert end.per_card_breakdown
         row = end.per_card_breakdown[0]
@@ -130,7 +130,7 @@ class TestLearnSessionPersistence:
         sm.set(sk.LEARNING_FINALIZED, False)
 
         with patch.object(LearnService, "_batch_update_cards", return_value=False):
-            result = LearnService().end_session()
+            result = LearnService().end_session(user_id=7, spreadsheet_id="sheet-123")
 
         assert result.update_successful is False
         assert sm.has(sk.LEARNING_CARDS)
@@ -145,7 +145,7 @@ class TestLearnSessionPersistence:
         sm.set(sk.LEARNING_FINALIZED, False)
 
         with patch.object(LearnService, "_batch_update_cards", return_value=True):
-            result = LearnService().end_session()
+            result = LearnService().end_session(user_id=7, spreadsheet_id="sheet-123")
 
         assert result.update_successful is True
         assert not sm.has(sk.LEARNING_CARDS)

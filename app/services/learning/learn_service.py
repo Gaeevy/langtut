@@ -18,7 +18,10 @@ from dataclasses import dataclass, field
 from app.config import config
 from app.gsheet import read_card_set, update_spreadsheet
 from app.models import Card
-from app.services.auth_manager import auth_manager
+from app.services.google_credentials import (
+    GoogleConnectionRequiredError,
+    GoogleCredentialsUnavailableError,
+)
 from app.session_manager import SessionKeys as sk
 from app.session_manager import SessionManager as sm
 from app.utils import get_timestamp, parse_timestamp
@@ -145,14 +148,18 @@ class LearnService:
     # Session lifecycle
     # ------------------------------------------------------------------
 
-    def start_session(self, tab_name: str, spreadsheet_id: str) -> LearnSessionResult:
+    def start_session(
+        self, tab_name: str, spreadsheet_id: str, *, user_id: int
+    ) -> LearnSessionResult:
         """Start a new learn session.
 
         Reads cards from the spreadsheet, builds a task queue based on each
         card's level pipeline, and initialises session state.
         """
         try:
-            card_set = read_card_set(worksheet_name=tab_name, spreadsheet_id=spreadsheet_id)
+            card_set = read_card_set(
+                worksheet_name=tab_name, spreadsheet_id=spreadsheet_id, user_id=user_id
+            )
 
             if not card_set:
                 return LearnSessionResult(success=False, error=f"Card set '{tab_name}' not found")
@@ -201,6 +208,9 @@ class LearnService:
                 task_count=len(task_queue),
             )
 
+        except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
+            raise
+
         except Exception as e:
             logger.error(f"Error starting learn session: {e}", exc_info=True)
             return LearnSessionResult(success=False, error=str(e))
@@ -209,7 +219,9 @@ class LearnService:
         """Check if there's an active learn session."""
         return self.session.has_active_session()
 
-    def end_session(self, early: bool = False) -> SessionEndResult:
+    def end_session(
+        self, *, user_id: int, spreadsheet_id: str, early: bool = False
+    ) -> SessionEndResult:
         """End the learn session and return results."""
         answers = sm.get(sk.LEARNING_ANSWERS, [])
         original_count = sm.get(sk.LEARNING_ORIGINAL_COUNT, len(answers))
@@ -221,7 +233,7 @@ class LearnService:
 
         stats = self.stats.calculate_session_stats(answers)
 
-        update_successful = self._batch_update_cards()
+        update_successful = self._batch_update_cards(user_id, spreadsheet_id)
 
         cards_remaining = 0
         if early:
@@ -593,15 +605,13 @@ class LearnService:
             )
         return result
 
-    def _batch_update_cards(self) -> bool:
+    def _batch_update_cards(self, user_id: int, spreadsheet_id: str) -> bool:
         """Batch update modified cards to Google Sheets."""
         try:
             cards_data = sm.get(sk.LEARNING_CARDS, [])
             active_tab = sm.get(sk.LEARNING_ACTIVE_TAB)
-            user = auth_manager.user
-            user_spreadsheet_id = user.get_active_spreadsheet_id() if user else None
 
-            if not cards_data or not active_tab or not user_spreadsheet_id:
+            if not cards_data or not active_tab or not spreadsheet_id:
                 logger.warning("Missing session data for batch update")
                 return False
 
@@ -622,9 +632,14 @@ class LearnService:
                 return False
 
             logger.info(f"Batch updating {len(cards_to_update)} cards to spreadsheet")
-            update_spreadsheet(active_tab, cards_to_update, spreadsheet_id=user_spreadsheet_id)
+            update_spreadsheet(
+                active_tab, cards_to_update, spreadsheet_id=spreadsheet_id, user_id=user_id
+            )
             logger.info("Batch spreadsheet update completed")
             return True
+
+        except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
+            raise
 
         except Exception as e:
             logger.error(f"Error in batch update: {e}", exc_info=True)

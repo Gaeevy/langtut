@@ -1,0 +1,12 @@
+{% if unfinished_learning_url or unfinished_review_url %}
+<div class="alert alert-info mt-3">
+    <p>Your unfinished session is still available.</p>
+    {% if unfinished_learning_url %}
+        <a class="btn btn-primary" href="{{ unfinished_learning_url }}">Resume unfinished learning session</a>
+    {% endif %}
+    {% if unfinished_review_url %}
+        <a class="btn btn-primary" href="{{ unfinished_review_url }}">Resume unfinished review session</a>
+        <p class="mt-2 mb-0">If your last review choice failed to save, submit that choice again.</p>
+    {% endif %}
+</div>
+{% endif %}

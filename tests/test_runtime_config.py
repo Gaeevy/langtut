@@ -20,10 +20,10 @@ from asgi import create_combined_app
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_railway_healthcheck_serves_anonymous_homepage(monkeypatch, tmp_path):
+def test_railway_healthcheck_serves_anonymous_homepage(monkeypatch, tmp_path, google_oauth):
     monkeypatch.setattr(config, "allowed_hosts", ["healthcheck.railway.app"])
     monkeypatch.setattr(config, "session_file_dir", str(tmp_path / "sessions"))
-    web = create_app()
+    web = create_app(google_oauth=google_oauth)
     app = create_combined_app(web, config.mcp_settings().model_copy(update={"enabled": False}))
     deployment = tomllib.loads((ROOT / "railway.toml").read_text())["deploy"]
 

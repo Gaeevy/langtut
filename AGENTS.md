@@ -16,33 +16,13 @@ for application-owned data.
 - Treat `README.md` as the user-facing setup reference; keep it aligned with command changes.
 - Read `docs/deployment.md` before deployment work for runtime configuration and healthchecks.
 
-## Project map
-
-- `serve.py`: Uvicorn launcher; reads shared runtime settings.
-- `asgi.py`: combined Flask/MCP factory; initializes the website database.
-- `app/__init__.py`: Flask app factory, configuration, Flask-Session, middleware, and blueprint
-  registration.
-- `app/routes/`: HTML blueprints; `app/routes/api/` contains the nested `/api` blueprints.
-- `app/services/`: business logic. Learning and review logic lives in `services/learning/`.
-- `app/models.py`: Pydantic domain/request models. `app/database.py`: SQLAlchemy models.
-- `app/gsheet.py`: Google Sheets card reads and progress writes.
-- `app/session_manager.py`: the only interface for Flask session state.
-- `app/templates/`, `app/static/`: Jinja templates and vanilla JS/CSS/PWA assets.
-- `config/languages.yaml`: supported TTS language/voice pairs.
-- `tests/`: pytest suite, organized mostly by route/service boundary.
-
 ## Commands
 
 Use `uv`; do not invoke the project with bare `python`, `pip`, or `pytest`.
+The [README](README.md) owns setup and startup commands.
+[Architecture](docs/architecture.md#runtime-and-code-map) owns the project map.
 
 ```bash
-# first-time development setup
-uv sync --extra dev
-uv run pre-commit install -t pre-commit -t pre-push
-
-# local server
-uv run python serve.py --reload
-
 # verification
 uv run pytest
 uv run pytest tests/path/to/test_file.py
@@ -68,8 +48,9 @@ the hooks reject commits to `main` and `master`.
 - Use `SessionManager` with an existing `SessionKeys` member. Add a namespaced enum member before
   storing new state; never access `flask.session` directly outside the manager.
 - Protect HTML routes with `@auth_manager.require_auth` and JSON routes with
-  `@auth_manager.require_auth_api`. Inside protected routes, use `auth_manager.user`; use
-  `auth_manager.get_credentials()` for Google API clients.
+  `@auth_manager.require_auth_api`. Resolve `auth_manager.user` in protected routes and pass
+  its trusted local ID explicitly to Sheets operations. Use `GoogleCredentialsService`
+  for Google credentials; its core must stay independent of Flask requests and sessions.
 - Use Pydantic models for structured input/domain data and typed result objects for service
   boundaries. Preserve type hints on changed function signatures.
 - Use absolute imports rooted at `app` for application modules (for example,
