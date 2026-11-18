@@ -10,9 +10,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from flask import Flask
-from flask_wtf.csrf import CSRFProtect
-
 from flask_session import Session
+from flask_wtf.csrf import CSRFProtect
 
 if TYPE_CHECKING:
     from app.services.google_oauth import GoogleOAuthService

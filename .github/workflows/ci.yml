@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.13"
+      - name: Install locked dependencies
+        run: uv sync --locked --extra dev
+      - name: Check lint and formatting
+        run: |
+          uv run --no-sync ruff check .
+          uv run --no-sync ruff format --check .
+      - name: Run tests
+        run: uv run --no-sync pytest
+      - name: Run repository hooks
+        env:
+          SKIP: ruff,ruff-format,no-commit-to-branch,protect-master-from-all-changes
+        run: uv run --no-sync pre-commit run --hook-stage pre-commit --all-files
+
+  railway-image:
+    name: Railway image smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the Railway image with dummy local files
+        run: |
+          set -o noclobber
+          mkdir -p credentials data
+          for path in .secrets.toml .env credentials/ci-canary.json data/ci-canary.db; do
+            printf '%s\n' 'CI canary' > "$path"
+          done
+          docker build --tag langtut-ci .
+      - name: Verify local files are excluded
+        run: |
+          docker run --rm --entrypoint sh langtut-ci -eu -c '
+            for path in /app/.secrets.toml /app/.env /app/credentials/ci-canary.json /app/data/ci-canary.db; do
+              if [ -e "$path" ]; then
+                printf "Unexpected file in image: %s\n" "$path" >&2
+                exit 1
+              fi
+            done
+          '
+      - name: Check the Railway healthcheck
+        id: healthcheck
+        env:
+          RAILWAY_ENVIRONMENT: production
+          PORT: "8080"
+          LANGTUT_ALLOWED_HOSTS: '["healthcheck.railway.app"]'
+          LANGTUT_SECRET_KEY: ci-flask-session-key
+          LANGTUT_TTS_ENABLED: "false"
+          LANGTUT_CLIENT_SECRETS_JSON: >-
+            {"web":{"client_id":"ci-client","client_secret":"ci-client-secret",
+            "auth_uri":"https://accounts.example.test/authorize",
+            "token_uri":"https://accounts.example.test/token"}}
+        run: |
+          docker run --detach --name langtut-ci --publish 127.0.0.1::8080 \
+            --env RAILWAY_ENVIRONMENT --env PORT --env LANGTUT_ALLOWED_HOSTS \
+            --env LANGTUT_SECRET_KEY --env LANGTUT_TTS_ENABLED \
+            --env LANGTUT_CLIENT_SECRETS_JSON langtut-ci
+          address=$(docker port langtut-ci 8080/tcp)
+          status=$(curl --silent --show-error --fail --retry 15 --retry-all-errors \
+            --retry-delay 1 --max-time 5 --output /dev/null --write-out '%{http_code}' \
+            --header 'Host: healthcheck.railway.app' "http://$address/")
+          if [ "$status" != 200 ]; then
+            printf 'Expected HTTP 200, got %s\n' "$status" >&2
+            exit 1
+          fi
+      - name: Show container logs
+        if: failure() && steps.healthcheck.outcome == 'failure'
+        run: docker logs langtut-ci
