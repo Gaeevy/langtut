@@ -7,26 +7,34 @@ Handles Google OAuth authentication flow using centralized AuthManager.
 import logging
 
 from flask import Blueprint, redirect, render_template, request, url_for
+from google.auth.exceptions import TransportError
+from requests.exceptions import RequestException
 from sqlalchemy.exc import SQLAlchemyError
 
 from app import csrf
 from app.config import Environment, config
 from app.services.auth_manager import auth_manager
-from app.services.google_credentials import GoogleCredentialsUnavailableError
+from app.services.google_credentials import (
+    GoogleConnectionRequiredError,
+    GoogleCredentialsUnavailableError,
+)
 
 logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint("auth", __name__)
 
 
+def _redirect_uri() -> str:
+    use_https = config.environment == Environment.PRODUCTION or "ngrok" in request.host
+    scheme = "https" if use_https else "http"
+    return f"{scheme}://{request.host}{url_for('auth.oauth2callback')}"
+
+
 @auth_bp.route("/auth")
 def auth():
     """Initiate OAuth flow."""
     try:
-        use_https = config.environment == Environment.PRODUCTION or "ngrok" in request.host
-        scheme = "https" if use_https else "http"
-        redirect_uri = f"{scheme}://{request.host}{url_for('auth.oauth2callback')}"
-        authorization_url = auth_manager.initiate_login(redirect_uri)
+        authorization_url = auth_manager.initiate_login(_redirect_uri())
         return redirect(authorization_url)
     except Exception as e:
         logger.error("Could not start Google sign-in (%s)", type(e).__name__)
@@ -45,14 +53,36 @@ def oauth2callback():
             authorization_response = authorization_response.replace("http://", "https://", 1)
 
         # Handle callback and create/login user
-        user = auth_manager.handle_callback(authorization_response)
+        auth_manager.handle_callback(authorization_response)
 
-        logger.info("User %s signed in with Google", user.id)
         return redirect(url_for("index.home"))
 
+    except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
+        raise
+    except (TransportError, RequestException):
+        return render_template(
+            "error.html", message="Google is temporarily unavailable. Try again."
+        ), 503
     except Exception as e:
         logger.warning("Google sign-in callback failed (%s)", type(e).__name__)
-        return render_template("error.html", message="OAuth callback error. Start sign-in again.")
+        return render_template(
+            "error.html",
+            message="Google authorization failed. Check your account and permissions, then try again.",
+        ), 400
+
+
+@auth_bp.post("/connect-google-sheets")
+@auth_manager.require_auth
+def connect_google_sheets():
+    """Request Sheets consent for the signed-in Google account."""
+    csrf.protect()
+    try:
+        return redirect(auth_manager.initiate_connection(_redirect_uri()))
+    except Exception as error:
+        logger.warning("Could not start Sheets connection (%s)", type(error).__name__)
+        return render_template(
+            "error.html", message="Could not connect Google Sheets. Try again."
+        ), 503
 
 
 @auth_bp.post("/clear")

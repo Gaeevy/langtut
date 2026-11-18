@@ -99,11 +99,11 @@ def test_activate_spreadsheet_returns_summary_and_updates_db(app_with_db):
 def test_validate_spreadsheet_adds_sheet_and_returns_spreadsheet_payload(app_with_db, monkeypatch):
     monkeypatch.setattr(
         "app.services.settings_service.validate_spreadsheet_access",
-        lambda sid: "Mock Title",
+        lambda sid, *, user_id: "Mock Title",
     )
     monkeypatch.setattr(
         "app.services.settings_service.read_all_card_sets",
-        lambda sid: [SimpleNamespace(name="Tab1", cards=[1, 2])],
+        lambda sid, *, user_id: [SimpleNamespace(name="Tab1", cards=[1, 2])],
     )
 
     from app.database import User, db

@@ -5,12 +5,27 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
+from oauthlib.oauth2 import MismatchingStateError
 from pydantic import SecretStr
 
 from app import create_app
 from app.config import config
+
+
+def test_oauth_library_compares_recorded_state_before_token_exchange(google_oauth, monkeypatch):
+    _, transaction = google_oauth.start_login(
+        "https://example.test/oauth2callback", expires_at=2_000_000_000
+    )
+    request = Mock()
+    monkeypatch.setattr("requests_oauthlib.OAuth2Session.request", request)
+    with pytest.raises(MismatchingStateError):
+        google_oauth.complete_authorization(
+            "https://example.test/oauth2callback?code=synthetic&state=wrong", transaction
+        )
+    request.assert_not_called()
 
 
 @pytest.mark.parametrize("source", ["file", "inline-json"])

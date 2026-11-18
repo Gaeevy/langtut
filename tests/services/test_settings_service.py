@@ -29,20 +29,22 @@ def test_validate_spreadsheet_returns_payload(monkeypatch):
         "app.services.settings_service.extract_spreadsheet_id", lambda _: "sheet123"
     )
     monkeypatch.setattr(
-        "app.services.settings_service.validate_spreadsheet_access", lambda _: "Sheet Name"
+        "app.services.settings_service.validate_spreadsheet_access",
+        lambda _, *, user_id: "Sheet Name",
     )
     monkeypatch.setattr(
         "app.services.settings_service.read_all_card_sets",
-        lambda _: [SimpleNamespace(name="Tab1", cards=[1, 2])],
+        lambda _, *, user_id: [SimpleNamespace(name="Tab1", cards=[1, 2])],
     )
     user = SimpleNamespace(
+        id=7,
         add_spreadsheet=lambda sid, url, name: SimpleNamespace(
             id=7,
             spreadsheet_id=sid,
             spreadsheet_name=name,
             spreadsheet_url=url,
             is_active=True,
-        )
+        ),
     )
 
     result = service.validate_spreadsheet(user, "https://docs.google.com/spreadsheets/d/sheet123")

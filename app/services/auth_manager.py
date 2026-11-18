@@ -1,19 +1,17 @@
-"""Manage browser authentication and adapt Google credentials to the browser session."""
+"""Manage browser sign-in, login sessions, and Google Sheets connection callbacks."""
 
 import logging
 from functools import wraps
 from time import time
+from urllib.parse import parse_qs, urlsplit
 
 from flask import current_app, jsonify, redirect, request, url_for
-from google.oauth2.credentials import Credentials
 
 from app.database import User, db
 from app.services.google_credentials import (
-    GoogleConnectionRequiredError,
     GoogleCredentialsService,
-    GoogleCredentialsUnavailableError,
 )
-from app.services.google_oauth import GoogleOAuthService, GoogleOAuthTransaction
+from app.services.google_oauth import GoogleOAuthPurpose, GoogleOAuthService, GoogleOAuthTransaction
 from app.services.users import invalidate_user_sessions, login_or_create_user
 from app.session_manager import SessionKeys as sk
 from app.session_manager import SessionManager as sm
@@ -38,49 +36,82 @@ class AuthManager:
 
     def initiate_login(self, redirect_uri: str) -> str:
         """Start Google login and store the pending transaction in the browser session."""
-        url, transaction = self._google_oauth.start_login(redirect_uri)
-        sm.set(sk.AUTH_STATE, transaction.state)
-        sm.set(sk.AUTH_REDIRECT_URI, transaction.redirect_uri)
-        sm.set(sk.AUTH_CODE_VERIFIER, transaction.code_verifier)
+        url, transaction = self._google_oauth.start_login(
+            redirect_uri, expires_at=int(time()) + 600
+        )
+        self._store_transaction(transaction)
         return url
 
-    def handle_callback(self, authorization_response: str) -> User:
-        """Consume the pending login and establish a fresh session for the verified user."""
-        state = sm.pop(sk.AUTH_STATE)
-        redirect_uri = sm.pop(sk.AUTH_REDIRECT_URI)
-        code_verifier = sm.pop(sk.AUTH_CODE_VERIFIER)
-        if not (state and redirect_uri and code_verifier):
-            raise ValueError("Missing pending Google login")
+    def initiate_connection(self, redirect_uri: str) -> str:
+        """Bind a Sheets consent attempt to the signed-in local user."""
+        user = self.user
+        if user is None:
+            raise ValueError("Sign in before connecting Google Sheets")
+        url, transaction = self._google_oauth.start_connection(
+            redirect_uri,
+            expires_at=int(time()) + 600,
+            user_id=user.id,
+            session_version=user.session_version,
+            login_hint=user.email or "",
+        )
+        self._store_transaction(transaction)
+        return url
 
-        transaction = GoogleOAuthTransaction(state, redirect_uri, code_verifier)
-        identity, credentials = self._google_oauth.complete_login(
+    def _pending_transactions(self) -> dict:
+        return {
+            state: value
+            for state, value in sm.get(sk.AUTH_TRANSACTIONS, {}).items()
+            if value.get("expires_at", 0) > time()
+        }
+
+    def _store_transaction(self, transaction: GoogleOAuthTransaction) -> None:
+        pending = self._pending_transactions()
+        # Keep the transaction collection bounded while allowing parallel browser tabs.
+        pending = dict(list(pending.items())[-7:])
+        pending[transaction.state] = transaction.model_dump(mode="json")
+        sm.set(sk.AUTH_TRANSACTIONS, pending)
+
+    def handle_callback(self, authorization_response: str) -> GoogleOAuthPurpose:
+        """Consume one OAuth transaction and complete its sign-in or connection action."""
+        states = parse_qs(urlsplit(authorization_response).query, keep_blank_values=True).get(
+            "state", []
+        )
+        if len(states) != 1 or not states[0]:
+            raise ValueError("Google callback must include one state")
+        pending = self._pending_transactions()
+        value = pending.pop(states[0], None)
+        sm.set(sk.AUTH_TRANSACTIONS, pending)
+        if value is None:
+            raise ValueError("Google authorization expired. Start again")
+        transaction = GoogleOAuthTransaction.model_validate(value)
+
+        if transaction.purpose == GoogleOAuthPurpose.CONNECT_SHEETS:
+            user = self.user
+            if (
+                user is None
+                or user.id != transaction.user_id
+                or user.session_version != transaction.session_version
+            ):
+                raise ValueError("Sign in to the initiating account before connecting Sheets")
+
+        identity, credentials = self._google_oauth.complete_authorization(
             authorization_response, transaction
         )
-        user = login_or_create_user(identity)
-
-        try:
+        if transaction.purpose == GoogleOAuthPurpose.CONNECT_SHEETS:
+            if identity.google_user_id != user.google_user_id:
+                raise ValueError("Choose the Google account used to sign in")
             self._google_credentials.save_connection(user, credentials)
-        except GoogleCredentialsUnavailableError:
-            logger.warning("Could not save Google Sheets connection during sign-in")
+            return transaction.purpose
 
+        user = login_or_create_user(identity)
         sm.clear()
+        sm.set(sk.AUTH_TRANSACTIONS, pending)
         sm.set(sk.USER_ID, user.id)
         sm.set(sk.USER_GOOGLE_ID, user.google_user_id)
         sm.set(sk.LOGIN_EXPIRES_AT, int(time()) + _LOGIN_LIFETIME_SECONDS)
         sm.set(sk.SESSION_VERSION, user.session_version)
         sm.regenerate_id()
-        return user
-
-    def get_credentials(self, *, force_refresh: bool = False) -> Credentials | None:
-        """Adapt Google credential failures for existing website callers."""
-        # Remove this browser adapter once Sheets callers pass the user ID directly.
-        user = self.user
-        if user is None:
-            return None
-        try:
-            return self._google_credentials.get_credentials(user.id, force_refresh=force_refresh)
-        except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
-            return None
+        return transaction.purpose
 
     @property
     def user(self) -> User | None:

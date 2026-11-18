@@ -12,6 +12,10 @@ from app.gsheet import (
     spreadsheet_editor_url,
     validate_spreadsheet_access,
 )
+from app.services.google_credentials import (
+    GoogleConnectionRequiredError,
+    GoogleCredentialsUnavailableError,
+)
 
 
 @dataclass
@@ -46,8 +50,8 @@ class SettingsService:
             if not spreadsheet_id:
                 return ServiceResponse({"success": False, "error": "Invalid spreadsheet URL"})
 
-            spreadsheet_name = validate_spreadsheet_access(spreadsheet_id)
-            card_sets = read_all_card_sets(spreadsheet_id)
+            spreadsheet_name = validate_spreadsheet_access(spreadsheet_id, user_id=user.id)
+            card_sets = read_all_card_sets(spreadsheet_id, user_id=user.id)
             if not card_sets:
                 return ServiceResponse(
                     {"success": False, "error": "No valid card sets found in the spreadsheet"}
@@ -68,6 +72,9 @@ class SettingsService:
                     ],
                 }
             )
+        except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
+            raise
+
         except Exception as e:
             return ServiceResponse(
                 {"success": False, "error": f"Error validating spreadsheet: {e!s}"}

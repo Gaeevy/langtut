@@ -12,6 +12,10 @@ from flask import Blueprint, jsonify, render_template
 from app.config import config
 from app.gsheet import read_all_card_sets
 from app.services.auth_manager import auth_manager
+from app.services.google_credentials import (
+    GoogleConnectionRequiredError,
+    GoogleCredentialsUnavailableError,
+)
 from app.services.tts import tts_service
 
 # Create blueprint
@@ -24,16 +28,19 @@ def test() -> dict[str, Any]:
     """Test endpoint for checking application functionality."""
     try:
         # Test reading card sets
-        card_sets = read_all_card_sets(config.spreadsheet_id)
+        card_sets = read_all_card_sets(config.spreadsheet_id, user_id=auth_manager.user.id)
 
         # Test Google Sheets access
         try:
-            card_sets = read_all_card_sets(config.spreadsheet_id)
+            card_sets = read_all_card_sets(config.spreadsheet_id, user_id=auth_manager.user.id)
             sheets_status = {
                 "working": True,
                 "card_sets_count": len(card_sets),
                 "card_sets": [cs.name for cs in card_sets[:3]],  # First 3 for brevity
             }
+        except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
+            raise
+
         except Exception as e:
             sheets_status = {"working": False, "error": str(e)}
 
@@ -65,6 +72,9 @@ def test() -> dict[str, Any]:
 
         # Return test data
         return jsonify(test_data)
+
+    except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
+        raise
 
     except Exception as e:
         # Error handling

@@ -3,10 +3,11 @@
 import asyncio
 import logging
 from pathlib import Path
+from unittest.mock import Mock
 
 import httpx
 import pytest
-from flask import Flask
+from flask import Flask, has_request_context
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from sqlalchemy import create_engine, text
@@ -17,7 +18,11 @@ from starlette.testclient import TestClient
 from app.database import User, UserSpreadsheet
 from app.mcp_server import create_mcp_app
 from app.mcp_settings import MCPSettings
-from app.services.mcp_spreadsheets import list_spreadsheet_names, readonly_engine
+from app.services.mcp_spreadsheets import (
+    list_spreadsheet_names,
+    list_spreadsheet_names_for_user,
+    readonly_engine,
+)
 from asgi import create_combined_app
 
 
@@ -76,6 +81,30 @@ def test_lookup_returns_only_matching_names(database, email, status, names):
         engine.dispose()
 
 
+@pytest.mark.parametrize(
+    ("user_id", "status", "names"),
+    [
+        (1, "ok", ["Portuguese", "Unnamed spreadsheet"]),
+        (3, "ok", ["Other"]),
+        (2, "ok", []),
+        (999, "user_not_found", []),
+    ],
+)
+def test_trusted_user_lookup_isolates_names_without_browser_or_google(
+    database, monkeypatch, user_id, status, names
+):
+    google_request = Mock(side_effect=AssertionError("Unexpected Google request"))
+    monkeypatch.setattr("requests.sessions.Session.request", google_request)
+    assert not has_request_context()
+    engine = readonly_engine(database)
+    try:
+        result = list_spreadsheet_names_for_user(engine, user_id)
+        assert result.model_dump() == {"status": status, "spreadsheets": names, "truncated": False}
+    finally:
+        engine.dispose()
+    google_request.assert_not_called()
+
+
 def test_database_is_read_only_and_missing_file_is_not_created(database, tmp_path):
     engine = readonly_engine(database)
     with engine.connect() as connection, pytest.raises(OperationalError):
@@ -90,9 +119,26 @@ def test_database_is_read_only_and_missing_file_is_not_created(database, tmp_pat
 def test_ambiguous_email_does_not_merge_users(database):
     engine = create_engine(f"sqlite:///{database}")
     with Session(engine) as session:
-        session.add(User(google_user_id="duplicate", email="LEARNER@example.com"))
+        duplicate = User(google_user_id="duplicate", email="LEARNER@example.com")
+        session.add(duplicate)
+        session.flush()
+        duplicate_id = duplicate.id
+        session.add(
+            UserSpreadsheet(
+                user_id=duplicate_id,
+                spreadsheet_id="duplicate-private-id",
+                spreadsheet_name="Duplicate account's sheet",
+            )
+        )
         session.commit()
     assert list_spreadsheet_names(engine, "learner@example.com").status == "ambiguous_user"
+    assert list_spreadsheet_names_for_user(engine, 1).spreadsheets == [
+        "Portuguese",
+        "Unnamed spreadsheet",
+    ]
+    assert list_spreadsheet_names_for_user(engine, duplicate_id).spreadsheets == [
+        "Duplicate account's sheet"
+    ]
     engine.dispose()
 
 
@@ -166,6 +212,7 @@ def test_sdk_client_discovers_and_calls_tool_through_combined_app(database, capl
                 assert [tool.name for tool in tools] == ["list_spreadsheets"]
                 assert tools[0].annotations.readOnlyHint
                 assert tools[0].inputSchema["required"] == ["email"]
+                assert set(tools[0].inputSchema["properties"]) == {"email"}
                 for email, status in [
                     ("learner@example.com", "ok"),
                     ("absent@example.com", "user_not_found"),

@@ -9,6 +9,10 @@ from flask import Blueprint, render_template, request
 
 from app.gsheet import read_all_card_sets
 from app.services.auth_manager import auth_manager
+from app.services.google_credentials import (
+    GoogleConnectionRequiredError,
+    GoogleCredentialsUnavailableError,
+)
 from app.session_manager import SessionKeys as sk
 from app.session_manager import SessionManager as sm
 
@@ -55,10 +59,13 @@ def home():
 
     # Normal app flow with user's spreadsheet
     try:
-        card_sets = read_all_card_sets(user_spreadsheet_id)
+        card_sets = read_all_card_sets(user_spreadsheet_id, user_id=user.id)
         logger.info(f"Found {len(card_sets)} card sets in spreadsheet {user_spreadsheet_id}")
         for card_set in card_sets:
             logger.info(f"  - {card_set.name}: {card_set.card_count} cards")
+    except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
+        raise
+
     except Exception as e:
         logger.error(f"Error reading card sets from spreadsheet {user_spreadsheet_id}: {e}")
         card_sets = []

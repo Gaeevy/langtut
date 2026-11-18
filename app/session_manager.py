@@ -15,9 +15,7 @@ class SessionKeys(Enum):
     """Enumerated session keys with prefix namespacing for organization."""
 
     # Auth namespace - OAuth and authentication state
-    AUTH_STATE = "auth.state"
-    AUTH_REDIRECT_URI = "auth.redirect_uri"
-    AUTH_CODE_VERIFIER = "auth.code_verifier"
+    AUTH_TRANSACTIONS = "auth.transactions"
     LOGIN_EXPIRES_AT = "auth.login_expires_at"
     SESSION_VERSION = "auth.session_version"
 
@@ -101,11 +99,6 @@ class SessionManager:
             key: SessionKeys enum value to remove
         """
         session.pop(key.value, None)
-
-    @staticmethod
-    def pop(key: SessionKeys) -> Any:
-        """Read and remove a session value, returning None if absent."""
-        return session.pop(key.value, None)
 
     @staticmethod
     def clear() -> None:

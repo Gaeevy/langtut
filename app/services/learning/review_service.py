@@ -5,6 +5,10 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.gsheet import read_card_set, update_spreadsheet
+from app.services.google_credentials import (
+    GoogleConnectionRequiredError,
+    GoogleCredentialsUnavailableError,
+)
 from app.services.learning.card_session import CardSessionManager
 from app.utils import get_timestamp
 
@@ -55,7 +59,9 @@ class ReviewService:
         """Initialize the review service."""
         self.session = CardSessionManager("review")
 
-    def start_session(self, tab_name: str, spreadsheet_id: str) -> ReviewSessionResult:
+    def start_session(
+        self, tab_name: str, spreadsheet_id: str, *, user_id: int
+    ) -> ReviewSessionResult:
         """Start a new review session with ALL cards.
 
         Args:
@@ -67,7 +73,9 @@ class ReviewService:
         """
         try:
             # Read card set from Google Sheets
-            card_set = read_card_set(worksheet_name=tab_name, spreadsheet_id=spreadsheet_id)
+            card_set = read_card_set(
+                worksheet_name=tab_name, spreadsheet_id=spreadsheet_id, user_id=user_id
+            )
 
             if not card_set:
                 return ReviewSessionResult(success=False, error=f"Card set '{tab_name}' not found")
@@ -86,6 +94,9 @@ class ReviewService:
             logger.info(f"Review session started: {len(cards)} cards from '{tab_name}'")
 
             return ReviewSessionResult(success=True, card_count=len(cards))
+
+        except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
+            raise
 
         except Exception as e:
             logger.error(f"Error starting review session: {e}", exc_info=True)
@@ -147,7 +158,9 @@ class ReviewService:
         logger.debug(f"Review navigation: {current} -> {new_index} ({direction})")
         return True
 
-    def record_review(self, outcome: ReviewOutcome, spreadsheet_id: str) -> ReviewActionResult:
+    def record_review(
+        self, outcome: ReviewOutcome, spreadsheet_id: str, *, user_id: int
+    ) -> ReviewActionResult:
         """Record one review choice and advance to the next card.
 
         Remembered cards retain their level. Forgotten cards lose one level.
@@ -179,7 +192,10 @@ class ReviewService:
                 for index, card_data in enumerate(state.cards)
             ]
             try:
-                self._save_cards(state.active_tab, cards_to_save, spreadsheet_id)
+                self._save_cards(state.active_tab, cards_to_save, spreadsheet_id, user_id)
+            except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
+                raise
+
             except Exception as error:
                 logger.error("Failed to save review session: %s", error, exc_info=True)
                 return ReviewActionResult(success=False, error="Could not save review progress")
@@ -199,7 +215,7 @@ class ReviewService:
         """
         return self.session.has_active_session()
 
-    def end_session_early(self, spreadsheet_id: str) -> ReviewActionResult:
+    def end_session_early(self, spreadsheet_id: str, *, user_id: int) -> ReviewActionResult:
         """Save reviewed cards and end an incomplete review session."""
         state = self.session.get_state()
         if not state:
@@ -207,7 +223,10 @@ class ReviewService:
 
         reviewed_cards = state.cards[: state.current_index]
         try:
-            self._save_cards(state.active_tab, reviewed_cards, spreadsheet_id)
+            self._save_cards(state.active_tab, reviewed_cards, spreadsheet_id, user_id)
+        except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
+            raise
+
         except Exception as error:
             logger.error("Failed to save partial review session: %s", error, exc_info=True)
             return ReviewActionResult(success=False, error="Could not save review progress")
@@ -224,12 +243,13 @@ class ReviewService:
         active_tab: str,
         cards_data: list[dict],
         spreadsheet_id: str,
+        user_id: int,
     ) -> None:
         """Deserialize and batch-save review-session cards."""
         if not cards_data:
             return
         cards = [self.session.deserialize_card(card_data) for card_data in cards_data]
-        update_spreadsheet(active_tab, cards, spreadsheet_id=spreadsheet_id)
+        update_spreadsheet(active_tab, cards, spreadsheet_id=spreadsheet_id, user_id=user_id)
 
     def _clear_session(self) -> None:
         """Clear review session data after a successful completion or early end."""

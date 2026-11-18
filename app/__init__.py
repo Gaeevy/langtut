@@ -108,13 +108,15 @@ def create_app(*, google_oauth: "GoogleOAuthService | None" = None) -> Flask:
         google_oauth = GoogleOAuthService.from_settings(
             client_json=config.client_secrets_json,
             client_file=config.client_secrets_file,
-            scopes=config.scopes,
+            identity_scopes=config.google_identity_scopes,
+            sheets_scopes=config.google_sheets_scopes,
         )
     app.extensions["google_oauth"] = google_oauth
     app.extensions["google_credentials"] = GoogleCredentialsService(
         client_id=google_oauth.client_id,
         client_secret=google_oauth.client_secret,
         token_uri=google_oauth.token_uri,
+        sheets_scopes=config.google_sheets_scopes,
     )
 
     from app.routes import register_blueprints

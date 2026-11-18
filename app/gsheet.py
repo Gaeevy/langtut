@@ -10,14 +10,17 @@ import re
 from collections.abc import Callable
 
 import gspread
+from flask import current_app
 from google.oauth2.credentials import Credentials
 from gspread.exceptions import APIError
 from gspread.spreadsheet import Spreadsheet
 from gspread.worksheet import Worksheet
 
-from app.config import config
 from app.models import NEVER_SHOWN, Card, CardSet, Levels
-from app.services.auth_manager import auth_manager
+from app.services.google_credentials import (
+    GoogleConnectionRequiredError,
+    GoogleCredentialsUnavailableError,
+)
 from app.utils import format_timestamp, parse_timestamp
 
 # Create logger
@@ -27,8 +30,10 @@ logger = logging.getLogger(__name__)
 _SPREADSHEET_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{20,}$")
 
 
-class _GoogleCredentialsUnavailableError(RuntimeError):
-    """Raised when a Sheets operation cannot obtain usable Google credentials."""
+def _get_credentials(user_id: int, *, force_refresh: bool = False) -> Credentials:
+    return current_app.extensions["google_credentials"].get_credentials(
+        user_id, force_refresh=force_refresh
+    )
 
 
 def _is_authentication_error(error: APIError) -> bool:
@@ -38,20 +43,13 @@ def _is_authentication_error(error: APIError) -> bool:
 
 
 def _run_with_auth_retry[ResultT](
+    user_id: int,
     operation: Callable[[Credentials], ResultT],
     description: str,
 ) -> ResultT:
     """Run a Sheets operation, rebuilding it once after a Google authentication failure."""
     for attempt in range(2):
-        credentials = (
-            auth_manager.get_credentials(force_refresh=True)
-            if attempt
-            else auth_manager.get_credentials()
-        )
-        if not credentials:
-            raise _GoogleCredentialsUnavailableError(
-                f"No Google credentials available for {description}"
-            )
+        credentials = _get_credentials(user_id, force_refresh=bool(attempt))
 
         try:
             return operation(credentials)
@@ -86,6 +84,8 @@ def _batch_update_worksheet(
     worksheet_name: str,
     spreadsheet_id: str,
     cell_updates: list[dict[str, object]],
+    *,
+    user_id: int,
 ) -> object:
     """Apply prepared cell updates through the shared authentication retry boundary."""
 
@@ -93,7 +93,7 @@ def _batch_update_worksheet(
         worksheet = _open_worksheet(credentials, worksheet_name, spreadsheet_id)
         return worksheet.batch_update(cell_updates)
 
-    return _run_with_auth_retry(update, f"updating worksheet {worksheet_name}")
+    return _run_with_auth_retry(user_id, update, f"updating worksheet {worksheet_name}")
 
 
 def extract_spreadsheet_id(url_or_id: str) -> str:
@@ -127,11 +127,12 @@ def spreadsheet_editor_url(spreadsheet_id: str) -> str:
     return f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}"
 
 
-def validate_spreadsheet_access(spreadsheet_id: str) -> str:
+def validate_spreadsheet_access(spreadsheet_id: str, *, user_id: int) -> str:
     """Validate spreadsheet access and return spreadsheet name.
 
     Args:
         spreadsheet_id: Google Sheets spreadsheet ID
+        user_id: Authenticated local user who is requesting access.
 
     Returns:
         Spreadsheet name/title
@@ -147,50 +148,49 @@ def validate_spreadsheet_access(spreadsheet_id: str) -> str:
     """
     logger.info(f"Validating spreadsheet access: {spreadsheet_id}")
 
-    try:
-        spreadsheet = _run_with_auth_retry(
-            lambda credentials: _open_spreadsheet(credentials, spreadsheet_id),
-            f"validating spreadsheet {spreadsheet_id}",
-        )
-    except _GoogleCredentialsUnavailableError as error:
-        raise ValueError("Not authenticated with Google") from error
+    spreadsheet = _run_with_auth_retry(
+        user_id,
+        lambda credentials: _open_spreadsheet(credentials, spreadsheet_id),
+        f"validating spreadsheet {spreadsheet_id}",
+    )
 
     logger.info(f"✅ Spreadsheet access validated: {spreadsheet.title}")
     return spreadsheet.title
 
 
-def get_spreadsheet(spreadsheet_id: str = None) -> Spreadsheet | None:
-    """Get spreadsheet by ID, falls back to default if not provided"""
-    sheet_id = spreadsheet_id or config.spreadsheet_id
+def get_spreadsheet(spreadsheet_id: str, *, user_id: int) -> Spreadsheet | None:
+    """Open the explicit spreadsheet using the trusted local user's Google grant."""
 
     try:
         return _run_with_auth_retry(
-            lambda credentials: _open_spreadsheet(credentials, sheet_id),
-            f"opening spreadsheet {sheet_id}",
+            user_id,
+            lambda credentials: _open_spreadsheet(credentials, spreadsheet_id),
+            f"opening spreadsheet {spreadsheet_id}",
         )
-    except _GoogleCredentialsUnavailableError as error:
-        logger.warning(str(error))
+    except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
+        raise
     except gspread.SpreadsheetNotFound:
-        logger.warning(f"Spreadsheet not found or inaccessible: {sheet_id}")
+        logger.warning(f"Spreadsheet not found or inaccessible: {spreadsheet_id}")
     except APIError as error:
         logger.error(
-            f"Google Sheets API error accessing spreadsheet {sheet_id}: {error}", exc_info=True
+            f"Google Sheets API error accessing spreadsheet {spreadsheet_id}: {error}",
+            exc_info=True,
         )
     except Exception as error:
-        logger.error(f"Error accessing spreadsheet {sheet_id}: {error}", exc_info=True)
+        logger.error(f"Error accessing spreadsheet {spreadsheet_id}: {error}", exc_info=True)
     return None
 
 
-def get_worksheet(worksheet_name, spreadsheet_id: str = None) -> Worksheet | None:
+def get_worksheet(worksheet_name: str, spreadsheet_id: str, *, user_id: int) -> Worksheet | None:
     """Get a specific worksheet by name"""
-    sheet_id = spreadsheet_id or config.spreadsheet_id
     try:
         return _run_with_auth_retry(
-            lambda credentials: _open_worksheet(credentials, worksheet_name, sheet_id),
+            user_id,
+            lambda credentials: _open_worksheet(credentials, worksheet_name, spreadsheet_id),
             f"opening worksheet {worksheet_name}",
         )
-    except _GoogleCredentialsUnavailableError as error:
-        logger.warning(str(error))
+    except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
+        raise
     except (gspread.SpreadsheetNotFound, gspread.WorksheetNotFound):
         logger.warning(f"Worksheet not found or inaccessible: {worksheet_name}")
     except APIError as error:
@@ -203,12 +203,11 @@ def get_worksheet(worksheet_name, spreadsheet_id: str = None) -> Worksheet | Non
     return None
 
 
-def read_all_card_sets(spreadsheet_id: str = None) -> list[CardSet]:
+def read_all_card_sets(spreadsheet_id: str, *, user_id: int) -> list[CardSet]:
     """Get all card sets from the spreadsheet"""
-    sheet_id = spreadsheet_id or config.spreadsheet_id
 
     def read(credentials: Credentials) -> list[CardSet]:
-        spreadsheet = _open_spreadsheet(credentials, sheet_id)
+        spreadsheet = _open_spreadsheet(credentials, spreadsheet_id)
         return [
             CardSet(
                 name=worksheet.title,
@@ -219,21 +218,21 @@ def read_all_card_sets(spreadsheet_id: str = None) -> list[CardSet]:
         ]
 
     try:
-        return _run_with_auth_retry(read, f"reading card sets from spreadsheet {sheet_id}")
-    except _GoogleCredentialsUnavailableError as error:
-        logger.warning(str(error))
+        return _run_with_auth_retry(
+            user_id, read, f"reading card sets from spreadsheet {spreadsheet_id}"
+        )
+    except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
+        raise
     except (gspread.SpreadsheetNotFound, APIError) as error:
         logger.error(
-            f"Could not read card sets from spreadsheet {sheet_id}: {error}", exc_info=True
+            f"Could not read card sets from spreadsheet {spreadsheet_id}: {error}", exc_info=True
         )
     return []
 
 
-def read_card_set(worksheet_name, spreadsheet_id: str = None) -> CardSet | None:
-    sheet_id = spreadsheet_id or config.spreadsheet_id
-
+def read_card_set(worksheet_name: str, spreadsheet_id: str, *, user_id: int) -> CardSet | None:
     def read(credentials: Credentials) -> CardSet:
-        worksheet = _open_worksheet(credentials, worksheet_name, sheet_id)
+        worksheet = _open_worksheet(credentials, worksheet_name, spreadsheet_id)
         return CardSet(
             name=worksheet.title,
             gid=worksheet.id,
@@ -241,9 +240,9 @@ def read_card_set(worksheet_name, spreadsheet_id: str = None) -> CardSet | None:
         )
 
     try:
-        return _run_with_auth_retry(read, f"reading worksheet {worksheet_name}")
-    except _GoogleCredentialsUnavailableError as error:
-        logger.warning(str(error))
+        return _run_with_auth_retry(user_id, read, f"reading worksheet {worksheet_name}")
+    except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
+        raise
     except (gspread.SpreadsheetNotFound, gspread.WorksheetNotFound):
         logger.warning(f"Worksheet not found or inaccessible: {worksheet_name}")
     except APIError as error:
@@ -297,7 +296,9 @@ def read_cards_from_worksheet(worksheet) -> list[Card]:
     return cards
 
 
-def update_spreadsheet(worksheet_name, cards, spreadsheet_id: str = None):
+def update_spreadsheet(
+    worksheet_name: str, cards: list[Card], spreadsheet_id: str, *, user_id: int
+) -> object:
     """Update data in Google Sheets in bulk for a specific sheet"""
     logger.info(
         f"Updating spreadsheet: {worksheet_name} ({len(cards)} cards, ID: {spreadsheet_id})"
@@ -311,7 +312,7 @@ def update_spreadsheet(worksheet_name, cards, spreadsheet_id: str = None):
 
     try:
         # First, we need to get all cards from the sheet
-        card_set = read_card_set(worksheet_name, spreadsheet_id)
+        card_set = read_card_set(worksheet_name, spreadsheet_id, user_id=user_id)
         if not card_set:
             raise Exception(f"Could not read worksheet {worksheet_name}")
 
@@ -367,8 +368,9 @@ def update_spreadsheet(worksheet_name, cards, spreadsheet_id: str = None):
         # Execute the batch update if there are changes
         if cell_updates:
             logger.info("Executing batch update to Google Sheets...")
-            sheet_id = spreadsheet_id or config.spreadsheet_id
-            result = _batch_update_worksheet(worksheet_name, sheet_id, cell_updates)
+            result = _batch_update_worksheet(
+                worksheet_name, spreadsheet_id, cell_updates, user_id=user_id
+            )
             logger.info(
                 f"✅ Batch update completed successfully. Updated {len(cell_updates)} cells"
             )
@@ -377,6 +379,8 @@ def update_spreadsheet(worksheet_name, cards, spreadsheet_id: str = None):
         logger.info("No updates to make")
         return "No updates to make"
 
+    except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
+        raise
     except Exception as e:
         logger.error(f"❌ Error updating spreadsheet: {e}", exc_info=True)
         raise

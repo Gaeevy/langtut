@@ -127,9 +127,8 @@ class Config(BaseModel):
     json_as_ascii: bool = _settings["json_as_ascii"]
 
     # Google OAuth
-    scopes: list[str] = _settings["scopes"]
-    api_service_name: str = _settings["api_service_name"]
-    api_version: str = _settings["api_version"]
+    google_identity_scopes: list[str] = _settings["google_identity_scopes"]
+    google_sheets_scopes: list[str] = _settings["google_sheets_scopes"]
 
     # Google TTS
     tts_enabled: bool = _settings["tts_enabled"]

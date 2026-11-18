@@ -1,110 +1,115 @@
 # Architecture
 
-LangTut is a Python Flask application with server-rendered Jinja pages and vanilla
-JavaScript. Google Sheets owns vocabulary and study statistics; SQLite owns application
-records. Google OAuth provides login and Sheets access; TTS/GCS provide audio.
+This describes the code in the current checkout. Use the [deployment guide](deployment.md)
+to verify a release and the [documentation index](README.md) for each topic's primary reference.
 
-## Runtime and boundaries
+## Runtime and code map
 
 ```text
-Browser -> Flask blueprints ----> services -> Google Sheets / SQLite / TTS
-                                     ^
-ChatGPT -> native MCP adapter --------+      (SQLite names only)
+Browser -> Flask routes -> application services -> Google Sheets / SQLite / TTS
+ChatGPT -> native MCP adapter -> read-only SQLite spreadsheet-name lookup
 ```
 
-`serve.py` launches one Uvicorn worker. `asgi.create_app()` builds Flask, initializes
-SQLite and missing tables, and mounts Flask through `a2wsgi` behind the native MCP
-routes. Importing `asgi.py` has no database side effects; Flask's factory alone does
-not initialize the database. `run.py` is retired.
-
-Configuration is resolved once through Dynaconf and validated by Pydantic. MCP receives
-plain settings and opens a separate read-only SQLite connection. It does not use
-Flask sessions, Google clients, or Flask's request-body logger. Runtime settings,
-credentials, proxy handling, and healthchecks are documented in [deployment.md](deployment.md).
-
-## Code map
+`serve.py` starts one Uvicorn worker. `asgi.create_app()` builds Flask, checks the auth
+schema, initializes missing tables, and mounts Flask behind the native MCP routes.
+Importing `asgi` has no database side effects. The Flask factory configures extensions
+and Google OAuth, while database initialization belongs to the combined factory.
 
 | Location | Responsibility |
 |---|---|
-| `app/__init__.py` | Flask factory, configuration, extensions, middleware |
-| `app/routes/` | HTTP parsing, HTML rendering; nested JSON blueprints in `api/` |
-| `app/services/` | Business logic; study and review in `learning/` |
-| `app/models.py` | Pydantic domain/request models |
-| `app/database.py` | SQLAlchemy models and database initialization |
-| `app/gsheet.py` | Google Sheets reads and progress writes |
-| `app/session_manager.py` | Exclusive interface to Flask session state |
-| `app/mcp_server.py` | MCP transport, tool declaration, limits |
-| `app/services/mcp_spreadsheets.py` | Read-only email lookup |
-| `app/templates/`, `app/static/` | Jinja and browser assets |
+| `app/__init__.py`, `app/config.py` | Flask setup and shared Dynaconf/Pydantic configuration |
+| `app/routes/`, `app/routes/api/` | HTML and JSON request adapters, blueprint registration |
+| `app/services/` | Application behavior, with learn/review under `learning/` |
+| `app/services/auth_manager.py` | Browser login, guards, and account-action orchestration |
+| `app/services/google_oauth.py`, `app/services/users.py` | Google authorization and verified-identity account lookup |
+| `app/services/google_credentials.py` | Sheets grants, refresh, rotation, and access-token cache |
+| `app/models.py`, `app/database.py` | Pydantic input/domain models and SQLAlchemy persistence |
+| `app/gsheet.py` | Sheets reads and progress writes |
+| `app/session_manager.py` | Flask session state and namespaced keys |
+| `app/mcp_server.py`, `app/services/mcp_spreadsheets.py` | MCP transport and stored-name lookups |
+| `app/templates/`, `app/static/` | Jinja, JavaScript, CSS, and PWA assets |
+| `config/languages.yaml` | TTS language and voice pairs |
+| `scripts/migrate_auth.py`, `tests/` | Auth migration and automated verification |
 
-Blueprint registration lives in `app/routes/__init__.py` and `app/routes/api/__init__.py`.
-Keep reusable behavior in services, not adapters. See [AGENTS.md](../AGENTS.md) for
-coding and test rules.
+[AGENTS.md](../AGENTS.md) owns implementation rules and required checks.
 
-## Persistence
+## Data ownership and study state
 
-| Store | Owned data |
+| Store | Data |
 |---|---|
-| Google Sheets | Vocabulary, examples, levels, counters, last study timestamps |
-| SQLite | Users, linked spreadsheets, encrypted refresh tokens, verbs, practice history |
-| Filesystem session | OAuth transaction, LangTut login expiry and version, active study queues, language settings |
+| Google Sheets | Vocabulary, examples, levels, counters, and last-shown timestamps |
+| SQLite | Users, linked spreadsheets, encrypted Sheets grants, verbs, and practice history |
+| Filesystem session | LangTut login and OAuth transactions, study queues, answers, and language selection |
 | GCS | Generated MP3 cache |
-| Browser localStorage | Bounded TTS cache; details in [audio.md](audio.md) |
+| Browser localStorage | Bounded TTS cache described in [audio.md](audio.md#caching) |
 
-Vocabulary rows have ten columns: ID, word, translation, equivalent, example,
-example translation, shown count, correct count, level, and last-shown timestamp.
-Reads skip invalid rows; progress writes update G:J. Sheets owns this data until
-an explicit storage migration lands. `create_all()` only creates missing tables.
+A vocabulary row has ten columns, in order: ID, word, translation, equivalent,
+example, example translation, shown count, correct count, level, and last-shown
+timestamp. Reads skip invalid rows. Progress writes update G:J for requested cards.
 
-## Study and audio flows
+Learn and review keep active state in the browser's server-side session. Learn saves
+progress at completion or early exit. Review saves its stack after the final card or
+saves reviewed cards on early exit. Failed writes retain state for retry. Accepted
+answers become durable at these save points. Irregular verbs use SQLite independently.
 
-Learning reads due cards, creates tasks, and keeps the active queue in session.
-Learning/review persist progress to Sheets at their save points; review early exit
-also saves and retains session state if the write fails. This is not incremental
-per-answer database persistence or guaranteed session recovery after interruption.
+Both form submission and AJAX are supported. AJAX renders feedback in the current
+page so playback can use the submit gesture. [Audio](audio.md) owns browser playback,
+cache behavior, and the physical-device checklist.
 
-Card submission supports form POST and AJAX. AJAX renders feedback in the existing
-page so audio can use the interaction that submitted the answer. Preserve the
-server-rendered fallback and Jinja/JavaScript contracts. Listening fetches tab cards
-and plays word/example clips in sequence. [audio.md](audio.md) owns playback,
-caching, invalidation, and physical-device verification.
+## Identity, sessions, and Sheets access
 
-Irregular verbs use SQLite services and `app/import_verbs/`, independently of Sheets.
-Unifying verb and vocabulary models is not an implemented feature.
+```text
+Google identity -> local User -> LangTut browser session
+Signed-in user -> Sheets consent for the same Google identity -> GoogleSheetsConnection
+Trusted User.id -> GoogleCredentialsService -> Google access token -> Sheets operation
+```
 
-## Authentication and permissions
+`User.google_user_id` is the stable Google subject. Email and name are profile fields.
+OAuth client configuration loads at Flask application setup. Sign-in requests identity
+scopes. Connect/Reconnect requests identity and Sheets scopes with offline access.
+Both callbacks verify the ID token. The connection callback also checks the initiating
+local user, session version, and matching Google subject.
 
-`AuthManager` coordinates browser login and route protection.
-`GoogleOAuthService` loads OAuth client configuration at Flask application setup.
-It builds the combined sign-in and Sheets consent flow and verifies the Google ID
-token. The browser session holds OAuth state, the redirect URI, and a PKCE verifier
-until the callback consumes them. Successful login rotates the session ID and resets
-the browser state for the signed-in user.
+The session holds up to eight pending transactions keyed by OAuth state. Each records
+its purpose, redirect URI, PKCE verifier, and ten-minute expiry. A callback consumes its
+own transaction. Login rotates the session ID and creates a seven-day, fixed-expiry login.
+Guards check the local user, Google subject, expiry, and session version.
 
-Google subject IDs identify users. The browser login expires seven days after sign-in
-without extension. Each guard checks the local user, Google subject, session version,
-and expiry. Protected HTML routes use `require_auth` and redirect to sign-in. Protected
-JSON routes use `require_auth_api` and return 401. All-device logout increments the user's
-session version. Both logout actions preserve the Sheets connection.
+| Action | LangTut login | Sheets connection |
+|---|---|---|
+| Log out | End this browser session | Retain |
+| Log out everywhere | Increment the user session version and end this login | Retain |
+| Disconnect Google Sheets | Retain | Delete the local grant and cached access |
+| Google rejects the stored grant as invalid | Retain | Delete the unusable connection and require reconnect |
 
-`GoogleCredentialsService` refreshes access tokens for a trusted local user ID within an
-application context. One `GoogleSheetsConnection` per user stores the encrypted refresh
-token and granted scopes when known. Up to 128 access tokens are cached per process.
-Refreshes for the same user are serialized within that process. Forced refresh and
-connection deletion evict the affected cache entry. A confirmed invalid grant removes
-the connection and leaves browser logins active.
+One `GoogleSheetsConnection` per local user stores the encrypted refresh token,
+Google subject, known granted scopes, and timestamps. Access tokens stay in a cache
+of at most 128 entries per process. Refreshes for a user are serialized within that
+process. Callers receive fresh Google `Credentials` objects containing access tokens.
+The service runs in an application context without a Flask request or session.
+Multiple workers need a review of cross-process refresh coordination.
 
-Sheets callers currently go through `AuthManager.get_credentials()`. The SQLite-only
-features need a valid LangTut login. The logout and Sheets disconnect forms use POST
-with Flask-WTF CSRF protection. See the [auth cutover and rollback](deployment.md#auth-cutover)
-for existing databases and Google-side revocation.
+Sheets operations take explicit trusted user and spreadsheet IDs. Routes resolve
+the user's active spreadsheet. Settings validation checks Google access before linking
+new spreadsheets. A Google 401 triggers one forced refresh and retry. A temporary
+proactive refresh failure can retain a still-valid token. Forced refresh evicts the
+rejected token first. Google file-permission 403 responses retain the connection.
 
-The unused `/admin/*` routes are removed. TTS and diagnostic routes require login.
-`POST /api/verbs/forms` accepts a logged-in user or the configured `X-Import-Key`;
-it is not restricted to an administrator role. Language-settings validation is public
-and does not access user records.
+## HTTP and MCP boundaries
 
-Enabled MCP deliberately permits public spreadsheet-name lookup by supplied email.
-It has no user authentication, and host/origin validation does not change that.
-[MCP documentation](mcp.md) describes the tool contract. The [AI-native roadmap](ai-native-mcp.md)
-proposes private MCP. The [GA roadmap](path-to-ga.md) describes future product changes.
+HTML guards redirect anonymous users to sign-in. JSON guards return 401. A missing
+Sheets connection produces a connection page or JSON 403 with
+`google_sheets_connection_required`. Credential-service outages produce 503 with
+`google_sheets_unavailable` for JSON callers. Connect, logout, and disconnect use
+CSRF-protected POSTs. Other routes retain their existing protection and validation.
+
+TTS and diagnostics require login. `POST /api/verbs/forms` accepts either a valid
+LangTut login or `X-Import-Key`. Language-settings validation is public.
+
+The public MCP contract and private-MCP remaining work live in [mcp.md](mcp.md).
+`list_spreadsheet_names_for_user(engine, user_id)` is an internal service boundary for
+trusted application code. Its caller establishes identity. Complete learn/review
+workflows still depend on `SessionManager` and need a state adapter for future MCP use.
+
+Existing auth schemas require the explicit [auth cutover](deployment.md#auth-cutover).
+Legacy refresh-token rows remain available for reviewed rollback and later cleanup.

@@ -24,7 +24,9 @@ def google_client_config() -> dict:
 
 @pytest.fixture
 def google_oauth(google_client_config) -> GoogleOAuthService:
-    return GoogleOAuthService(google_client_config, config.scopes)
+    return GoogleOAuthService(
+        google_client_config, config.google_identity_scopes, config.google_sheets_scopes
+    )
 
 
 @pytest.fixture

@@ -25,6 +25,9 @@ from .verbs import verbs_bp
 
 def register_blueprints(app: Flask) -> None:
     """Register all blueprints with the Flask app."""
+    from app.routes.google_errors import register_google_error_handlers
+
+    register_google_error_handlers(app)
     app.register_blueprint(auth_bp)
     app.register_blueprint(index_bp)  # Homepage routes
     app.register_blueprint(learn_bp)  # Learn mode routes

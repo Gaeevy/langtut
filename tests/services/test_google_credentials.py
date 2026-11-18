@@ -40,6 +40,7 @@ def service(google_oauth):
         client_id=google_oauth.client_id,
         client_secret=google_oauth.client_secret,
         token_uri=google_oauth.token_uri,
+        sheets_scopes=config.google_sheets_scopes,
         cache_size=2,
     )
 
@@ -49,7 +50,12 @@ def _add_google_user(service: GoogleCredentialsService, subject: str) -> int:
     db.session.add(user)
     db.session.flush()
     user_id = user.id
-    service.save_connection(user, Credentials(token=None, refresh_token=f"grant-{subject}"))
+    service.save_connection(
+        user,
+        Credentials(
+            token=None, refresh_token=f"grant-{subject}", scopes=config.google_sheets_scopes
+        ),
+    )
     return user_id
 
 
@@ -118,12 +124,17 @@ def test_new_grant_replaces_old_connection_and_cache(credentials_app, service, s
         service.save_connection(
             user,
             Credentials(
-                token=None, refresh_token="replacement-grant", granted_scopes=config.scopes
+                token=None,
+                refresh_token="replacement-grant",
+                granted_scopes=config.google_identity_scopes + config.google_sheets_scopes,
             ),
         )
 
         assert service.get_credentials(user_id).token == "access-for-replacement-grant"
-        assert GoogleSheetsConnection.query.one().granted_scopes == config.scopes
+        assert (
+            GoogleSheetsConnection.query.one().granted_scopes
+            == config.google_identity_scopes + config.google_sheets_scopes
+        )
         assert send_to_google.call_count == 2
 
 
@@ -133,7 +144,7 @@ def test_login_without_new_refresh_token_preserves_existing_connection(
     with credentials_app.app_context():
         user_id = _add_google_user(service, "one")
         user = db.session.get(User, user_id)
-        service.save_connection(user, Credentials(token=None))
+        service.save_connection(user, Credentials(token=None, scopes=config.google_sheets_scopes))
 
         assert service.get_credentials(user_id).token == "access-for-grant-one"
         send_to_google.assert_called_once()

@@ -17,7 +17,6 @@ from app.database import GoogleSheetsConnection, User, db
 logger = logging.getLogger(__name__)
 
 _REFRESH_BUFFER = timedelta(minutes=10)
-_SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets"
 
 
 class GoogleConnectionRequiredError(RuntimeError):
@@ -56,13 +55,20 @@ class GoogleCredentialsService:
     """Manage Google Sheets grants and an access-token cache for one process."""
 
     def __init__(
-        self, *, client_id: str, client_secret: str, token_uri: str, cache_size: int = 128
+        self,
+        *,
+        client_id: str,
+        client_secret: str,
+        token_uri: str,
+        sheets_scopes: list[str],
+        cache_size: int = 128,
     ) -> None:
         if cache_size < 1:
             raise ValueError("Google credential cache size must be positive")
         self._client_id = client_id
         self._client_secret = client_secret
         self._token_uri = token_uri
+        self._sheets_scopes = frozenset(sheets_scopes)
         self._cache_size = cache_size
         self._cache: OrderedDict[tuple[int, str], _AccessToken] = OrderedDict()
         self._cache_lock = Lock()
@@ -113,29 +119,34 @@ class GoogleCredentialsService:
             return token.credentials()
 
     def save_connection(self, user: User, credentials: Credentials) -> None:
-        """Store the grant from a verified Google login and cache its access token."""
+        """Store a grant after the connection callback verifies the Google account."""
         scopes = credentials.granted_scopes
-        if scopes is not None and _SHEETS_SCOPE not in scopes:
-            return
+        if scopes is None:
+            scopes = credentials.scopes
+        if scopes is None or not self._sheets_scopes.issubset(scopes):
+            raise GoogleConnectionRequiredError("Grant Google Sheets access to connect")
 
         user_id = user.id
         with self._user_locks[user_id % len(self._user_locks)]:
             try:
                 connection = self._find_connection(user_id)
-                if credentials.refresh_token:
-                    if connection is None:
-                        connection = GoogleSheetsConnection(
-                            user_id=user_id, google_user_id=user.google_user_id
+                if connection is None:
+                    if not credentials.refresh_token:
+                        raise GoogleConnectionRequiredError(
+                            "Google did not provide offline access. Try connecting again"
                         )
-                        db.session.add(connection)
+                    connection = GoogleSheetsConnection(
+                        user_id=user_id, google_user_id=user.google_user_id
+                    )
+                    db.session.add(connection)
+                if credentials.refresh_token:
                     connection.rotate_token(credentials.refresh_token)
-                    connection.granted_scopes = list(scopes) if scopes is not None else None
-                    db.session.commit()
-                    self._evict(user_id)
-                if connection is not None:
-                    token = _AccessToken.from_credentials(credentials)
-                    if token is not None and token.credentials().valid:
-                        self._cache_token((user_id, user.google_user_id), token)
+                connection.granted_scopes = list(scopes)
+                db.session.commit()
+                self._evict(user_id)
+                token = _AccessToken.from_credentials(credentials)
+                if token is not None and token.credentials().valid:
+                    self._cache_token((user_id, user.google_user_id), token)
             except (SQLAlchemyError, ValueError):
                 db.session.rollback()
                 raise GoogleCredentialsUnavailableError(

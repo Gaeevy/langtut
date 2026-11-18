@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}Connect Google Sheets{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <h2>Connect Google Sheets</h2>
+    <p>Connect your Google account to use vocabulary spreadsheets.</p>
+    {% if message %}<p role="alert">{{ message }}</p>{% endif %}
+    {% include "_connect_google_sheets.html" %}
+    <a class="btn btn-link mt-3" href="{{ url_for('verbs.index') }}">Practice irregular verbs</a>
+</div>
+{% endblock %}

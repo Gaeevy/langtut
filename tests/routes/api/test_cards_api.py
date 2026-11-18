@@ -13,10 +13,10 @@ def _patch_auth(monkeypatch, authenticated: bool, spreadsheet_id: str | None = "
     """Patch authentication and current user in one place."""
     monkeypatch.setattr(auth_manager, "is_authenticated", lambda: authenticated)
     if spreadsheet_id is None:
-        user = SimpleNamespace(get_active_spreadsheet=lambda: None)
+        user = SimpleNamespace(id=7, get_active_spreadsheet=lambda: None)
     else:
         user = SimpleNamespace(
-            get_active_spreadsheet=lambda: SimpleNamespace(spreadsheet_id=spreadsheet_id)
+            id=7, get_active_spreadsheet=lambda: SimpleNamespace(spreadsheet_id=spreadsheet_id)
         )
     monkeypatch.setattr(type(auth_manager), "user", property(lambda self: user))
 
