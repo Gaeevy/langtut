@@ -79,6 +79,10 @@ def _render_results_template(result, ended_early: bool = False):
 @auth_manager.require_auth
 def start(tab_name: str):
     """Start learning session."""
+    if SessionManager.get(SessionKeys.LEARNING_FINALIZED) and SessionManager.get(
+        SessionKeys.LEARNING_CARDS
+    ):
+        return redirect(url_for("index.home"))
     user = auth_manager.user
     spreadsheet_id = user.get_active_spreadsheet_id()
 

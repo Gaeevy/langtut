@@ -13,6 +13,7 @@ from flask import Flask, has_request_context
 from google.auth.exceptions import TransportError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import config
 from app.database import GoogleSheetsConnection, User, db
@@ -282,3 +283,26 @@ def test_concurrent_requests_share_one_refresh(credentials_app, service, send_to
         second = pool.submit(get_credentials, second_request)
         assert first.result(timeout=5) == second.result(timeout=5) == "shared-access"
     send_to_google.assert_called_once()
+
+
+def test_invalid_grant_cleanup_failure_cannot_fall_back_to_cached_token(
+    credentials_app, service, send_to_google, monkeypatch
+):
+    send_to_google.side_effect = [
+        _google_response("expiring-access", expires_in=540),
+        Mock(status=400, data=b'{"error":"invalid_grant"}'),
+        Mock(status=400, data=b'{"error":"invalid_grant"}'),
+    ]
+    with credentials_app.app_context():
+        user_id = _add_google_user(service, "one")
+        assert service.get_credentials(user_id).token == "expiring-access"
+        with monkeypatch.context() as patch_commit:
+            patch_commit.setattr(
+                db.session, "commit", Mock(side_effect=SQLAlchemyError("private-details"))
+            )
+            with pytest.raises(GoogleCredentialsUnavailableError, match="Could not remove invalid"):
+                service.get_credentials(user_id)
+        assert db.session.get(GoogleSheetsConnection, user_id) is not None
+        with pytest.raises(GoogleConnectionRequiredError):
+            service.get_credentials(user_id)
+        assert send_to_google.call_count == 3

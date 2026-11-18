@@ -104,6 +104,9 @@ and browser behavior.
    and all-device logout against the [lifecycle table](architecture.md#identity-sessions-and-sheets-access).
 6. Study using form and AJAX submissions, complete and end review early, and listen.
    Apply the [physical-device checklist](audio.md#manual-verification-checklist).
+7. Revoke a Sheets grant before saving study results. Reconnect, choose Resume on the
+   homepage, and verify the retained work saves. For a failed review choice, verify
+   the current card is shown again and the explicit resubmission saves it once.
 
 Local disconnect removes LangTut's grant and cache. To revoke issued tokens at
 Google, remove LangTut from [Google Account connections](https://myaccount.google.com/connections).

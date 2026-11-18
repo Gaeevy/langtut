@@ -18,6 +18,7 @@ from app.services.google_credentials import (
     GoogleConnectionRequiredError,
     GoogleCredentialsUnavailableError,
 )
+from app.services.google_oauth import GoogleAuthorizationError
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,8 @@ def oauth2callback():
 
     except (GoogleConnectionRequiredError, GoogleCredentialsUnavailableError):
         raise
+    except GoogleAuthorizationError as error:
+        return render_template("error.html", message=f"Google authorization failed. {error}"), 400
     except (TransportError, RequestException):
         return render_template(
             "error.html", message="Google is temporarily unavailable. Try again."

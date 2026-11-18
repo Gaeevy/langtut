@@ -2,6 +2,7 @@
 
 import json
 import re
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlencode, urlsplit
 
@@ -9,6 +10,8 @@ import pytest
 from cryptography.fernet import Fernet
 from google.auth.exceptions import RefreshError
 from google.oauth2.credentials import Credentials
+from gspread.exceptions import APIError
+from requests import Response
 from requests.exceptions import ConnectionError
 
 from app import create_app
@@ -437,6 +440,8 @@ def test_failed_connection_preserves_login_and_existing_grant(
         response = client.get(callback)
 
         assert response.status_code == expected_status
+        if failure == "wrong-account":
+            assert b"Choose the same Google account" in response.data
         assert auth_manager.is_authenticated()
         assert auth_manager.user.google_sheets_connection.get_decrypted_token() == "refresh-token"
         assert b"private-provider-details" not in response.data
@@ -503,7 +508,9 @@ def test_expired_and_parallel_oauth_transactions(
         assert auth_manager.user.google_sheets_connection is not None
         expired_state = _start_connection(client)["state"][0]
         clock.return_value += 600
-        assert client.get(_callback_url(expired_state)).status_code == 400
+        expired = client.get(_callback_url(expired_state))
+        assert expired.status_code == 400
+        assert b"expired or was already used" in expired.data
         assert auth_manager.is_authenticated()
 
 
@@ -516,7 +523,9 @@ def test_connection_attempt_cannot_follow_browser_account_change(
         verify_token.return_value = {"sub": "different-user"}
         _sign_in(client)
         before = google_token_request.call_count
-        assert client.get(_callback_url(connect_state)).status_code == 400
+        changed = client.get(_callback_url(connect_state))
+        assert changed.status_code == 400
+        assert b"Your sign-in changed" in changed.data
         assert google_token_request.call_count == before
         assert auth_manager.user.google_user_id == "different-user"
         assert GoogleSheetsConnection.query.count() == 0
@@ -551,3 +560,98 @@ def test_sheets_routes_report_connection_required_without_google_calls(
         assert client.get("/api/verbs/tenses").status_code == 200
         refresh.assert_not_called()
     google_token_request.assert_not_called()
+
+
+@pytest.mark.parametrize("session_kind", ["learn", "learn-early", "review"])
+def test_failed_save_reconnect_resume_and_explicit_save(
+    auth_app, google_token_request, verify_token, monkeypatch, session_kind
+):
+    level = "3" if session_kind == "review" else "0"
+    rows = [
+        ["id", "word", "translation", "equivalent", "example"],
+        ["1", "olá", "hello", "", "Olá, como vai?", "", "0", "0", level, ""],
+    ]
+    worksheet = SimpleNamespace(
+        title="Words", id=42, get_all_values=Mock(return_value=rows), batch_update=Mock()
+    )
+    spreadsheet = SimpleNamespace(worksheets=lambda: [worksheet], worksheet=lambda name: worksheet)
+    monkeypatch.setattr(
+        "app.gsheet.gspread.authorize",
+        lambda credentials: SimpleNamespace(open_by_key=lambda sheet_id: spreadsheet),
+    )
+    client = auth_app.test_client()
+    _sign_in(client)
+    _connect(client)
+    with auth_app.app_context():
+        User.query.one().add_spreadsheet("synthetic-sheet")
+
+    if session_kind == "review":
+        assert client.get("/review/start/Words").location == "/review/card"
+        save_path, method = "/review/answer/forgotten", "POST"
+    else:
+        assert client.post("/learn/start/Words").location == "/learn/card"
+        with client.session_transaction() as session:
+            tasks = session[sk.LEARNING_TASK_QUEUE.value]
+        if session_kind == "learn-early":
+            tasks = tasks[:1]
+        answers = {
+            "pick_translation": "hello",
+            "pick_one": "olá",
+            "build_sentence": "Olá, como vai?",
+        }
+        for task in tasks:
+            answer = client.post("/learn/answer", json={"user_answer": answers[task["mode"]]})
+            assert answer.get_json()["correct"] is True
+            client.get("/learn/next_card")
+        save_path, method = (
+            ("/learn/end" if session_kind == "learn-early" else "/learn/results"),
+            "GET",
+        )
+
+    rejected = Response()
+    rejected.status_code = 401
+    rejected._content = b'{"error":{"code":401,"message":"rejected","status":"UNAUTHENTICATED"}}'
+    worksheet.get_all_values.side_effect = APIError(rejected)
+    with patch.object(
+        Credentials, "refresh", side_effect=RefreshError("revoked", {"error": "invalid_grant"})
+    ):
+        failed = client.open(save_path, method=method)
+    assert failed.status_code == 403
+    assert b"Resume unfinished" in failed.data
+    worksheet.batch_update.assert_not_called()
+    with client.session_transaction() as session:
+        cards_key = sk.REVIEW_CARDS if session_kind == "review" else sk.LEARNING_CARDS
+        retained_cards = session[cards_key.value]
+
+    if session_kind == "review":
+        assert client.get("/review/start/Another").location == "/review/flip"
+    else:
+        assert client.post("/learn/start/Another").location == "/"
+    with client.session_transaction() as session:
+        assert session[cards_key.value] == retained_cards
+
+    worksheet.get_all_values.side_effect = None
+    _connect(client)
+    worksheet.batch_update.assert_not_called()
+    homepage = client.get("/")
+    resume = re.search(
+        rb'href="([^"]+)">Resume unfinished (?:learning|review) session', homepage.data
+    )[1].decode()
+    if session_kind == "review":
+        assert resume == "/review/flip"
+        assert client.get(resume).status_code == 200
+        worksheet.batch_update.assert_not_called()
+        assert client.post(save_path).location == "/"
+    else:
+        assert resume == save_path
+        assert client.get(resume).status_code == 200
+
+    worksheet.batch_update.assert_called_once()
+    updates = {cell["range"]: cell["values"] for cell in worksheet.batch_update.call_args.args[0]}
+    if session_kind == "review":
+        assert updates["I2"] == [[2]]
+    else:
+        assert updates["G2"] == [[1]]
+        assert updates["H2"] == [[0 if session_kind == "learn-early" else 1]]
+    with client.session_transaction() as session:
+        assert cards_key.value not in session

@@ -52,6 +52,12 @@ progress at completion or early exit. Review saves its stack after the final car
 saves reviewed cards on early exit. Failed writes retain state for retry. Accepted
 answers become durable at these save points. Irregular verbs use SQLite independently.
 
+After reconnecting Sheets, the homepage offers **Resume unfinished session** actions
+from retained study state. Pending learning saves can be retried from there. Review
+resumes on the current card so a choice that failed to save can be submitted again.
+Reconnection itself performs no study save. Starting another session preserves work
+awaiting a save.
+
 Both form submission and AJAX are supported. AJAX renders feedback in the current
 page so playback can use the submit gesture. [Audio](audio.md) owns browser playback,
 cache behavior, and the physical-device checklist.
@@ -74,6 +80,9 @@ The session holds up to eight pending transactions keyed by OAuth state. Each re
 its purpose, redirect URI, PKCE verifier, and ten-minute expiry. A callback consumes its
 own transaction. Login rotates the session ID and creates a seven-day, fixed-expiry login.
 Guards check the local user, Google subject, expiry, and session version.
+Separate tabs can complete their attempts sequentially. Concurrent writes to the
+filesystem session can overwrite each other's transaction maps; that storage provides
+no atomic callback consumption.
 
 | Action | LangTut login | Sheets connection |
 |---|---|---|
@@ -94,6 +103,9 @@ the user's active spreadsheet. Settings validation checks Google access before l
 new spreadsheets. A Google 401 triggers one forced refresh and retry. A temporary
 proactive refresh failure can retain a still-valid token. Forced refresh evicts the
 rejected token first. Google file-permission 403 responses retain the connection.
+Some existing Sheets helpers still return empty results after missing worksheets,
+permission errors, or API outages. Consistent contracts for those failures remain
+a separate Sheets cleanup.
 
 ## HTTP and MCP boundaries
 

@@ -12,6 +12,10 @@ from google_auth_oauthlib.flow import Flow
 from pydantic import BaseModel, Field, SecretStr
 
 
+class GoogleAuthorizationError(ValueError):
+    """An expected browser-authorization failure with a safe public message."""
+
+
 class GoogleIdentity(BaseModel):
     google_user_id: str = Field(min_length=1)
     email: str = ""
@@ -166,8 +170,9 @@ class GoogleOAuthService:
             code_verifier=transaction.code_verifier,
         )
 
-        # OAuthlib rejects changed scopes before application code can handle partial consent.
-        # Read the granted scope through its documented response hook, then validate it below.
+        # Let partial/extra consent reach the application's required-scope validation.
+        # Adjust OAuthlib's expected scopes for this response through its response hook.
+        # An omitted scope field retains the requested scopes.
         def accept_returned_scopes(response):
             payload = json.loads(response.text)
             if "scope" in payload:

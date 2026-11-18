@@ -11,7 +11,12 @@ from app.database import User, db
 from app.services.google_credentials import (
     GoogleCredentialsService,
 )
-from app.services.google_oauth import GoogleOAuthPurpose, GoogleOAuthService, GoogleOAuthTransaction
+from app.services.google_oauth import (
+    GoogleAuthorizationError,
+    GoogleOAuthPurpose,
+    GoogleOAuthService,
+    GoogleOAuthTransaction,
+)
 from app.services.users import invalidate_user_sessions, login_or_create_user
 from app.session_manager import SessionKeys as sk
 from app.session_manager import SessionManager as sm
@@ -19,6 +24,8 @@ from app.session_manager import SessionManager as sm
 logger = logging.getLogger(__name__)
 
 _LOGIN_LIFETIME_SECONDS = 7 * 24 * 60 * 60
+_OAUTH_TRANSACTION_LIFETIME_SECONDS = 10 * 60
+_MAX_PENDING_TRANSACTIONS = 8
 
 
 class AuthManager:
@@ -37,7 +44,7 @@ class AuthManager:
     def initiate_login(self, redirect_uri: str) -> str:
         """Start Google login and store the pending transaction in the browser session."""
         url, transaction = self._google_oauth.start_login(
-            redirect_uri, expires_at=int(time()) + 600
+            redirect_uri, expires_at=int(time()) + _OAUTH_TRANSACTION_LIFETIME_SECONDS
         )
         self._store_transaction(transaction)
         return url
@@ -46,10 +53,10 @@ class AuthManager:
         """Bind a Sheets consent attempt to the signed-in local user."""
         user = self.user
         if user is None:
-            raise ValueError("Sign in before connecting Google Sheets")
+            raise GoogleAuthorizationError("Sign in before connecting Google Sheets.")
         url, transaction = self._google_oauth.start_connection(
             redirect_uri,
-            expires_at=int(time()) + 600,
+            expires_at=int(time()) + _OAUTH_TRANSACTION_LIFETIME_SECONDS,
             user_id=user.id,
             session_version=user.session_version,
             login_hint=user.email or "",
@@ -66,44 +73,63 @@ class AuthManager:
 
     def _store_transaction(self, transaction: GoogleOAuthTransaction) -> None:
         pending = self._pending_transactions()
-        # Keep the transaction collection bounded while allowing parallel browser tabs.
-        pending = dict(list(pending.items())[-7:])
+        # Retain attempts across tabs completed sequentially; session writes are not atomic.
+        pending = dict(list(pending.items())[-(_MAX_PENDING_TRANSACTIONS - 1) :])
         pending[transaction.state] = transaction.model_dump(mode="json")
         sm.set(sk.AUTH_TRANSACTIONS, pending)
 
     def handle_callback(self, authorization_response: str) -> GoogleOAuthPurpose:
-        """Consume one OAuth transaction and complete its sign-in or connection action."""
+        """Consume the browser transaction and finish its sign-in or connection action."""
+        transaction = self._consume_transaction(authorization_response)
+        if transaction.purpose == GoogleOAuthPurpose.CONNECT_SHEETS:
+            self._complete_connection(authorization_response, transaction)
+        else:
+            identity, _ = self._google_oauth.complete_authorization(
+                authorization_response, transaction
+            )
+            self._establish_login(login_or_create_user(identity))
+        return transaction.purpose
+
+    def _consume_transaction(self, authorization_response: str) -> GoogleOAuthTransaction:
         states = parse_qs(urlsplit(authorization_response).query, keep_blank_values=True).get(
             "state", []
         )
         if len(states) != 1 or not states[0]:
-            raise ValueError("Google callback must include one state")
+            raise GoogleAuthorizationError(
+                "The Google callback is incomplete. Start authorization again."
+            )
         pending = self._pending_transactions()
         value = pending.pop(states[0], None)
         sm.set(sk.AUTH_TRANSACTIONS, pending)
         if value is None:
-            raise ValueError("Google authorization expired. Start again")
-        transaction = GoogleOAuthTransaction.model_validate(value)
+            raise GoogleAuthorizationError(
+                "This authorization attempt expired or was already used. Start again."
+            )
+        return GoogleOAuthTransaction.model_validate(value)
 
-        if transaction.purpose == GoogleOAuthPurpose.CONNECT_SHEETS:
-            user = self.user
-            if (
-                user is None
-                or user.id != transaction.user_id
-                or user.session_version != transaction.session_version
-            ):
-                raise ValueError("Sign in to the initiating account before connecting Sheets")
-
+    def _complete_connection(
+        self, authorization_response: str, transaction: GoogleOAuthTransaction
+    ) -> None:
+        user = self.user
+        if (
+            user is None
+            or user.id != transaction.user_id
+            or user.session_version != transaction.session_version
+        ):
+            raise GoogleAuthorizationError(
+                "Your sign-in changed. Start Connect Google Sheets again from the intended account."
+            )
         identity, credentials = self._google_oauth.complete_authorization(
             authorization_response, transaction
         )
-        if transaction.purpose == GoogleOAuthPurpose.CONNECT_SHEETS:
-            if identity.google_user_id != user.google_user_id:
-                raise ValueError("Choose the Google account used to sign in")
-            self._google_credentials.save_connection(user, credentials)
-            return transaction.purpose
+        if identity.google_user_id != user.google_user_id:
+            raise GoogleAuthorizationError(
+                "Choose the same Google account you used to sign in to LangTut."
+            )
+        self._google_credentials.save_connection(user, credentials)
 
-        user = login_or_create_user(identity)
+    def _establish_login(self, user: User) -> None:
+        pending = self._pending_transactions()
         sm.clear()
         sm.set(sk.AUTH_TRANSACTIONS, pending)
         sm.set(sk.USER_ID, user.id)
@@ -111,7 +137,6 @@ class AuthManager:
         sm.set(sk.LOGIN_EXPIRES_AT, int(time()) + _LOGIN_LIFETIME_SECONDS)
         sm.set(sk.SESSION_VERSION, user.session_version)
         sm.regenerate_id()
-        return transaction.purpose
 
     @property
     def user(self) -> User | None:

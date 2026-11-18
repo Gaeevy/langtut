@@ -22,6 +22,8 @@ review_bp = Blueprint("review", __name__, url_prefix="/review")
 @auth_manager.require_auth
 def start(tab_name: str):
     """Start a review session with ALL cards from the specified tab."""
+    if SessionManager.get(SessionKeys.REVIEW_CARDS):
+        return redirect(url_for("review.flip"))
     user = auth_manager.user
     spreadsheet_id = user.get_active_spreadsheet_id()
 

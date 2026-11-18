@@ -17,6 +17,7 @@ from app.database import GoogleSheetsConnection, User, db
 logger = logging.getLogger(__name__)
 
 _REFRESH_BUFFER = timedelta(minutes=10)
+_REFRESH_LOCK_SLOTS = 32
 
 
 class GoogleConnectionRequiredError(RuntimeError):
@@ -72,8 +73,8 @@ class GoogleCredentialsService:
         self._cache_size = cache_size
         self._cache: OrderedDict[tuple[int, str], _AccessToken] = OrderedDict()
         self._cache_lock = Lock()
-        # A fixed set of locks keeps memory bounded as users come and go.
-        self._user_locks = tuple(Lock() for _ in range(32))
+        # Fixed slots bound memory. Users sharing a slot wait for each other.
+        self._user_locks = tuple(Lock() for _ in range(_REFRESH_LOCK_SLOTS))
 
     def get_credentials(self, user_id: int, *, force_refresh: bool = False) -> Credentials:
         """Return access credentials for the user's active Google Sheets grant.
@@ -82,29 +83,30 @@ class GoogleCredentialsService:
             GoogleConnectionRequiredError: There is no usable Sheets grant.
             GoogleCredentialsUnavailableError: Refresh failed without a confirmed revocation.
         """
-        with self._user_locks[user_id % len(self._user_locks)]:
-            cached = None
+        with self._lock_for_user(user_id):
             if force_refresh:
                 self._evict(user_id)
             try:
                 connection = self._find_connection(user_id)
-                if connection is None:
-                    self._evict(user_id)
-                    raise GoogleConnectionRequiredError("Connect Google Sheets to continue")
-                key = (user_id, connection.google_user_id)
-                if not force_refresh:
-                    cached = self._get_cached(key)
-                    if cached is not None and not cached.needs_refresh():
-                        return cached.credentials()
+            except SQLAlchemyError:
+                db.session.rollback()
+                raise GoogleCredentialsUnavailableError(
+                    "Google credentials are unavailable"
+                ) from None
+            if connection is None:
+                self._evict(user_id)
+                raise GoogleConnectionRequiredError("Connect Google Sheets to continue")
 
-                try:
-                    token = self._refresh(connection)
-                except GoogleConnectionRequiredError:
-                    cached = None
-                    self._evict(user_id)
-                    db.session.delete(connection)
-                    db.session.commit()
-                    raise
+            key = (user_id, connection.google_user_id)
+            cached = None if force_refresh else self._get_cached(key)
+            if cached is not None and not cached.needs_refresh():
+                return cached.credentials()
+
+            try:
+                token = self._refresh(connection)
+            except GoogleConnectionRequiredError:
+                self._discard_connection(connection)
+                raise
             except (GoogleCredentialsUnavailableError, SQLAlchemyError) as exc:
                 if isinstance(exc, SQLAlchemyError):
                     db.session.rollback()
@@ -118,6 +120,20 @@ class GoogleCredentialsService:
             self._cache_token(key, token)
             return token.credentials()
 
+    def _lock_for_user(self, user_id: int) -> Lock:
+        return self._user_locks[user_id % _REFRESH_LOCK_SLOTS]
+
+    def _discard_connection(self, connection: GoogleSheetsConnection) -> None:
+        self._evict(connection.user_id)
+        try:
+            db.session.delete(connection)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            raise GoogleCredentialsUnavailableError(
+                "Could not remove invalid Google credentials"
+            ) from None
+
     def save_connection(self, user: User, credentials: Credentials) -> None:
         """Store a grant after the connection callback verifies the Google account."""
         scopes = credentials.granted_scopes
@@ -127,7 +143,7 @@ class GoogleCredentialsService:
             raise GoogleConnectionRequiredError("Grant Google Sheets access to connect")
 
         user_id = user.id
-        with self._user_locks[user_id % len(self._user_locks)]:
+        with self._lock_for_user(user_id):
             try:
                 connection = self._find_connection(user_id)
                 if connection is None:
@@ -155,7 +171,7 @@ class GoogleCredentialsService:
 
     def disconnect(self, user_id: int) -> None:
         """Remove LangTut's local Sheets grant and invalidate its cached access token."""
-        with self._user_locks[user_id % len(self._user_locks)]:
+        with self._lock_for_user(user_id):
             try:
                 GoogleSheetsConnection.query.filter_by(user_id=user_id).delete()
                 db.session.commit()
