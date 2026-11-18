@@ -78,7 +78,7 @@ jobs:
             --env LANGTUT_SECRET_KEY --env LANGTUT_TTS_ENABLED \
             --env LANGTUT_CLIENT_SECRETS_JSON langtut-ci
           address=$(docker port langtut-ci 8080/tcp)
-          status=$(curl --silent --show-error --fail --retry 15 --retry-connrefused \
+          status=$(curl --silent --show-error --fail --retry 15 --retry-all-errors \
             --retry-delay 1 --max-time 5 --output /dev/null --write-out '%{http_code}' \
             --header 'Host: healthcheck.railway.app' "http://$address/")
           if [ "$status" != 200 ]; then
