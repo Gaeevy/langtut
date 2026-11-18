@@ -117,6 +117,8 @@ ignore = [
 [tool.ruff.lint.isort]
 # Group imports properly
 known-first-party = ["src"]
+# The local Flask-Session data directory has the same name as the dependency.
+known-third-party = ["flask_session"]
 force-single-line = false
 split-on-trailing-comma = true
 
